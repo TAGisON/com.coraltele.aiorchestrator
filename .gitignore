@@ -1,0 +1,48 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets/
+
+# Java / Maven / Gradle
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.gradle/
+build/
+*.class
+*.jar
+*.war
+hs_err_pid*
+
+# Python
+__pycache__/
+.venv/
+venv/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.npm/
+
+# IDE
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
