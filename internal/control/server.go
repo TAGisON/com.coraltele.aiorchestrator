@@ -15,6 +15,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -94,6 +95,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}", s.handleGetSession)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
+	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
 	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
@@ -309,6 +311,12 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		state = updated.State
+		obs := &observe.Observer{Repo: s.repo, Meta: observe.SessionMeta{
+			SessionID: sess.ID, TenantID: sess.TenantID,
+			ProfileID: sess.ProfileID, ProfileVersion: sess.ProfileVersion,
+			Clock: sess.Clock, RecordingRef: sess.RecordingRef,
+		}}
+		obs.OnSessionStarted(r.Context())
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"session_id":               sess.ID,
@@ -420,11 +428,33 @@ func (s *Server) handleStopSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "stop failed", nil)
 		return
 	}
+	s.onSessionTerminal(r.Context(), sess, terminal)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"session_id": sess.ID,
 		"state":      sess.State,
 		"reason":     req.Reason,
 	})
+}
+
+func (s *Server) onSessionTerminal(ctx context.Context, sess store.Session, terminal string) {
+	doc := profile.Document{}
+	if pv, err := s.repo.GetVersion(ctx, sess.ProfileID, sess.ProfileVersion); err == nil {
+		if parsed, err := profile.Parse(pv.Document); err == nil {
+			doc = parsed
+		}
+	}
+	audits, _ := s.repo.ListAuditEvents(ctx, sess.ID)
+	handoff := DetectHandoffFromAudit(audits)
+	obs := &observe.Observer{Repo: s.repo, Meta: observe.SessionMeta{
+		SessionID: sess.ID, TenantID: sess.TenantID,
+		ProfileID: sess.ProfileID, ProfileVersion: sess.ProfileVersion,
+		Clock: sess.Clock, RecordingRef: sess.RecordingRef,
+	}}
+	obs.OnSessionTerminal(ctx, terminal, handoff,
+		analyticsEmitSet(doc, "contained"),
+		analyticsEmitSet(doc, "handoff"),
+	)
+	s.enqueuePostcall(ctx, sess)
 }
 
 // EdgeTokenSecret returns the HMAC key used for edge tokens (for MountEdge).

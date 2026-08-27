@@ -12,6 +12,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/thinkpath"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
@@ -75,6 +76,10 @@ type Talk struct {
 
 	Sink *SinkBuffer
 	Path *thinkpath.Path
+	// Obs is optional best-effort audit/analytics (Phase E). Nil is fine.
+	Obs *observe.Observer
+	// ProfileVersion pinned at session create (for turn payload / Obs meta).
+	ProfileVersion int
 
 	mu           sync.Mutex
 	state        TurnState
@@ -194,23 +199,80 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Unlock()
 	defer cancel()
 
+	started := time.Now()
 	res, err := t.Path.Run(thinkCtx, userText)
 	if err != nil {
 		t.setState(Listening)
+		t.emitTurn(ctx, userText, "", res, false, "error", started)
 		return err
 	}
 	if res.BlockedThink || res.Action == "refuse" || res.Action == "escalate" || res.Action == "block_think" {
 		// still may speak refuse/escalate message
 		if res.ResponseText == "" {
 			t.setState(Listening)
+			t.emitTurn(ctx, userText, "", res, false, res.Action, started)
 			return nil
 		}
 	}
 	if res.ResponseText == "" {
 		t.setState(Listening)
+		t.emitTurn(ctx, userText, "", res, false, res.Action, started)
 		return nil
 	}
-	return t.speak(ctx, res.ResponseText)
+	err = t.speak(ctx, res.ResponseText)
+	barge := t.LastBargeIn()
+	outcome := res.Action
+	if outcome == "" {
+		outcome = "allow"
+	}
+	if barge {
+		outcome = "barge_in"
+	}
+	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
+	return err
+}
+
+func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thinkpath.Result, barge bool, outcome string, started time.Time) {
+	listenGW, thinkGW, speakGW := "", "", ""
+	if len(t.Doc.Routers.Listen.Providers) > 0 {
+		listenGW = t.Doc.Routers.Listen.Providers[0]
+	}
+	if len(t.Doc.Routers.Think.Providers) > 0 {
+		thinkGW = t.Doc.Routers.Think.Providers[0]
+	}
+	if len(t.Doc.Routers.Speak.Providers) > 0 {
+		speakGW = t.Doc.Routers.Speak.Providers[0]
+	}
+	if t.Obs != nil {
+		t.Obs.OnTurnCompleted(ctx, observe.TurnCompleted{
+			UserText:      userText,
+			ResponseText:  response,
+			BargeIn:       barge,
+			SkillName:     res.SkillName,
+			SkillOK:       res.SkillOK,
+			KnowledgeHit:  res.KnowledgeHit,
+			GroundingReq:  t.Doc.Grounding.Required,
+			ListenGateway: listenGW,
+			ThinkGateway:  thinkGW,
+			SpeakGateway:  speakGW,
+			Outcome:       outcome,
+			LatencyMs:     time.Since(started).Milliseconds(),
+		})
+	}
+	if t.Bus != nil {
+		t.Bus.PublishEvent(bus.Event{Kind: "turn.completed", Data: map[string]any{
+			"outcome":    outcome,
+			"skill_name": res.SkillName,
+			"skill_ok":   res.SkillOK,
+			"barge_in":   barge,
+		}})
+		if res.SkillName != "" {
+			t.Bus.PublishEvent(bus.Event{Kind: "skill.completed", Data: map[string]any{
+				"name": res.SkillName,
+				"ok":   res.SkillOK,
+			}})
+		}
+	}
 }
 
 func (t *Talk) speak(ctx context.Context, text string) error {
@@ -309,6 +371,9 @@ func (t *Talk) bargeIn() {
 	if t.Bus != nil {
 		t.Bus.PublishEvent(bus.Event{Kind: "barge_in"})
 		t.Bus.PublishEvent(bus.Event{Kind: "turn", Data: string(Capturing)})
+	}
+	if t.Obs != nil {
+		t.Obs.OnBargeIn(context.Background())
 	}
 }
 

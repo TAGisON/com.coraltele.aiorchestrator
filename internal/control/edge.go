@@ -15,6 +15,8 @@ import (
 type EdgeBinder struct {
 	Repo store.Repository
 	Mgr  *session.Manager
+	// OnTerminal runs after durable Cancelled from feeder-gone (same hook as stop API).
+	OnTerminal func(ctx context.Context, sess store.Session, terminal string)
 }
 
 func (b *EdgeBinder) BindEdge(claims token.Claims, peerRate port.SampleRateHz) (port.SampleRateHz, int, func(), error) {
@@ -29,9 +31,17 @@ func (b *EdgeBinder) BindEdge(claims token.Claims, peerRate port.SampleRateHz) (
 		return 0, 0, nil, fmt.Errorf("tenant mismatch")
 	}
 	onGone := func() {
-		_, _ = b.Mgr.Stop(context.Background(), claims.SessionID, "feeder_gone")
-		if b.Repo != nil {
-			_, _ = b.Repo.UpdateSessionState(context.Background(), claims.SessionID, store.StateCancelled)
+		ctx := context.Background()
+		_, _ = b.Mgr.Stop(ctx, claims.SessionID, "feeder_gone")
+		if b.Repo == nil {
+			return
+		}
+		sess, err := b.Repo.UpdateSessionState(ctx, claims.SessionID, store.StateCancelled)
+		if err != nil {
+			return
+		}
+		if b.OnTerminal != nil {
+			b.OnTerminal(ctx, sess, store.StateCancelled)
 		}
 	}
 	return a.SampleRate, a.FrameMs, onGone, nil
@@ -51,12 +61,16 @@ func (b *EdgeBinder) AttachConn(sessionID string, conn *modaudiostream.Conn) err
 	return nil
 }
 
+// NewEdgeBinder returns an EdgeBinder that routes feeder-gone Terminal through onSessionTerminal.
+func (s *Server) NewEdgeBinder(mgr *session.Manager) *EdgeBinder {
+	return &EdgeBinder{Repo: s.repo, Mgr: mgr, OnTerminal: s.onSessionTerminal}
+}
+
 // MountEdge registers GET /edge/fs on the control mux (Bearer auth skipped for /edge/).
 func (s *Server) MountEdge(secret []byte, mgr *session.Manager) {
 	if len(secret) == 0 || mgr == nil {
 		return
 	}
-	binder := &EdgeBinder{Repo: s.repo, Mgr: mgr}
-	h := modaudiostream.NewHandler(secret, binder)
+	h := modaudiostream.NewHandler(secret, s.NewEdgeBinder(mgr))
 	s.mux.Handle("GET /edge/fs", h)
 }

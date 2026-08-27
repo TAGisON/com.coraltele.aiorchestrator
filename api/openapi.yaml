@@ -167,6 +167,42 @@ paths:
                     type: string
                   reason:
                     type: string
+  /v1/sessions/{id}/events:
+    get:
+      summary: SSE event stream for a session
+      description: |
+        Content-Type: text/event-stream.
+
+        Locked SSE event catalog (CONTROL_API.md §3):
+        - caption — Listen partial/final text
+        - session.state — lifecycle state changes
+        - skill.completed — skill execute outcome
+        - turn.completed — Talk turn durable completion
+        - error — session/composer errors
+
+        Bus mapping: state→session.state; turn.completed→turn.completed;
+        skill.completed→skill.completed; error→error; text tap→caption.
+        Backpressure drops partial captions first.
+      operationId: sessionEvents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /v1/jobs/playback:
     post:
       summary: Enqueue file playback job

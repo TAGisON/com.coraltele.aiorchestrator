@@ -28,4 +28,14 @@ type Repository interface {
 	GetPlaybackJob(ctx context.Context, id string) (PlaybackJob, error)
 	UpdatePlaybackJob(ctx context.Context, job PlaybackJob) error
 	LeaseNextPlaybackJob(ctx context.Context, owner string) (PlaybackJob, error)
+
+	AppendAuditEvent(ctx context.Context, ev AuditEvent) (AuditEvent, error)
+	ListAuditEvents(ctx context.Context, sessionID string) ([]AuditEvent, error)
+	AppendAnalyticsEvent(ctx context.Context, ev AnalyticsEvent) (AnalyticsEvent, error)
+	ListAnalyticsEvents(ctx context.Context, sessionID string) ([]AnalyticsEvent, error)
+
+	CreatePostcallJob(ctx context.Context, job PostcallJob) error
+	GetPostcallJob(ctx context.Context, id string) (PostcallJob, error)
+	UpdatePostcallJob(ctx context.Context, job PostcallJob) error
+	LeaseNextPostcallJob(ctx context.Context, owner string) (PostcallJob, error)
 }

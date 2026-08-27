@@ -48,6 +48,17 @@ type Document struct {
 	Rules []Rule `json:"rules"`
 	// Playbook is an optional FSM for playbook-grounded profiles.
 	Playbook *Playbook `json:"playbook"`
+	Templates struct {
+		Disposition *struct {
+			ID string `json:"id"`
+		} `json:"disposition"`
+		MoM *struct {
+			ID string `json:"id"`
+		} `json:"mom"`
+	} `json:"templates"`
+	Analytics struct {
+		Emit []string `json:"emit"`
+	} `json:"analytics"`
 }
 
 type RouterProviders struct {

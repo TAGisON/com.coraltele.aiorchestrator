@@ -10,14 +10,19 @@ import (
 
 // Memory is an in-process Repository for tests without Postgres.
 type Memory struct {
-	mu        sync.Mutex
-	profiles  map[string]Profile
-	versions  map[string][]ProfileVersion
-	sessions  map[string]Session
-	kbDocs    map[string]KBDocument
-	kbChunks  map[string][]KBChunk // document_id → chunks
-	playJobs  map[string]PlaybackJob
-	healthy   bool
+	mu         sync.Mutex
+	profiles   map[string]Profile
+	versions   map[string][]ProfileVersion
+	sessions   map[string]Session
+	kbDocs     map[string]KBDocument
+	kbChunks   map[string][]KBChunk // document_id → chunks
+	playJobs   map[string]PlaybackJob
+	auditSeq   int64
+	audits     []AuditEvent
+	analyticsSeq int64
+	analytics  []AnalyticsEvent
+	postJobs   map[string]PostcallJob
+	healthy    bool
 }
 
 func NewMemory() *Memory {
@@ -28,6 +33,7 @@ func NewMemory() *Memory {
 		kbDocs:   make(map[string]KBDocument),
 		kbChunks: make(map[string][]KBChunk),
 		playJobs: make(map[string]PlaybackJob),
+		postJobs: make(map[string]PostcallJob),
 		healthy:  true,
 	}
 }
@@ -263,4 +269,111 @@ func (m *Memory) LeaseNextPlaybackJob(ctx context.Context, owner string) (Playba
 		}
 	}
 	return PlaybackJob{}, ErrNotFound
+}
+
+func (m *Memory) AppendAuditEvent(ctx context.Context, ev AuditEvent) (AuditEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.auditSeq++
+	ev.ID = m.auditSeq
+	ev.CreatedAt = time.Now().UTC()
+	if len(ev.Payload) > 0 {
+		ev.Payload = append(json.RawMessage(nil), ev.Payload...)
+	}
+	m.audits = append(m.audits, ev)
+	return ev, nil
+}
+
+func (m *Memory) ListAuditEvents(ctx context.Context, sessionID string) ([]AuditEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []AuditEvent
+	for _, ev := range m.audits {
+		if ev.SessionID == sessionID {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) AppendAnalyticsEvent(ctx context.Context, ev AnalyticsEvent) (AnalyticsEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.analyticsSeq++
+	ev.ID = m.analyticsSeq
+	if ev.Value == 0 {
+		ev.Value = 1
+	}
+	ev.CreatedAt = time.Now().UTC()
+	if len(ev.Dimensions) > 0 {
+		ev.Dimensions = append(json.RawMessage(nil), ev.Dimensions...)
+	}
+	m.analytics = append(m.analytics, ev)
+	return ev, nil
+}
+
+func (m *Memory) ListAnalyticsEvents(ctx context.Context, sessionID string) ([]AnalyticsEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []AnalyticsEvent
+	for _, ev := range m.analytics {
+		if ev.SessionID == sessionID {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) CreatePostcallJob(ctx context.Context, job PostcallJob) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, j := range m.postJobs {
+		if j.SessionID == job.SessionID && (j.State == JobQueued || j.State == JobRunning) {
+			return ErrConflict
+		}
+	}
+	if _, ok := m.postJobs[job.ID]; ok {
+		return ErrConflict
+	}
+	now := time.Now().UTC()
+	job.CreatedAt = now
+	job.UpdatedAt = now
+	m.postJobs[job.ID] = job
+	return nil
+}
+
+func (m *Memory) GetPostcallJob(ctx context.Context, id string) (PostcallJob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	j, ok := m.postJobs[id]
+	if !ok {
+		return PostcallJob{}, ErrNotFound
+	}
+	return j, nil
+}
+
+func (m *Memory) UpdatePostcallJob(ctx context.Context, job PostcallJob) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.postJobs[job.ID]; !ok {
+		return ErrNotFound
+	}
+	job.UpdatedAt = time.Now().UTC()
+	m.postJobs[job.ID] = job
+	return nil
+}
+
+func (m *Memory) LeaseNextPostcallJob(ctx context.Context, owner string) (PostcallJob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, j := range m.postJobs {
+		if j.State == JobQueued {
+			j.State = JobRunning
+			j.LeaseOwner = owner
+			j.UpdatedAt = time.Now().UTC()
+			m.postJobs[id] = j
+			return j, nil
+		}
+	}
+	return PostcallJob{}, ErrNotFound
 }

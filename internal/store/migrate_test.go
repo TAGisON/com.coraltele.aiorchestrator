@@ -26,6 +26,17 @@ func TestMigrationSQL_HasPhaseBTables(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasPhaseEAnalytics(t *testing.T) {
+	body, err := os.ReadFile("migrations/003_phase_e_analytics.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS analytics_event") {
+		t.Fatal("migration missing analytics_event")
+	}
+}
+
 func TestMigrationSQL_HasPhaseDKBTables(t *testing.T) {
 	body, err := os.ReadFile("migrations/002_phase_d_kb.sql")
 	if err != nil {

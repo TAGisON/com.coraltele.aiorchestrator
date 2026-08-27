@@ -73,6 +73,7 @@ func main() {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	_ = srv.StartPlaybackWorker(workerCtx, mgr)
+	_ = srv.StartPostcallWorker(workerCtx)
 
 	addr := envOr("HTTP_ADDR", ":8080")
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}

@@ -169,6 +169,7 @@ func (w *PlaybackWorker) runJob(ctx context.Context, job store.PlaybackJob) {
 	}
 	job.SessionID = sid
 	_ = w.Repo.UpdatePlaybackJob(ctx, job)
+	ensurePlaybackSession(ctx, w.Repo, job, sid, profile.SampleRateHz(doc))
 
 	tap := actor.Bus.SubscribeAudio(64)
 	evs := actor.Bus.SubscribeEvents(16)
@@ -228,5 +229,35 @@ done:
 		job.ErrorMessage = "no frames"
 	}
 	_ = w.Repo.UpdatePlaybackJob(ctx, job)
+
+	if job.State == store.JobCompleted {
+		sess, err := w.Repo.UpdateSessionState(ctx, sid, store.StateCompleted)
+		if err != nil {
+			sess, _ = w.Repo.GetSession(ctx, sid)
+			sess.State = store.StateCompleted
+		}
+		if sess.ID != "" {
+			enqueuePostcallRepo(ctx, w.Repo, sess)
+		}
+	} else {
+		_, _ = w.Repo.UpdateSessionState(ctx, sid, store.StateFailed)
+	}
 	log.Printf("playback job %s state=%s frames=%d", job.ID, job.State, frames)
+}
+
+func enqueuePostcallRepo(ctx context.Context, repo store.Repository, sess store.Session) {
+	id, err := newID()
+	if err != nil {
+		return
+	}
+	job := store.PostcallJob{
+		ID:             id,
+		SessionID:      sess.ID,
+		ProfileID:      sess.ProfileID,
+		ProfileVersion: sess.ProfileVersion,
+		State:          store.JobQueued,
+	}
+	if err := repo.CreatePostcallJob(ctx, job); err != nil && !errors.Is(err, store.ErrConflict) {
+		log.Printf("postcall enqueue from playback fail-open session=%s err=%v", sess.ID, err)
+	}
 }
