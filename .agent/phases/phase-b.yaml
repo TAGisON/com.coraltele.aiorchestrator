@@ -1,0 +1,15 @@
+id: phase-b
+name: Durable platform
+platform_first: Phase B
+exit_criteria:
+  - Postgres migrations for profile session audit playback_job postcall_job
+  - Profile validate against registry returns 422 on bad gateway id
+  - Control HTTP per docs/architecture/CONTROL_API.md (health sessions stop)
+  - OpenAPI stub or api/openapi.yaml started
+out_of_scope:
+  - Live audio / FS
+  - External vendors
+docs:
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/architecture/CONTROL_API.md
+  - docs/architecture/PROFILE_SCHEMA.md

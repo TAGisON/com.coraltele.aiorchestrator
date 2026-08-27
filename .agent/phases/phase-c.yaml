@@ -1,0 +1,15 @@
+id: phase-c
+name: Runtime kernel
+platform_first: Phase C
+exit_criteria:
+  - Session actor bus clocks live and playback
+  - Talk composer + local VAD barge-in with fake Speak
+  - Think path rules playbook stub knowledge skill with fakes
+out_of_scope:
+  - FS edge
+  - Real TTS-Engine required (fake OK)
+  - External vendors
+docs:
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/architecture/RUNTIME.md
+  - docs/architecture/RULES_AND_SKILLS.md

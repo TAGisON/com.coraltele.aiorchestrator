@@ -1,0 +1,13 @@
+id: phase-e
+name: Observability and post-call
+platform_first: Phase E
+exit_criteria:
+  - Audit write path per turn
+  - analytics_event and SSE event catalog
+  - Postcall worker disposition template
+out_of_scope:
+  - External vendors
+docs:
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/architecture/ANALYTICS_AND_POSTCALL.md
+  - docs/architecture/OPERATIONS.md

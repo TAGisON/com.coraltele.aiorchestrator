@@ -1,0 +1,14 @@
+id: phase-f
+name: External vendors one at a time
+platform_first: Phase F
+exit_criteria:
+  - At least one external gateway passes same contract tests as fakes
+  - Profile can select it with failover
+  - No composer or thinkpath changes for the vendor
+out_of_scope:
+  - Bundled duplex Talk as default
+  - Rewriting ports for vendor quirks
+docs:
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/architecture/PORTS.md
+depends_on: phases a-e coral-side complete

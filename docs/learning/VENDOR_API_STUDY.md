@@ -42,4 +42,4 @@ Those three are how **we** will call Next AI. Until those service docs exist, we
 
 ## How we will use Next AI (when engine docs arrive)
 
-Classify each API as Listen, Speak, or Think. Write three translators. Orchestration, profiles, RAG assembly, rules, feeders stay in `com.coraltele.aiorchestrator`.
+Classify each API as Listen, Speak, Think, or Translate. Write separate gateways. Orchestration, profiles, RAG assembly, rules, feeders stay in `com.coraltele.aiorchestrator`.

@@ -1,0 +1,16 @@
+id: phase-a
+name: Freeze contracts
+platform_first: Phase A
+exit_criteria:
+  - internal/port matches docs/architecture/PORTS.md
+  - internal/router + gateway registry exist
+  - fake gateways for listen think speak translate knowledge skill
+  - contract tests green for cancel timeout streaming gate knowledge miss
+out_of_scope:
+  - FreeSWITCH edge
+  - Next AI / external vendors
+  - Postgres control API
+docs:
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/architecture/PORTS.md
+  - docs/architecture/CONTRACTS.md

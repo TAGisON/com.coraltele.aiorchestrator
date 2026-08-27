@@ -1,0 +1,40 @@
+repo: com.coraltele.aiorchestrator
+pipeline: coral-phase
+version: 1
+
+mail:
+  enabled: true
+  secrets_file: .agent/secrets.local.json
+
+monitor:
+  interval_sec: 60
+  assign_opens_new_cursor_window: true
+
+limits:
+  max_coder_review_loops: 2
+
+roles:
+  - planner
+  - coder
+  - reviewer
+  - summarizer
+
+phases:
+  - phase-a
+  - phase-b
+  - phase-c
+  - phase-d
+  - phase-e
+  - phase-f
+
+skills:
+  planner: coral-phase-planner
+  coder: coral-phase-coder
+  reviewer: coral-phase-reviewer
+  summarizer: coral-phase-summarizer
+
+docs:
+  platform_first: docs/architecture/PLATFORM_FIRST.md
+  ports: docs/architecture/PORTS.md
+  control_api: docs/architecture/CONTROL_API.md
+  solution: docs/SOLUTION.md

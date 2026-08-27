@@ -6,6 +6,14 @@
 *.key
 credentials.json
 secrets/
+.agent/secrets.local.json
+.agent/secrets/
+.agent/status.json
+.agent/audit.jsonl
+.agent/queue.json
+.agent/work/
+.agent/*.pid
+.agent/monitor.pid
 
 # Java / Maven / Gradle
 target/

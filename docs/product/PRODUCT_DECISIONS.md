@@ -65,9 +65,11 @@ Swappable without rewriting the product:
 
 **“Any vendor / any codec”** is the **direction**: published allowlists at the edge; canonical processing inside. It is not a V1 promise that every codec and every vendor works on the live path. Batch-only engines may run on **playback** only.
 
-Fused speech-to-speech (single-vendor listen+think+speak) may exist as **one optional engine**. It is not the architecture of the product. **Default:** we call STT, LLM, and TTS as **separate services**. We give voice and get text; we give text and get voice; we give texts + persona + profile + grounding context and get a response. Orchestration stays in this product.
+Fused speech-to-speech (single-vendor listen+think+speak) may exist as **one optional engine**. It is not the architecture of the product. **Default:** we call STT, LLM, and TTS as **separate services** through **routers** (payment-gateway style): the product says Speak; the **active** TTS gateway runs. TTS-Engine, Next AI TTS, and Sarvam are gateways on that rail — including first-party. Orchestration stays in this product.
 
 Vendors (including Next AI) are **clients we consume**. We do not become their telephony socket, and we do not put our profile store inside a vendor.
+
+**First-party engines are still vendors on the slot.** In-house TTS-Engine (Go) is a **Speak gateway** like Next AI TTS or Sarvam: same Speak contract, same gateway pattern, chosen by profile (`speak: tts-engine` vs `speak: nextai`). We own the process and the ops; we do **not** give it a private path around the orchestrator. Streaming vs file, PCM vs PCMU 8 kHz for PSTN, sample rate — those are **gateway capabilities**, not a second Speak API.
 
 ---
 
@@ -112,6 +114,15 @@ If it is not in grounding and the profile is grounded, the product **refuses or 
 
 We **choose** what grounding is attached to an LLM call. Sending persona + profile + retrieved context in the request is our control. Storing our only KB solely inside a vendor is **out**.
 
+**Where knowledge and CRM physically live** (see `docs/architecture/INTEGRATION.md`):
+
+- **Ours:** profile, persona, agent, skill *contracts*, templates, session **audit**.  
+- **Coral directory:** users, orgs, roles, existing user details — **we consume**, we do not replace. Sessions/profiles bind to `coral_user_id` / tenant; future extras key off that id.  
+- **Theirs unless they opt in:** FAQ/KB/RAG corpora, CRM/RDBMS, txn/ticket truth.  
+- **Knowledge router:** ingest/dump gateway **or** retrieve-API gateway **or** both.  
+- **Skill router:** HTTP to their (or Coral) APIs for “status of my transaction.” Direct DB is last-resort, not default.  
+- Greenfield tenants may use **only** our ingest store. Attach tenants **must** work without moving private data into us.
+
 ---
 
 ## 7. Job families (in-category — this is the product vision)
@@ -152,9 +163,9 @@ Do not specify Zoom, Exotel, SMTP, Salesforce, etc. in this lock. Specify **slot
 |---|---|
 | **Feeder** | file, websocket, meeting recording, telephony, browser, radio |
 | **Sink** | file, websocket, captions overlay, second audio channel |
-| **Skill** | mail, CRM write, ticket, calendar, human transfer |
-| **Knowledge** | upload, connector, graph import |
-| **Engine** | STT, LLM, TTS (and later VAD, MT) — one vendor translator per engine |
+| **Knowledge** | ingest/dump, **their** search/KB HTTP API, graph import |
+| **Skill** | **their** CRM/ticket/txn HTTP APIs, Coral CRM, mail, transfer |
+| **Engine** | STT, LLM, TTS (and later VAD, MT) — one vendor gateway per engine |
 
 A new integration is **in spec** when it fills a slot without changing the profile model. If it needs a new mode or a new collision rule, **update this file first**.
 

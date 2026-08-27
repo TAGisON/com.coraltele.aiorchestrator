@@ -1,125 +1,179 @@
-# Architecture — approach (planning lock)
+# Architecture — locked approach
 
-**Status:** Approach locked for planning. Not an implementation spec (no class list, no codec matrix, no vendor SDK).  
+**Status:** LOCKED (replaces earlier “Python V1 / phased stack” talk).  
 **Date:** 26 August 2026  
-**Product parent:** `docs/product/PRODUCT_DECISIONS.md`  
-**Contracts:** `docs/architecture/CONTRACTS.md`
+**Product parent:** `docs/product/PRODUCT_DECISIONS.md` (product features still win if they conflict)
 
-If this file and the product lock disagree, **the product lock wins**.
+**Locks from this discussion**
 
----
-
-## 1. Goal of the architecture
-
-We own **orchestration and control**. Vendors own **engines we can replace**. Edges own **streams we can attach**.
-
-Future integrations (another STT, a meeting file, a mail skill, telephony) must plug in **without rewriting sessions, profiles, or modes**.
+1. **Language: Go** — this service is a Go process. `Ai_code` is a **reference**, not the base.  
+2. **Vendors: payment-gateway style** — product says Listen / Think / Speak; a **router** sends the call to the **active** provider. Adding a provider is a new gateway, not a change to Talk.  
+4. **Customer systems: connect, don’t absorb** — Profile / persona / skill *definitions* live **here**. KB/FAQ/RAG **content** and CRM/RDBMS stay **theirs** unless they **dump** into us or we **call their APIs** this turn. See `INTEGRATION.md`.  
+6. **Identity: Coral user management** — operators and tenants come from the existing Coral directory. This service stores **references** (`coral_user_id`, tenant) and may add product flags later on that id. It is not a second IdP. Callers are ANI/channel + CRM skill unless they already have a Coral/customer id.
 
 ---
 
-## 2. Three layers
+## 1. What we are building
+
+A **Go runtime** that:
+
+- Attaches live or playback audio/text  
+- Runs a **named profile** (modes, rules, KB, skills, **which gateways are active**)  
+- Talks to **engine gateways** (STT, LLM, TTS) the way a checkout talks to Razorpay vs PayU  
+- Gives audio/text/actions back out  
+
+FreeSWITCH + `mod_audio_stream` = **card machine / POS** (bytes in/out).  
+TTS-Engine, Next AI TTS, Sarvam = **payment gateways** on the Speak rail.  
+This service = **checkout + order logic** (session, VAD, barge-in, RAG, rules).  
+Coral Java = **ERP** (ACD, CRM, tickets) via skills and control HTTP.
+
+---
+
+## 2. Payment-gateway pattern (engines)
+
+Product-level code **never** names Next AI or TTS-Engine.
 
 ```
-Edges (not this product)          Runtime (this product)           Consumers
-─────────────────────            ──────────────────────           ──────────
-Feeder: file, WSS, FS, …    →    Session + named profile     →    Call center profile
-Sink:   file, WSS, FS, …    ←    Listen / Speak / Talk / Think    Meeting pack, copilot, …
-                                 Agent bundle (KB, rules, skills)
-                                 Engine translators (STT, LLM, TTS)
+Talk composer:  “Speak(text, session)”
+                     │
+                     ▼
+              Speak router
+              (profile: active TTS + failover list)
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+   TTS-Engine    Next AI TTS    Sarvam
+   (gateway)     (gateway)      (gateway)
 ```
 
-**Runtime** (`com.coraltele.aiorchestrator`) is a process we install. It does not embed FreeSWITCH, Zoom, or a vendor’s full agent product.
+Same **router family** (not only STT/LLM/TTS):
 
-**Edges** only give and take bytes (or files).  
-`mod_audio_stream` is the telephony edge: capture + inject. **No OpenAI, no Next AI, no profile inside that module.** The old FreeSWITCH → Realtime bridge is not the architecture of this product.
+- **Knowledge router** — ingest store **or** customer KB HTTP (or both).  
+- **Skill router** — Coral CRM / transfer **or** customer txn/ticket APIs.  
+- **Translate router** — MT gateways for interpret profiles.  
 
-**Consumers** are verticals: they pick a profile and attach feeders/sinks/skills.
+Product says “ground this turn” / “get status”; the **active** knowledge/skill gateway runs. Same pattern as Speak.
 
----
-
-## 3. Full control (what we never give away)
-
-| We own | Vendor may see | Vendor must not own |
-|---|---|---|
-| Session id, profile, clock (live/playback) | Audio or text for **one** call to STT or TTS or LLM | When to listen vs speak vs think |
-| When STT / LLM / TTS is invoked | Persona + context **we** put on an LLM request | Our KB as the only copy of truth |
-| Rules, skills, memory, analytics | Engine-specific ids (mapped in the translator) | Barge-in policy, handoff, feeders |
-| Canonical audio inside the runtime | Their wire format (translator converts) | Product modes |
-
-Next AI (and any later engine vendor) is a **service we call**:
-
-- STT: we give voice → they give text  
-- TTS: we give text → they give voice  
-- LLM: we give texts + persona + profile + grounding context → they give a response  
-
-We do **not** send them a raw duplex “black box call” as the product path.
-
----
-
-## 4. Contracts vs translators (the only extension mechanism)
-
-**Contract (ours, stable):** what the runtime needs. See `CONTRACTS.md`.  
-**Translator (theirs, disposable):** maps one vendor or one edge onto a contract.
-
-Adding Next AI = one STT translator + one LLM translator + one TTS translator.  
-Adding a second STT vendor = a fourth translator, **zero** change to Talk or call center.  
-Adding FreeSWITCH = a feeder/sink translator that speaks `mod_audio_stream`’s existing stream dialect.
-
-We never “if Next AI then different session.” We never “if Exotel then different product.” External API docs are used to **write a translator**, or to **learn**, not to reshape the runtime.
-
-Fused speech-to-speech (audio in, audio out, hidden STT+LLM+TTS) is an **optional** extra contract (`bundled Talk`). It is not the default and must not be required for captions, Speak-only, or our RAG-in-the-middle.
-
----
-
-## 5. Control plane vs data plane
-
-**Control:** create/destroy session, bind profile, attach feeder/sink, inject text, stop Talk, health.  
-**Data:** audio frames and/or text streams for that session.
-
-Do not make HTTP POST of live PCM the realtime path. Do not make FreeSWITCH JSON the native platform protocol — that would force every non-call feeder to fake telephony.
-
----
-
-## 6. Canonical media (direction, not a codec SOW)
-
-Decode / resample at the **edge translator**. Inside the runtime, one canonical PCM family. Encode again at the sink translator.
-
-Published allowlists at the edge; not “every codec on the live path” in V1.
-
-Turn-taking (VAD, barge-in, flush TTS) lives in the **runtime**, not in `mod_audio_stream` and not inside a vendor unless we explicitly call their cancel API from the TTS translator.
-
----
-
-## 7. Scope for future integrations
-
-Named slots (product §9). A future integration is valid when it fills a slot:
-
-| Slot | First uses (not a closed list) |
+| Checkout analogue | Us |
 |---|---|
-| Feeder / sink | File, generic WSS, `mod_audio_stream` |
-| STT / LLM / TTS | Next AI first; others behind the same contracts |
-| Skill | One audited action in V1 (mail or equivalent is a project choice) |
-| Knowledge | Upload / files first; graph later |
+| “Pay ₹500” | “Speak this text” / “Transcribe this audio” / “Complete this prompt” |
+| Active PG + MID | Profile: `speak.provider = tts-engine`, secrets in vault |
+| PG adapter (ISO messages) | Gateway: their gRPC/HTTP/WS → our port |
+| Enable/disable PG in admin | Activate/deactivate gateway; health probe |
+| Fallback PG on decline | Failover list (no dead air: next gateway or canned clip) |
+| Refund in our ledger, not in PG | Session/transcript/audit **here**, not only in the vendor |
 
-Chat as a feeder, two-way interpret, on-prem engines, diarization: **in-category**, not required to specify wire format now.
+**Capability filter:** live session → router **skips** gateways that cannot stream (same as not sending a UPI-only intent to a card-only PG).
 
----
+**First-party is still a PG:** TTS-Engine is “our Razorpay,” not the checkout itself.
 
-## 8. V1 build order
-
-1. Runtime: session + profile + canonical audio + Listen and Speak against **contracts** (one translator each is enough). File feeder + file sink (proves we are not call-center-only).  
-2. Think: LLM translator + rules + document context we attach. LLM off still runs Listen/Speak.  
-3. Talk: compose Listen + Think + Speak + barge-in in the runtime.  
-4. Telephony: point `mod_audio_stream` at this runtime (feeder translator), not at a vendor.  
-5. Further feeders and vendors: more translators only.
-
-Playback jobs never require FreeSWITCH. Live CC never requires engines inside the FS module.
+Edges (FS, file) are **not** payment gateways. They are **acquire / settle rails** (feeder/sink adapters). Different registry, same idea: product says “attach audio,” router does not care if it is FS or a file.
 
 ---
 
-## 9. What we are not doing
+## 3. Media plane (the Kafka decision)
 
-- Implementing Exotel Voicebot as a product path.  
-- Treating a duplex vendor WSS as our STT+LLM+TTS.  
-- Putting profile/KB/orchestration in Next AI or OpenAI.  
-- Growing `mod_audio_stream` into an AI module.
+**PCM and live text-for-playout never enter a broker.**
+
+Why this is the right architecture, not a shortcut:
+
+- A turn is **one session, one ear, 20 ms**. Kafka/Redis copy, batch, and persist; they add jitter and still need a single consumer — the session that owns the socket.  
+- Barge-in must **flush this process’s sink buffer now**. A broker cannot do that.  
+- LiveKit, FS, every serious voice runtime keeps media **in the process that holds the socket**.
+
+**What we use instead (complete system, not a later phase):**
+
+| Data | Store |
+|---|---|
+| Live audio / turn text in flight | **Goroutine + in-memory channels** (session bus) |
+| Profiles, KB metadata, session/audit, playback **jobs** (file URI, not samples) | **PostgreSQL** |
+| Recording / playback blobs | **Filesystem or object store** (URI in PG) |
+| Hop traces / metrics | **OpenTelemetry** (async) |
+| Coral notify (disposition, transfer) | **HTTP** skill/control (they already are HTTP services) |
+
+No Redis on the media path. No Kafka. Playback **workers** are more Go processes (or the same binary) that **lease jobs from Postgres** (`FOR UPDATE SKIP LOCKED`). That is distribution without treating audio as messages.
+
+Live scale-out: **more Go instances + WS affinity**. A call never migrates mid-stream. That is correct, not incomplete.
+
+---
+
+## 4. System architecture
+
+```
+                         Coral Java (ACD, CRM, config, telemetry)
+                                    │  HTTP control / skills
+                                    ▼
+┌───────────────────────────────────────────────────────────┐
+│  aiorchestrator (Go)                                      │
+│  HTTP control │ session actors │ routers │ in-memory bus  │
+│  PG: profiles, KB, jobs, audit                            │
+└──────────┬─────────────────┬──────────────────┬───────────┘
+           │ WS              │ gRPC/HTTP        │ HTTP
+           ▼                 ▼                  ▼
+    mod_audio_stream    Speak/Listen/Think    Next AI
+    (FreeSWITCH)        gateways:             STT / LLM / TTS
+                        TTS-Engine, …         (gateways)
+```
+
+**This service owns:** session, clocks, VAD, composer, routers, RAG/rules, skill dispatch, job lease, audit.  
+**This service does not own:** SIP/ACD, waveform models (TTS-Engine process), LLM/STT clouds, CRM tables.
+
+---
+
+## 5. Application architecture (inside Go)
+
+Hexagonal:
+
+- **Core:** session actor, Talk state machine, clocks, rules, retrieve  
+- **Ports:** Listen, Think, Speak, Translate, Feeder, Sink, Skill, Knowledge  
+- **Routers:** pick active gateway by profile + health + capabilities  
+- **Gateways:** one package per provider (`internal/gateway/ttsengine`, `internal/gateway/nextai`, …)  
+- **Rails:** `internal/edge/modaudiostream`, `internal/edge/file`
+
+Core **must not** import gateway SDKs.
+
+**Session actor:** one goroutine (plus its WS read/write). Channels for audio frames. Cancel via `context`.
+
+**Control:** Go HTTP (stdlib or chi) + OpenAPI for Coral.
+
+**TTS-Engine:** gRPC client **inside the Speak gateway**, PCMU 8 kHz converted there to session canonical PCM (8000–48000 Hz per profile).
+
+---
+
+## 6. Live vs playback (same service, two clocks)
+
+Same routers, same gateways, same PG.
+
+| | Live | Playback |
+|---|---|---|
+| Trigger | FS WS connect (or generic WS) | Job row in PG (file URI) |
+| Clock | 20 ms paced, VAD, barge-in | Run as fast as quality allows |
+| Gateways | Streaming-capable only | Streaming or batch |
+| Scale | Sticky instance | Any instance that leases the job |
+
+---
+
+## 7. Failure
+
+Router: primary gateway timeout → failover gateway → profile fallback (clip / escalate skill).  
+No dead air. Skills with side effects are not blindly retried (like a double charge).
+
+---
+
+## 8. Latency (unchanged physics)
+
+p50 &lt; ~1.2 s live turn. Budget: our VAD + vendor STT + vendor LLM + Speak gateway TTFB (TTS-Engine ~50 ms) + 40–100 ms playout. Stream every live hop. Speculative TTS when we implement Talk fully — it belongs in the composer, not in a broker.
+
+---
+
+## 9. What we explicitly discarded
+
+- Python kernel (reference only)  
+- Java media loop  
+- `if nextai` in Talk  
+- Kafka/Redis **audio**  
+- Microservice-per-engine  
+- Embedding TTS-Engine as a library  
+- Bundled duplex vendor as the default Talk path  
+
+Companion notes: `TECH_CHOICES.md`, `SERVICE.md`, `RUNTIME.md`, `CONTRACTS.md`, `BUILD.md`, `PROFILE_SCHEMA.md`, `RULES_AND_SKILLS.md`, `EDGE_FS.md`, `ANALYTICS_AND_POSTCALL.md`, `OPERATIONS.md` (aligned to this lock).
