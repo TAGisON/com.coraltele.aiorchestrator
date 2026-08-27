@@ -1,0 +1,259 @@
+openapi: 3.0.3
+info:
+  title: Coral AI Orchestrator Control API
+  version: 0.1.0
+  description: >
+    Phase B stub. Shapes locked in docs/architecture/CONTROL_API.md.
+    Auth header name still open (lab accepts optional Bearer token).
+servers:
+  - url: /
+paths:
+  /v1/health:
+    get:
+      summary: Process + Postgres health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  db:
+                    type: boolean
+        "503":
+          description: Unhealthy (e.g. DB down)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/profiles:
+    post:
+      summary: Create draft profile
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                tenant_id:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        "201":
+          description: Created
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/profiles/{id}/versions:
+    post:
+      summary: Publish immutable profile version
+      operationId: publishProfileVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Profile document (PROFILE_SCHEMA.md)
+      responses:
+        "201":
+          description: Published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_id:
+                    type: string
+                  version:
+                    type: integer
+        "422":
+          description: profile_invalid (unknown or wrong-port gateway id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/sessions:
+    post:
+      summary: Create session and pin profile version
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+  /v1/sessions/{id}:
+    get:
+      summary: Session status
+      operationId: getSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStatus"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/sessions/{id}/stop:
+    post:
+      summary: Drain toward terminal state
+      operationId: stopSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: operator
+      responses:
+        "200":
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  state:
+                    type: string
+                  reason:
+                    type: string
+components:
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - profile_invalid
+                - gateway_unavailable
+                - rate_limited
+                - bad_request
+                - internal
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+    CreateSessionRequest:
+      type: object
+      required: [profile_id]
+      properties:
+        profile_id:
+          type: string
+        profile_version:
+          oneOf:
+            - type: string
+              enum: [latest]
+            - type: integer
+          example: latest
+        clock:
+          type: string
+          enum: [live, playback]
+          default: live
+        caller:
+          type: object
+          additionalProperties: true
+        recording_ref:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        tenant_id:
+          type: string
+    CreateSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        profile_id:
+          type: string
+        profile_version:
+          type: integer
+        clock:
+          type: string
+        canonical_sample_rate_hz:
+          type: integer
+        state:
+          type: string
+          example: Created
+        edge_token:
+          type: string
+        edge_wss_url:
+          type: string
+    SessionStatus:
+      type: object
+      properties:
+        session_id:
+          type: string
+        profile_id:
+          type: string
+        profile_version:
+          type: integer
+        clock:
+          type: string
+        state:
+          type: string
+        owner_instance:
+          type: string
+        canonical_sample_rate_hz:
+          type: integer
