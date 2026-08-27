@@ -1,0 +1,123 @@
+package composer_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
+)
+
+func talkProfile() profile.Document {
+	var doc profile.Document
+	doc.ID = "talk"
+	doc.Modes.Talk = true
+	doc.Modes.Listen = true
+	doc.Modes.Speak = true
+	doc.Modes.Think = true
+	doc.Audio.CanonicalSampleRateHz = 16000
+	doc.Routers.Listen.Providers = []string{"fake-listen"}
+	doc.Routers.Speak.Providers = []string{"fake-speak"}
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	return doc
+}
+
+func TestComposer_TurnAndBargeIn(t *testing.T) {
+	reg := router.NewMemRegistry()
+	slowSpeak := &fake.Speak{FrameCount: 20, InterFrameDelay: 15 * time.Millisecond}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDSpeak, Port: port.PortSpeak,
+		Capabilities: slowSpeak.Capabilities(), Instance: slowSpeak,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range []port.Registration{
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: (&fake.Think{}).Capabilities(), Instance: &fake.Think{}},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	b := bus.New()
+	mem := session.NewMemory()
+	talk, err := composer.NewTalk(talkProfile(), reg, b, mem, "live", "sess-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- talk.InjectFinal(ctx, "hello there")
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for talk.State() != composer.Speaking {
+		if time.Now().After(deadline) {
+			t.Fatalf("never reached Speaking; state=%s", talk.State())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Inject loud speech frames to trigger barge-in while Speaking.
+	for i := 0; i < 5; i++ {
+		talk.OnPCM(vad.SpeechFrame(16000, uint64(i+1), 640))
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("speak did not finish after barge-in")
+	}
+
+	if !talk.LastBargeIn() {
+		t.Fatal("expected barge-in")
+	}
+	if talk.CancelCount() < 1 {
+		t.Fatal("expected Speak.Cancel")
+	}
+	if slowSpeak.CancelCalls.Load() < 1 {
+		t.Fatal("fake-speak Cancel not called")
+	}
+	if talk.Sink.Flushed() < 1 && talk.State() != composer.Capturing && talk.State() != composer.Listening {
+		// flush may be 0 if no frames buffered yet; state must leave Speaking
+		t.Fatalf("post-barge state %s flushed=%d", talk.State(), talk.Sink.Flushed())
+	}
+	st := talk.State()
+	if st != composer.Capturing && st != composer.Listening {
+		t.Fatalf("want Capturing/Listening got %s", st)
+	}
+}
+
+func TestComposer_NoGatewayImport(t *testing.T) {
+	// Compiles with port+router only via NewTalk; registry supplies Instances.
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	talk, err := composer.NewTalk(talkProfile(), reg, bus.New(), session.NewMemory(), "live", "s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := talk.InjectFinal(context.Background(), "ping"); err != nil {
+		t.Fatal(err)
+	}
+	if talk.State() != composer.Listening {
+		t.Fatalf("state %s", talk.State())
+	}
+}

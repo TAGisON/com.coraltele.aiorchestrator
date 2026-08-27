@@ -44,6 +44,10 @@ type Document struct {
 			Gateway string `json:"gateway"`
 		} `json:"http_kb"`
 	} `json:"knowledge"`
+	// Rules are declarative Think-path policies (RULES_AND_SKILLS.md).
+	Rules []Rule `json:"rules"`
+	// Playbook is an optional FSM for playbook-grounded profiles.
+	Playbook *Playbook `json:"playbook"`
 }
 
 type RouterProviders struct {
@@ -51,7 +55,34 @@ type RouterProviders struct {
 }
 
 type SkillDefinition struct {
-	Gateway string `json:"gateway"`
+	Gateway   string `json:"gateway"`
+	Authority string `json:"authority"` // inform | decide | act
+	Confirm   bool   `json:"confirm"`
+}
+
+// Rule is one profile rules[] entry.
+type Rule struct {
+	ID      string         `json:"id"`
+	Phase   string         `json:"phase"`
+	When    map[string]any `json:"when"`
+	Action  string         `json:"action"`
+	Skill   string         `json:"skill"`
+	Message string         `json:"message"`
+	Text    string         `json:"text"`
+}
+
+// Playbook is a minimal FSM (entry + states/slots).
+type Playbook struct {
+	Entry  string                   `json:"entry"`
+	States map[string]PlaybookState `json:"states"`
+}
+
+// PlaybookState is one FSM node.
+type PlaybookState struct {
+	OnIntent   string   `json:"on_intent"`
+	Fallback   string   `json:"fallback"`
+	Slots      []string `json:"slots"`
+	OnComplete string   `json:"on_complete"`
 }
 
 // ValidationError is returned for profile_invalid (HTTP 422).

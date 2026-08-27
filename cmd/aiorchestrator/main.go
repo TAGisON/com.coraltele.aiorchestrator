@@ -13,6 +13,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -47,7 +48,8 @@ func main() {
 		OwnerInstance: envOr("OWNER_INSTANCE", "local"),
 		EdgeBaseURL:   envOr("EDGE_BASE_URL", "wss://localhost/edge/fs"),
 	}
-	srv := control.New(repo, reg, cfg)
+	rt := &control.SessionRuntime{Mgr: session.NewManager(reg)}
+	srv := control.NewWithRuntime(repo, reg, rt, cfg)
 	addr := envOr("HTTP_ADDR", ":8080")
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 

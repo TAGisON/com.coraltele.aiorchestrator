@@ -10,6 +10,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/control"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -153,5 +154,55 @@ func publishOK(t *testing.T, srv *control.Server, id, body string) {
 	srv.Handler().ServeHTTP(rr, req)
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("publish %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	mem := store.NewMemory()
+	rt := &control.SessionRuntime{Mgr: session.NewManager(reg)}
+	srv := control.NewWithRuntime(mem, reg, rt, control.Config{})
+	createProfile(t, srv, "rt-lab")
+	publishOK(t, srv, "rt-lab", `{
+  "id":"rt-lab",
+  "modes":{"listen":true,"speak":true,"think":true},
+  "audio":{"canonical_sample_rate_hz":16000},
+  "routers":{
+    "listen":{"providers":["fake-listen"]},
+    "speak":{"providers":["fake-speak"]},
+    "think":{"providers":["fake-think"]}
+  }
+}`)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
+  "profile_id":"rt-lab",
+  "profile_version":"latest",
+  "clock":"live"
+}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &created)
+	if created["state"] != "Running" {
+		t.Fatalf("want Running got %v", created["state"])
+	}
+	sid := created["session_id"].(string)
+	rr = httptest.NewRecorder()
+	stopReq := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+sid+"/stop", bytes.NewBufferString(`{"reason":"operator"}`))
+	stopReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(rr, stopReq)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("stop %d %s", rr.Code, rr.Body.String())
+	}
+	var stopped map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &stopped)
+	if stopped["state"] != "Cancelled" {
+		t.Fatalf("want Cancelled got %v", stopped["state"])
 	}
 }

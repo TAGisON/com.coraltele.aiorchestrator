@@ -17,6 +17,22 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
+// Runtime is the minimal session-actor surface Control needs (Phase C).
+type Runtime interface {
+	StartSession(ctx context.Context, p RuntimeStart) error
+	StopSession(ctx context.Context, sessionID, reason string) (terminalState string, err error)
+}
+
+// RuntimeStart is create-time actor spawn input.
+type RuntimeStart struct {
+	SessionID  string
+	TenantID   string
+	Clock      string
+	SampleRate int
+	Profile    profile.Document
+	Document   json.RawMessage
+}
+
 // Config for the control HTTP server.
 type Config struct {
 	// AuthToken when non-empty requires Authorization: Bearer <token> (lab stub).
@@ -28,22 +44,28 @@ type Config struct {
 	EdgeBaseURL string
 }
 
-// Server serves CONTROL_API Phase B routes.
+// Server serves CONTROL_API Phase B routes (+ Phase C runtime glue).
 type Server struct {
 	repo store.Repository
 	reg  port.Registry
+	rt   Runtime
 	cfg  Config
 	mux  *http.ServeMux
 }
 
 func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
+	return NewWithRuntime(repo, reg, nil, cfg)
+}
+
+// NewWithRuntime wires an optional runtime manager for session start/stop.
+func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config) *Server {
 	if cfg.OwnerInstance == "" {
 		cfg.OwnerInstance = "local"
 	}
 	if cfg.EdgeBaseURL == "" {
 		cfg.EdgeBaseURL = "wss://localhost/edge/fs"
 	}
-	s := &Server{repo: repo, reg: reg, cfg: cfg, mux: http.NewServeMux()}
+	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -236,13 +258,39 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "create session failed", nil)
 		return
 	}
+	state := sess.State
+	if s.rt != nil {
+		if err := s.rt.StartSession(r.Context(), RuntimeStart{
+			SessionID:  sess.ID,
+			TenantID:   sess.TenantID,
+			Clock:      sess.Clock,
+			SampleRate: sess.CanonicalSampleRateHz,
+			Profile:    doc,
+			Document:   pv.Document,
+		}); err != nil {
+			_, _ = s.repo.UpdateSessionState(r.Context(), sess.ID, store.StateFailed)
+			ge, ok := port.AsGatewayError(err)
+			if ok && ge.Code == port.CodeUnsupported {
+				writeError(w, http.StatusUnprocessableEntity, CodeProfileInvalid, err.Error(), map[string]any{"reason": "capability_gate"})
+				return
+			}
+			writeError(w, http.StatusInternalServerError, CodeInternal, "runtime start failed: "+err.Error(), nil)
+			return
+		}
+		updated, err := s.repo.UpdateSessionState(r.Context(), sess.ID, store.StateRunning)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, CodeInternal, "set running failed", nil)
+			return
+		}
+		state = updated.State
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"session_id":               sess.ID,
 		"profile_id":               sess.ProfileID,
 		"profile_version":          sess.ProfileVersion,
 		"clock":                    sess.Clock,
 		"canonical_sample_rate_hz": sess.CanonicalSampleRateHz,
-		"state":                    sess.State,
+		"state":                    state,
 		"edge_token":               edgeToken,
 		"edge_wss_url":             s.cfg.EdgeBaseURL + "?token=" + edgeToken,
 	})
@@ -318,7 +366,6 @@ func (s *Server) handleStopSession(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// Phase B: no runtime actor — Draining then Completed (or Cancelled on operator reason).
 	terminal := store.StateCompleted
 	if req.Reason == "operator" || req.Reason == "cancel" {
 		terminal = store.StateCancelled
@@ -327,6 +374,20 @@ func (s *Server) handleStopSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "drain failed", nil)
 		return
+	}
+	if s.rt != nil {
+		term, err := s.rt.StopSession(r.Context(), id, req.Reason)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, CodeInternal, "runtime stop failed", nil)
+			return
+		}
+		if term == "Cancelled" {
+			terminal = store.StateCancelled
+		} else if term == "Failed" {
+			terminal = store.StateFailed
+		} else if term == "Completed" {
+			terminal = store.StateCompleted
+		}
 	}
 	sess, err = s.repo.UpdateSessionState(r.Context(), id, terminal)
 	if err != nil {

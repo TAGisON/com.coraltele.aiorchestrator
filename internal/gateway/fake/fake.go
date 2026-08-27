@@ -97,7 +97,10 @@ func (s *listenStream) Close(ctx context.Context) error {
 // --- Speak ---
 
 type Speak struct {
-	Delay time.Duration // used for timeout tests when combined with short ctx
+	Delay           time.Duration // used for timeout tests when combined with short ctx
+	FrameCount      int           // frames to emit; 0 = 1 (default). >1 for barge-in tests.
+	InterFrameDelay time.Duration // pause between frames (barge-in window)
+	CancelCalls     atomic.Int64  // tiny test hook
 }
 
 func (s *Speak) ID() port.GatewayID { return IDSpeak }
@@ -107,11 +110,18 @@ func (s *Speak) Capabilities() port.Capability {
 }
 
 func (s *Speak) Speak(ctx context.Context, req port.SpeakRequest) (port.SpeakStream, error) {
+	nFrames := s.FrameCount
+	if nFrames <= 0 {
+		nFrames = 1
+	}
 	st := &speakStream{
-		frames: make(chan port.PCMFrame, 4),
-		done:   make(chan struct{}),
-		rate:   req.SampleRate,
-		delay:  s.Delay,
+		frames:   make(chan port.PCMFrame, 4),
+		done:     make(chan struct{}),
+		rate:     req.SampleRate,
+		delay:    s.Delay,
+		nFrames:  nFrames,
+		gap:      s.InterFrameDelay,
+		onCancel: func() { s.CancelCalls.Add(1) },
 	}
 	go st.run(ctx, req.Text)
 	return st, nil
@@ -122,8 +132,11 @@ type speakStream struct {
 	done     chan struct{}
 	rate     port.SampleRateHz
 	delay    time.Duration
+	nFrames  int
+	gap      time.Duration
 	cancel   atomic.Bool
 	doneOnce sync.Once
+	onCancel func()
 }
 
 func (s *speakStream) run(ctx context.Context, text string) {
@@ -137,19 +150,35 @@ func (s *speakStream) run(ctx context.Context, text string) {
 			return
 		}
 	}
-	if s.cancel.Load() {
-		return
-	}
-	// one silent frame (~20ms @ 16k = 640 bytes)
 	n := 640
 	if s.rate > 0 {
 		n = int(s.rate) * 2 / 50
 	}
-	frame := port.PCMFrame{Data: make([]byte, n), SampleRate: s.rate, Seq: 1, At: time.Now()}
-	select {
-	case s.frames <- frame:
-	case <-ctx.Done():
-		return
+	for i := 0; i < s.nFrames; i++ {
+		if s.cancel.Load() {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		frame := port.PCMFrame{Data: make([]byte, n), SampleRate: s.rate, Seq: uint64(i + 1), At: time.Now()}
+		select {
+		case s.frames <- frame:
+		case <-ctx.Done():
+			return
+		}
+		if s.gap > 0 && i+1 < s.nFrames {
+			select {
+			case <-time.After(s.gap):
+			case <-ctx.Done():
+				return
+			}
+			if s.cancel.Load() {
+				return
+			}
+		}
 	}
 	_ = text
 }
@@ -163,6 +192,9 @@ func (s *speakStream) Done() <-chan struct{}         { return s.done }
 
 func (s *speakStream) Cancel(ctx context.Context) error {
 	s.cancel.Store(true)
+	if s.onCancel != nil {
+		s.onCancel()
+	}
 	s.finish()
 	return nil
 }
