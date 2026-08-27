@@ -2,9 +2,12 @@ package session_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	fileedge "github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/file"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
@@ -87,6 +90,46 @@ func TestActor_LiveAndPlayback_StartStop(t *testing.T) {
 	if term != "Completed" {
 		t.Fatalf("term %s", term)
 	}
+}
+
+func TestActor_AttachFileFeeder(t *testing.T) {
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	mgr := session.NewManager(reg)
+	ctx := context.Background()
+	doc := talkDoc()
+	a, err := mgr.Start(ctx, session.StartParams{
+		SessionID: "s-file", Clock: string(clock.Playback), Profile: doc, SampleRate: 16000, FrameMs: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a.pcm")
+	n := clock.FrameBytes(16000, 20)
+	blob := make([]byte, n*2)
+	if err := os.WriteFile(path, blob, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tap := a.Bus.SubscribeAudio(8)
+	f, err := fileedge.Open(ctx, path, 16000, 16000, 20, a.Clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.AttachFeeder(ctx, f, "file")
+	got := 0
+	deadline := time.After(2 * time.Second)
+	for got < 2 {
+		select {
+		case <-tap:
+			got++
+		case <-deadline:
+			t.Fatalf("frames %d", got)
+		}
+	}
+	_, _ = mgr.Stop(ctx, "s-file", "done")
 }
 
 func TestActor_Live_RefusesBatchOnlyListen(t *testing.T) {

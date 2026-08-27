@@ -10,11 +10,14 @@ import (
 
 // Memory is an in-process Repository for tests without Postgres.
 type Memory struct {
-	mu       sync.Mutex
-	profiles map[string]Profile
-	versions map[string][]ProfileVersion
-	sessions map[string]Session
-	healthy  bool
+	mu        sync.Mutex
+	profiles  map[string]Profile
+	versions  map[string][]ProfileVersion
+	sessions  map[string]Session
+	kbDocs    map[string]KBDocument
+	kbChunks  map[string][]KBChunk // document_id → chunks
+	playJobs  map[string]PlaybackJob
+	healthy   bool
 }
 
 func NewMemory() *Memory {
@@ -22,6 +25,9 @@ func NewMemory() *Memory {
 		profiles: make(map[string]Profile),
 		versions: make(map[string][]ProfileVersion),
 		sessions: make(map[string]Session),
+		kbDocs:   make(map[string]KBDocument),
+		kbChunks: make(map[string][]KBChunk),
+		playJobs: make(map[string]PlaybackJob),
 		healthy:  true,
 	}
 }
@@ -135,4 +141,126 @@ func (m *Memory) UpdateSessionState(ctx context.Context, id, state string) (Sess
 	s.UpdatedAt = time.Now().UTC()
 	m.sessions[id] = s
 	return s, nil
+}
+
+func (m *Memory) CreateKBDocument(ctx context.Context, doc KBDocument) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.kbDocs[doc.ID]; ok {
+		return ErrConflict
+	}
+	now := time.Now().UTC()
+	doc.CreatedAt = now
+	doc.UpdatedAt = now
+	m.kbDocs[doc.ID] = doc
+	return nil
+}
+
+func (m *Memory) GetKBDocument(ctx context.Context, id string) (KBDocument, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d, ok := m.kbDocs[id]
+	if !ok {
+		return KBDocument{}, ErrNotFound
+	}
+	return d, nil
+}
+
+func (m *Memory) UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d, ok := m.kbDocs[id]
+	if !ok {
+		return KBDocument{}, ErrNotFound
+	}
+	d.Status = status
+	d.ErrorMessage = errMsg
+	d.UpdatedAt = time.Now().UTC()
+	m.kbDocs[id] = d
+	return d, nil
+}
+
+func (m *Memory) ReplaceKBChunks(ctx context.Context, documentID string, chunks []KBChunk) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.kbDocs[documentID]; !ok {
+		return ErrNotFound
+	}
+	cp := make([]KBChunk, len(chunks))
+	copy(cp, chunks)
+	m.kbChunks[documentID] = cp
+	return nil
+}
+
+func (m *Memory) ListKBChunks(ctx context.Context, tenantID string, collections []string) ([]KBChunk, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	allow := map[string]struct{}{}
+	for _, c := range collections {
+		allow[c] = struct{}{}
+	}
+	var out []KBChunk
+	for _, chunks := range m.kbChunks {
+		for _, ch := range chunks {
+			if tenantID != "" && ch.TenantID != "" && ch.TenantID != tenantID {
+				continue
+			}
+			if len(allow) > 0 {
+				if _, ok := allow[ch.Collection]; !ok {
+					continue
+				}
+			}
+			out = append(out, ch)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) CreatePlaybackJob(ctx context.Context, job PlaybackJob) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.playJobs[job.ID]; ok {
+		return ErrConflict
+	}
+	now := time.Now().UTC()
+	job.CreatedAt = now
+	job.UpdatedAt = now
+	m.playJobs[job.ID] = job
+	return nil
+}
+
+func (m *Memory) GetPlaybackJob(ctx context.Context, id string) (PlaybackJob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	j, ok := m.playJobs[id]
+	if !ok {
+		return PlaybackJob{}, ErrNotFound
+	}
+	return j, nil
+}
+
+func (m *Memory) UpdatePlaybackJob(ctx context.Context, job PlaybackJob) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.playJobs[job.ID]; !ok {
+		return ErrNotFound
+	}
+	job.UpdatedAt = time.Now().UTC()
+	m.playJobs[job.ID] = job
+	return nil
+}
+
+func (m *Memory) LeaseNextPlaybackJob(ctx context.Context, owner string) (PlaybackJob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, j := range m.playJobs {
+		if j.State == JobQueued {
+			j.State = JobRunning
+			j.LeaseOwner = owner
+			j.UpdatedAt = time.Now().UTC()
+			m.playJobs[id] = j
+			return j, nil
+		}
+	}
+	return PlaybackJob{}, ErrNotFound
 }

@@ -97,6 +97,9 @@ type Actor struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
 	drainOnce sync.Once
+
+	feeders []port.Feeder
+	sinks   []port.Sink
 }
 
 // State returns the current lifecycle state.
@@ -156,9 +159,18 @@ func (a *Actor) Drain(reason string) {
 		a.mu.Lock()
 		a.state = StateDraining
 		a.terminal = term
+		feeders := append([]port.Feeder(nil), a.feeders...)
+		sinks := append([]port.Sink(nil), a.sinks...)
 		a.mu.Unlock()
 		a.Bus.PublishEvent(bus.Event{Kind: "drain", Data: reason})
 		a.Bus.PublishEvent(bus.Event{Kind: "state", Data: StateDraining})
+		ctx := context.Background()
+		for _, f := range feeders {
+			_ = f.Close(ctx)
+		}
+		for _, s := range sinks {
+			_ = s.Close(ctx)
+		}
 		if a.cancel != nil {
 			a.cancel()
 		}
@@ -221,6 +233,76 @@ func (a *Actor) FeedPlaybackBlob(ctx context.Context, pcm []byte) error {
 	}
 	a.Bus.PublishEvent(bus.Event{Kind: "playback_exhausted"})
 	return nil
+}
+
+// AttachFeeder binds a feeder and pumps canonical frames onto the session bus until feeder stops or actor drains.
+func (a *Actor) AttachFeeder(ctx context.Context, f port.Feeder, attachmentID string) {
+	a.mu.Lock()
+	a.feeders = append(a.feeders, f)
+	a.Attachments = append(a.Attachments, Attachment{ID: attachmentID, Kind: "feeder", Role: string(f.ID())})
+	a.mu.Unlock()
+	go a.pumpFeeder(ctx, f)
+}
+
+// AttachSink registers a sink for outbound PCM (Speak → edge).
+func (a *Actor) AttachSink(s port.Sink, attachmentID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sinks = append(a.sinks, s)
+	a.Attachments = append(a.Attachments, Attachment{ID: attachmentID, Kind: "sink", Role: string(s.ID())})
+}
+
+// Sinks returns attached sinks (copy of slice header).
+func (a *Actor) Sinks() []port.Sink {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make([]port.Sink, len(a.sinks))
+	copy(out, a.sinks)
+	return out
+}
+
+func (a *Actor) pumpFeeder(ctx context.Context, f port.Feeder) {
+	frames := f.Frames()
+	events := f.Events()
+	for {
+		select {
+		case <-ctx.Done():
+			_ = f.Close(context.Background())
+			return
+		case fr, ok := <-frames:
+			if !ok {
+				a.Bus.PublishEvent(bus.Event{Kind: "feeder_gone", Data: string(f.ID())})
+				return
+			}
+			a.FeedPCM(fr)
+		case ev, ok := <-events:
+			if !ok {
+				continue
+			}
+			a.Bus.PublishEvent(bus.Event{Kind: "feeder_" + ev.Kind, Data: ev.Data})
+			if ev.Kind == "stop" || ev.Kind == "error" {
+				// File (and FS) feeders may enqueue stop/error while PCM is still
+				// buffered on Frames(); a fair select must not drop those frames.
+				a.drainFeederFrames(frames)
+				return
+			}
+		}
+	}
+}
+
+// drainFeederFrames publishes any PCM already queued on frames (non-blocking).
+func (a *Actor) drainFeederFrames(frames <-chan port.PCMFrame) {
+	for {
+		select {
+		case fr, ok := <-frames:
+			if !ok {
+				return
+			}
+			a.FeedPCM(fr)
+		default:
+			return
+		}
+	}
 }
 
 // StartParams configures a new actor.

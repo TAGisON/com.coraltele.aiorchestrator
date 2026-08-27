@@ -17,4 +17,15 @@ type Repository interface {
 	CreateSession(ctx context.Context, sess Session) error
 	GetSession(ctx context.Context, id string) (Session, error)
 	UpdateSessionState(ctx context.Context, id, state string) (Session, error)
+
+	CreateKBDocument(ctx context.Context, doc KBDocument) error
+	GetKBDocument(ctx context.Context, id string) (KBDocument, error)
+	UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error)
+	ReplaceKBChunks(ctx context.Context, documentID string, chunks []KBChunk) error
+	ListKBChunks(ctx context.Context, tenantID string, collections []string) ([]KBChunk, error)
+
+	CreatePlaybackJob(ctx context.Context, job PlaybackJob) error
+	GetPlaybackJob(ctx context.Context, id string) (PlaybackJob, error)
+	UpdatePlaybackJob(ctx context.Context, job PlaybackJob) error
+	LeaseNextPlaybackJob(ctx context.Context, owner string) (PlaybackJob, error)
 }

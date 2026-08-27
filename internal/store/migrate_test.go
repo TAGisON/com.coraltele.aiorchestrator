@@ -26,6 +26,19 @@ func TestMigrationSQL_HasPhaseBTables(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasPhaseDKBTables(t *testing.T) {
+	body, err := os.ReadFile("migrations/002_phase_d_kb.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, table := range []string{"kb_document", "kb_chunk"} {
+		if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS "+table) {
+			t.Fatalf("migration missing table %s", table)
+		}
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

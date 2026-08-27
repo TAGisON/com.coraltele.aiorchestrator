@@ -167,6 +167,127 @@ paths:
                     type: string
                   reason:
                     type: string
+  /v1/jobs/playback:
+    post:
+      summary: Enqueue file playback job
+      operationId: createPlaybackJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile_id, file_uri]
+              properties:
+                profile_id:
+                  type: string
+                profile_version:
+                  oneOf:
+                    - type: string
+                      enum: [latest]
+                    - type: integer
+                file_uri:
+                  type: string
+                tenant_id:
+                  type: string
+      responses:
+        "201":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  state:
+                    type: string
+                    example: Queued
+  /v1/jobs/{id}:
+    get:
+      summary: Playback (or other) job status
+      operationId: getJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /v1/kb/documents:
+    post:
+      summary: Upload document for ingest-default Knowledge
+      operationId: uploadKBDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection]
+              properties:
+                uri:
+                  type: string
+                collection:
+                  type: string
+                tenant_id:
+                  type: string
+                text:
+                  type: string
+                  description: Inline lab body when uri not used
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                collection:
+                  type: string
+                uri:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created (indexing|ready|failed)
+  /v1/kb/documents/{id}:
+    get:
+      summary: KB document status
+      operationId: getKBDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /edge/fs:
+    get:
+      summary: FreeSWITCH mod_audio_stream WSS (EDGE_FS.md); query token=signed
+      operationId: edgeFS
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: rate
+          in: query
+          schema:
+            type: integer
+            description: Peer sample rate Hz
+      responses:
+        "101":
+          description: Switching Protocols (WebSocket)
+        "401":
+          description: Invalid token
 components:
   schemas:
     ErrorEnvelope:

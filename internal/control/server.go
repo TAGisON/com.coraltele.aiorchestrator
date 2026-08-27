@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
@@ -40,8 +41,12 @@ type Config struct {
 	AuthToken string
 	// OwnerInstance stamped on new sessions.
 	OwnerInstance string
-	// EdgeBaseURL used for stub edge_wss_url (no FS in Phase B).
+	// EdgeBaseURL used for edge_wss_url.
 	EdgeBaseURL string
+	// EdgeTokenSecret HMAC key for signed edge tokens. Empty → random lab secret at New.
+	EdgeTokenSecret []byte
+	// EdgeTokenTTL for issued tokens (default 5m).
+	EdgeTokenTTL time.Duration
 }
 
 // Server serves CONTROL_API Phase B routes (+ Phase C runtime glue).
@@ -65,6 +70,14 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 	if cfg.EdgeBaseURL == "" {
 		cfg.EdgeBaseURL = "wss://localhost/edge/fs"
 	}
+	if len(cfg.EdgeTokenSecret) == 0 {
+		var b [32]byte
+		_, _ = rand.Read(b[:])
+		cfg.EdgeTokenSecret = b[:]
+	}
+	if cfg.EdgeTokenTTL <= 0 {
+		cfg.EdgeTokenTTL = 5 * time.Minute
+	}
 	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux()}
 	s.routes()
 	return s
@@ -81,10 +94,19 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}", s.handleGetSession)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
+	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
+	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
+	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
+	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
 }
 
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Edge uses signed query token (EDGE_FS.md), not Bearer.
+		if strings.HasPrefix(r.URL.Path, "/edge/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if s.cfg.AuthToken == "" {
 			next.ServeHTTP(w, r)
 			return
@@ -235,7 +257,11 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "id generate failed", nil)
 		return
 	}
-	edgeToken, err := newID()
+	edgeToken, err := token.Issue(s.cfg.EdgeTokenSecret, token.Claims{
+		TenantID:  req.TenantID,
+		SessionID: sid,
+		ProfileID: pv.ProfileID,
+	}, s.cfg.EdgeTokenTTL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "token generate failed", nil)
 		return
@@ -399,6 +425,11 @@ func (s *Server) handleStopSession(w http.ResponseWriter, r *http.Request) {
 		"state":      sess.State,
 		"reason":     req.Reason,
 	})
+}
+
+// EdgeTokenSecret returns the HMAC key used for edge tokens (for MountEdge).
+func (s *Server) EdgeTokenSecret() []byte {
+	return s.cfg.EdgeTokenSecret
 }
 
 func decodeJSON(r *http.Request, dst any) error {
