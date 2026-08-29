@@ -164,7 +164,7 @@ func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
 	}
 	mem := store.NewMemory()
 	rt := &control.SessionRuntime{Mgr: session.NewManager(reg)}
-	srv := control.NewWithRuntime(mem, reg, rt, control.Config{})
+	srv := control.NewWithRuntime(mem, reg, rt, control.Config{}, nil)
 	createProfile(t, srv, "rt-lab")
 	publishOK(t, srv, "rt-lab", `{
   "id":"rt-lab",

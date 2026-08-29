@@ -30,7 +30,7 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 	}
 	mem := store.NewMemory()
 	mgr := session.NewManager(reg)
-	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-worker"})
+	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-worker"}, nil)
 	createProfile(t, srv, "e-lab")
 	publishOK(t, srv, "e-lab", `{
   "id":"e-lab",
@@ -130,7 +130,7 @@ func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
 	}
 	mem := store.NewMemory()
 	mgr := session.NewManager(reg)
-	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{})
+	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{}, nil)
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
@@ -214,7 +214,7 @@ func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
 	}
 	mem := store.NewMemory()
 	mgr := session.NewManager(reg)
-	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-edge"})
+	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-edge"}, nil)
 	createProfile(t, srv, "edge-gone-lab")
 	publishOK(t, srv, "edge-gone-lab", `{
   "id":"edge-gone-lab",

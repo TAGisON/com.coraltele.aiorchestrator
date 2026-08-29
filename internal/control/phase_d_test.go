@@ -135,7 +135,7 @@ func TestPlaybackJob_FileFeedsBus(t *testing.T) {
 	mem := store.NewMemory()
 	registerPhaseD(t, reg, mem)
 	mgr := session.NewManager(reg)
-	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{})
+	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{}, nil)
 	createProfile(t, srv, "pb-lab")
 	publishOK(t, srv, "pb-lab", `{
   "id":"pb-lab",

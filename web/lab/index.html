@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Orchestrator — Lab Console</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --bad: #f07178;
+      --warn: #e6c07b;
+      --mono: "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+      --sans: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: var(--sans); min-height: 100vh;
+    }
+    header {
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+      justify-content: space-between; background: #121a24;
+    }
+    header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: 0.02em; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem;
+      border: 1px solid var(--border); color: var(--muted);
+    }
+    .pill.ok { border-color: var(--ok); color: var(--ok); }
+    .pill.bad { border-color: var(--bad); color: var(--bad); }
+    main {
+      display: grid; grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 64px);
+    }
+    nav {
+      border-right: 1px solid var(--border); padding: 1rem 0.75rem;
+      background: #121a24;
+    }
+    nav button {
+      display: block; width: 100%; text-align: left; background: transparent;
+      border: 0; color: var(--muted); padding: 0.55rem 0.75rem; border-radius: 8px;
+      cursor: pointer; font: inherit; margin-bottom: 0.25rem;
+    }
+    nav button:hover, nav button.active { background: var(--panel); color: var(--text); }
+    .content { padding: 1.25rem 1.5rem; overflow: auto; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem;
+    }
+    .panel h2 { margin: 0 0 0.75rem; font-size: 0.95rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; align-items: flex-end; }
+    label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.75rem; color: var(--muted); }
+    input, select, textarea {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 0.45rem 0.6rem; font: inherit; min-width: 160px;
+    }
+    textarea { width: 100%; min-height: 160px; font-family: var(--mono); font-size: 0.8rem; }
+    button.action {
+      background: var(--accent); color: #041018; border: 0; border-radius: 8px;
+      padding: 0.5rem 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    button.action.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    button.action:disabled { opacity: 0.5; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; }
+    pre.log {
+      margin: 0; max-height: 280px; overflow: auto; font-family: var(--mono);
+      font-size: 0.75rem; background: var(--bg); padding: 0.75rem; border-radius: 8px;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      nav { display: flex; flex-wrap: wrap; gap: 0.25rem; border-right: 0; border-bottom: 1px solid var(--border); }
+      nav button { width: auto; }
+      .grid2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Speech-and-Agent Lab Console</h1>
+    <div id="statusPills">
+      <span class="pill" id="pillHealth">health …</span>
+      <span class="pill" id="pillStore">store …</span>
+      <span class="pill" id="pillSarvam">sarvam …</span>
+    </div>
+  </header>
+  <main>
+    <nav id="nav">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="gateways">Gateways</button>
+      <button data-tab="profiles">Profiles</button>
+      <button data-tab="sessions">Sessions</button>
+      <button data-tab="inspect">Inspect session</button>
+      <button data-tab="playback">Playback job</button>
+      <button data-tab="logs">API log</button>
+    </nav>
+    <div class="content">
+      <section class="tab" id="tab-overview">
+        <div class="panel">
+          <h2>Lab status</h2>
+          <pre class="log" id="overviewJson">Loading…</pre>
+          <div class="row">
+            <button class="action" onclick="refreshOverview()">Refresh</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Quick start</h2>
+          <ol style="color:var(--muted); font-size:0.9rem; line-height:1.5;">
+            <li>Confirm store is <strong>postgres</strong> (DATABASE_URL).</li>
+            <li>Create + publish a profile (fakes or Sarvam routers).</li>
+            <li>Create a session, stop it, then inspect audit / analytics.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-gateways" hidden>
+        <div class="panel">
+          <h2>Registered gateways</h2>
+          <div class="row"><button class="action" onclick="loadGateways()">Refresh</button></div>
+          <pre class="log" id="gatewaysJson"></pre>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-profiles" hidden>
+        <div class="grid2">
+          <div class="panel">
+            <h2>Create profile</h2>
+            <div class="row">
+              <label>id <input id="profId" value="lab-fakes" /></label>
+              <label>display_name <input id="profName" value="Lab fakes" /></label>
+            </div>
+            <button class="action" onclick="createProfile()">Create</button>
+          </div>
+          <div class="panel">
+            <h2>Publish version</h2>
+            <div class="row">
+              <label>profile id <input id="pubId" value="lab-fakes" /></label>
+              <label>preset
+                <select id="preset" onchange="applyPreset()">
+                  <option value="fakes">fakes (listen/speak/think)</option>
+                  <option value="sarvam">sarvam + fake failover</option>
+                  <option value="captions">captions listen-only</option>
+                </select>
+              </label>
+            </div>
+            <textarea id="profDoc"></textarea>
+            <div class="row" style="margin-top:0.75rem;">
+              <button class="action" onclick="publishProfile()">Publish</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Profiles in DB</h2>
+          <div class="row"><button class="action secondary" onclick="loadProfiles()">Refresh list</button></div>
+          <table><thead><tr><th>id</th><th>name</th><th>updated</th><th></th></tr></thead>
+          <tbody id="profTable"></tbody></table>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-sessions" hidden>
+        <div class="panel">
+          <h2>Create session</h2>
+          <div class="row">
+            <label>profile_id <input id="sessProfile" value="lab-fakes" /></label>
+            <label>clock
+              <select id="sessClock"><option>live</option><option>playback</option></select>
+            </label>
+            <button class="action" onclick="createSession()">Create</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Sessions</h2>
+          <div class="row"><button class="action secondary" onclick="loadSessions()">Refresh</button></div>
+          <table><thead><tr><th>id</th><th>profile</th><th>state</th><th>clock</th><th></th></tr></thead>
+          <tbody id="sessTable"></tbody></table>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-inspect" hidden>
+        <div class="panel">
+          <h2>Inspect</h2>
+          <div class="row">
+            <label>session_id <input id="inspId" style="min-width:280px" /></label>
+            <button class="action" onclick="inspectSession()">Load</button>
+            <button class="action secondary" onclick="stopSession(document.getElementById('inspId').value)">Stop</button>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="panel"><h2>Session</h2><pre class="log" id="inspSession"></pre></div>
+          <div class="panel"><h2>Audit</h2><pre class="log" id="inspAudit"></pre></div>
+          <div class="panel"><h2>Analytics</h2><pre class="log" id="inspAnalytics"></pre></div>
+          <div class="panel"><h2>SSE (live tail)</h2>
+            <button class="action secondary" onclick="toggleSSE()">Toggle SSE</button>
+            <pre class="log" id="inspSSE"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-playback" hidden>
+        <div class="panel">
+          <h2>Enqueue playback job</h2>
+          <div class="row">
+            <label>profile_id <input id="pbProfile" value="lab-fakes" /></label>
+            <label>file_uri <input id="pbUri" value="file://fixtures/sample.wav" style="min-width:280px" /></label>
+            <button class="action" onclick="createPlayback()">Enqueue</button>
+          </div>
+          <pre class="log" id="pbOut"></pre>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-logs" hidden>
+        <div class="panel">
+          <h2>Browser → API call log</h2>
+          <div class="row"><button class="action secondary" onclick="clearApiLog()">Clear</button></div>
+          <pre class="log" id="apiLog"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

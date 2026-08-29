@@ -22,6 +22,10 @@ Evidence / summaries: sibling worktree `com.coraltele.aiorchestrator-validation-
 Handoff via `.agent/work/<phase>/` + `# agent-approval`; trails archived out of this repo after each feature.  
 Validation pauses after each feature (`next-feature` to continue).
 
+## Lab
+
+Postgres DB `aiorchestrator` + POC console: `docs/LAB.md` → http://127.0.0.1:8080/lab/
+
 ## Hard rules
 
 - Go kernel; no Python/Java media kernel  

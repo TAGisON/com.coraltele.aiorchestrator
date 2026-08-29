@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/control"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coralcrm"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coraltransfer"
@@ -22,64 +22,81 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
+	"github.com/coraltele/com.coraltele.aiorchestrator/web"
 )
 
 func main() {
+	applog.Configure(os.Getenv("LOG_LEVEL"), os.Getenv("LOG_FORMAT"))
+
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
-		fmt.Fprintf(os.Stderr, "register: %v\n", err)
+		applog.Error("register fakes failed", "err", err)
 		os.Exit(1)
 	}
 
 	ctx := context.Background()
 	databaseURL := envOr("DATABASE_URL", "")
+	requireDB := envOr("REQUIRE_DATABASE", "0") == "1" || envOr("REQUIRE_DATABASE", "") == "true"
+
 	var repo store.Repository
 	var closer func()
+	storeBackend := "memory"
 	if databaseURL == "" {
-		fmt.Fprintln(os.Stderr, "DATABASE_URL unset: using in-memory store (lab only)")
+		if requireDB {
+			applog.Error("DATABASE_URL required (REQUIRE_DATABASE=1)")
+			os.Exit(1)
+		}
+		applog.Warn("DATABASE_URL unset: using in-memory store (lab only)")
 		repo = store.NewMemory()
 		closer = func() {}
 	} else {
 		st, err := store.Open(ctx, databaseURL)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "store: %v\n", err)
+			applog.Error("store open failed", "err", err)
 			os.Exit(1)
 		}
 		repo = st
 		closer = st.Close
+		storeBackend = "postgres"
+		applog.Info("postgres connected", "migrations", "applied")
 	}
 	defer closer()
 
 	ing := ingest.New(repo)
 	if err := ingest.Register(reg, ing); err != nil {
-		fmt.Fprintf(os.Stderr, "register ingest: %v\n", err)
+		applog.Error("register ingest failed", "err", err)
 		os.Exit(1)
 	}
 	if err := coraltransfer.Register(reg, &coraltransfer.Gateway{BaseURL: os.Getenv("CORAL_BASE_URL")}); err != nil {
-		fmt.Fprintf(os.Stderr, "register coral-transfer: %v\n", err)
+		applog.Error("register coral-transfer failed", "err", err)
 		os.Exit(1)
 	}
 	if err := coralcrm.Register(reg, &coralcrm.Gateway{BaseURL: os.Getenv("CORAL_BASE_URL")}); err != nil {
-		fmt.Fprintf(os.Stderr, "register coral-crm: %v\n", err)
+		applog.Error("register coral-crm failed", "err", err)
 		os.Exit(1)
 	}
+
+	sarvamConfigured := false
 	if sarvamCfg, err := sarvam.LoadConfig(); err != nil {
-		fmt.Fprintf(os.Stderr, "sarvam config: %v\n", err)
+		applog.Error("sarvam config failed", "err", err)
 		os.Exit(1)
 	} else if sarvamCfg.Configured() {
 		if err := sarvamstt.Register(reg, sarvamstt.New(sarvamCfg)); err != nil {
-			fmt.Fprintf(os.Stderr, "register sarvam-stt: %v\n", err)
+			applog.Error("register sarvam-stt failed", "err", err)
 			os.Exit(1)
 		}
 		if err := sarvamllm.Register(reg, sarvamllm.New(sarvamCfg)); err != nil {
-			fmt.Fprintf(os.Stderr, "register sarvam-llm: %v\n", err)
+			applog.Error("register sarvam-llm failed", "err", err)
 			os.Exit(1)
 		}
 		if err := sarvamtts.Register(reg, sarvamtts.New(sarvamCfg)); err != nil {
-			fmt.Fprintf(os.Stderr, "register sarvam-tts: %v\n", err)
+			applog.Error("register sarvam-tts failed", "err", err)
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stderr, "sarvam gateways registered (sarvam-stt, sarvam-llm, sarvam-tts)")
+		sarvamConfigured = true
+		applog.Info("sarvam gateways registered", "ids", "sarvam-stt,sarvam-llm,sarvam-tts")
+	} else {
+		applog.Info("sarvam not configured (set SARVAM_API_KEY to enable)")
 	}
 
 	cfg := control.Config{
@@ -90,7 +107,12 @@ func main() {
 	}
 	mgr := session.NewManager(reg)
 	rt := &control.SessionRuntime{Mgr: mgr}
-	srv := control.NewWithRuntime(repo, reg, rt, cfg)
+	srv := control.NewWithRuntime(repo, reg, rt, cfg, web.LabFS)
+	srv.SetLabExtras(control.LabExtras{
+		StoreBackend:     storeBackend,
+		SarvamConfigured: sarvamConfigured,
+		HTTPAddr:         envOr("HTTP_ADDR", ":8080"),
+	})
 	srv.MountEdge(srv.EdgeTokenSecret(), mgr)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
@@ -101,16 +123,16 @@ func main() {
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 
 	go func() {
-		fmt.Printf("aiorchestrator control listening on %s\n", addr)
+		applog.Info("control listening", "addr", addr, "lab_ui", "http://127.0.0.1"+addr+"/lab/", "store", storeBackend)
 		kinds := []port.PortKind{
 			port.PortListen, port.PortSpeak, port.PortThink,
 			port.PortTranslate, port.PortKnowledge, port.PortSkill,
 		}
 		for _, k := range kinds {
-			fmt.Printf("  port %s: %d gateway(s)\n", k, len(reg.List(k)))
+			applog.Info("port gateways", "port", string(k), "count", len(reg.List(k)))
 		}
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "http: %v\n", err)
+			applog.Error("http failed", "err", err)
 			os.Exit(1)
 		}
 	}()
@@ -118,6 +140,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
+	applog.Info("shutdown requested")
 	workerCancel()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

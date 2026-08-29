@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
@@ -57,14 +59,17 @@ type Server struct {
 	rt   Runtime
 	cfg  Config
 	mux  *http.ServeMux
+	lab  LabExtras
+	labFS fs.FS
 }
 
 func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
-	return NewWithRuntime(repo, reg, nil, cfg)
+	return NewWithRuntime(repo, reg, nil, cfg, nil)
 }
 
 // NewWithRuntime wires an optional runtime manager for session start/stop.
-func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config) *Server {
+// labFS is optional embed root containing a "lab/" directory for the POC console.
+func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config, labFS fs.FS) *Server {
 	if cfg.OwnerInstance == "" {
 		cfg.OwnerInstance = "local"
 	}
@@ -79,13 +84,13 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 	if cfg.EdgeTokenTTL <= 0 {
 		cfg.EdgeTokenTTL = 5 * time.Minute
 	}
-	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux()}
+	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux(), labFS: labFS}
 	s.routes()
 	return s
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.authMiddleware(s.mux)
+	return s.requestLogMiddleware(s.authMiddleware(s.mux))
 }
 
 func (s *Server) routes() {
@@ -100,12 +105,49 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
 	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
+	s.mountLabRoutes(s.labFS)
+}
+
+func (s *Server) requestLogMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &statusRecorder{ResponseWriter: w, status: 200}
+		next.ServeHTTP(rw, r)
+		applog.Info("http",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"remote", r.RemoteAddr,
+		)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Edge uses signed query token (EDGE_FS.md), not Bearer.
 		if strings.HasPrefix(r.URL.Path, "/edge/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Lab POC static UI does not require Bearer.
+		if s.authMiddlewareLabBypass(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -135,8 +177,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		dbOK = false
 	}
 	writeJSON(w, code, map[string]any{
-		"status": status,
-		"db":     dbOK,
+		"status":        status,
+		"db":            dbOK,
+		"store_backend": s.lab.StoreBackend,
 	})
 }
 

@@ -72,6 +72,22 @@ func (m *Memory) GetProfile(ctx context.Context, id string) (Profile, error) {
 	return p, nil
 }
 
+func (m *Memory) ListProfiles(ctx context.Context, limit int) ([]Profile, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	out := make([]Profile, 0, len(m.profiles))
+	for _, p := range m.profiles {
+		out = append(out, p)
+	}
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (m *Memory) PublishVersion(ctx context.Context, profileID string, doc json.RawMessage) (ProfileVersion, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -134,6 +150,22 @@ func (m *Memory) GetSession(ctx context.Context, id string) (Session, error) {
 		return Session{}, ErrNotFound
 	}
 	return s, nil
+}
+
+func (m *Memory) ListSessions(ctx context.Context, limit int) ([]Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	out := make([]Session, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		out = append(out, s)
+	}
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (m *Memory) UpdateSessionState(ctx context.Context, id, state string) (Session, error) {

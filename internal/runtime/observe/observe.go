@@ -5,9 +5,9 @@ package observe
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -51,7 +51,7 @@ func (o *Observer) Audit(ctx context.Context, eventType string, payload map[stri
 		Payload:   raw,
 	})
 	if err != nil {
-		log.Printf("observe audit fail-open session=%s type=%s err=%v", o.Meta.SessionID, eventType, err)
+		applog.Warn("observe audit fail-open", "session", o.Meta.SessionID, "type", eventType, "err", err)
 	}
 }
 
@@ -76,7 +76,7 @@ func (o *Observer) Metric(ctx context.Context, metric string, value float64, dim
 		Dimensions: raw,
 	})
 	if err != nil {
-		log.Printf("observe analytics fail-open session=%s metric=%s err=%v", o.Meta.SessionID, metric, err)
+		applog.Warn("observe analytics fail-open", "session", o.Meta.SessionID, "metric", metric, "err", err)
 	}
 }
 
