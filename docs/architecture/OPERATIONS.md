@@ -122,3 +122,46 @@ Profile schema unchanged; router provider lists differ.
 - **No audio:** Check edge WS, sink flush logs, Speak gateway health.  
 - **Wrong KB answer:** Audit row → gateway ids + retrieval hash; not logs.  
 - **Stuck session:** Control `GET /sessions/{id}` + force `stop`.
+
+---
+
+## 10. Sarvam lab gateways (Phase F)
+
+Lab realtime Talk can use Sarvam Listen / Think / Speak with fakes as ordered failover. Secrets never go in git.
+
+### Secrets
+
+1. Copy `.agent/secrets.example.json` → `.agent/secrets.local.json` (gitignored).  
+2. Set `sarvam.api_key`, or export `SARVAM_API_KEY` (env wins over file for the key).  
+3. Optional URL overrides: `stt_rest_url`, `stt_ws_url`, `chat_url`, `tts_url` (defaults match public Sarvam hosts in the example file).
+
+`cmd/aiorchestrator` registers `sarvam-stt`, `sarvam-llm`, and `sarvam-tts` only when a key is present. Without a key, CI / lab still run on fakes only.
+
+### Profile provider lists (example)
+
+```yaml
+routers:
+  listen:
+    providers: [sarvam-stt, fake-listen]
+  think:
+    providers: [sarvam-llm, fake-think]
+  speak:
+    providers: [sarvam-tts, fake-speak]
+```
+
+Prefer session canonical PCM at **16 kHz** for lab (Sarvam STT streaming supports 8 kHz / 16 kHz; other rates are resampled in-gateway to 16 kHz).
+
+Defaults: STT `saaras:v3` + `en-IN`; LLM `sarvam-105b-conversations`; TTS Bulbul `bulbul:v3` speaker `shubh`.
+
+### Tests
+
+```text
+# Always (no key / no network to Sarvam required)
+go test ./... -count=1
+
+# Optional live (operator machine only)
+$env:SARVAM_API_KEY = "<from secrets.local.json>"
+go test -tags=sarvam_live ./internal/gateway/sarvamstt -count=1 -v
+```
+
+Never commit `.agent/secrets.local.json` or print API keys in logs/artifacts.

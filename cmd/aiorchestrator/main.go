@@ -14,6 +14,10 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coraltransfer"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/ingest"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvam"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvamllm"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvamstt"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvamtts"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
@@ -58,6 +62,24 @@ func main() {
 	if err := coralcrm.Register(reg, &coralcrm.Gateway{BaseURL: os.Getenv("CORAL_BASE_URL")}); err != nil {
 		fmt.Fprintf(os.Stderr, "register coral-crm: %v\n", err)
 		os.Exit(1)
+	}
+	if sarvamCfg, err := sarvam.LoadConfig(); err != nil {
+		fmt.Fprintf(os.Stderr, "sarvam config: %v\n", err)
+		os.Exit(1)
+	} else if sarvamCfg.Configured() {
+		if err := sarvamstt.Register(reg, sarvamstt.New(sarvamCfg)); err != nil {
+			fmt.Fprintf(os.Stderr, "register sarvam-stt: %v\n", err)
+			os.Exit(1)
+		}
+		if err := sarvamllm.Register(reg, sarvamllm.New(sarvamCfg)); err != nil {
+			fmt.Fprintf(os.Stderr, "register sarvam-llm: %v\n", err)
+			os.Exit(1)
+		}
+		if err := sarvamtts.Register(reg, sarvamtts.New(sarvamCfg)); err != nil {
+			fmt.Fprintf(os.Stderr, "register sarvam-tts: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "sarvam gateways registered (sarvam-stt, sarvam-llm, sarvam-tts)")
 	}
 
 	cfg := control.Config{

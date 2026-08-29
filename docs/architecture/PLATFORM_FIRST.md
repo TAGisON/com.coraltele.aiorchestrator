@@ -109,17 +109,29 @@ Until 1–12 hold, do **not** start external vendor gateways except TTS-Engine (
 
 **Exit:** one completed call leaves audit + analytics + optional disposition.
 
-### Phase F — External vendors (one at a time)
+### Phase F — External vendors (Sarvam lab first)
 
-Order (recommended):
+**Lab decision (2026-08-29):** first real external adapter is **Sarvam**, not Next AI.  
+Implement **three** gateways in this phase so a realtime Talk path can be exercised end-to-end:
 
-1. `nextai-stt` (Listen)  
-2. `nextai-llm` (Think)  
-3. `nextai-tts` (Speak) — failover beside TTS-Engine  
-4. `nextai-mt` (Translate) if interpret profiles  
-5. Tenant `http_kb` / `http_crm` as needed  
+1. `sarvam-stt` (Listen) — default model `saaras:v3`, language `en-IN`  
+2. `sarvam-llm` (Think) — Sarvam chat completions (current recommended model at implement time)  
+3. `sarvam-tts` (Speak) — Bulbul default voice  
 
-Each vendor: implement port → register → pass **same** contract tests as fakes → enable in one profile → measure latency.
+Failover: profile ordered providers include fakes, e.g.  
+`[sarvam-stt, fake-listen]`, `[sarvam-llm, fake-think]`, `[sarvam-tts, fake-speak]`.
+
+Secrets: `SARVAM_API_KEY` or `.agent/secrets.local.json` → `sarvam.api_key` (gitignored). CI remains fake-only when unset.
+
+**Later / follow-up (not this phase exit):**
+
+1. `nextai-stt` / `nextai-llm` / `nextai-tts` / `nextai-mt` when engine docs + credentials exist  
+2. Tenant `http_kb` / `http_crm` as needed  
+3. Bhashini or other Indic providers as additional Listen/Speak gateways  
+
+Each vendor gateway: implement port → register → pass **same** contract tests as fakes → enable in one profile → measure latency. **No** composer / thinkpath changes.
+
+**Exit:** profile-selected Sarvam Listen+Think+Speak works in lab with fakes as failover; contract tests green (fakes always; Sarvam when keyed).
 
 ---
 
@@ -129,7 +141,8 @@ Each vendor: implement port → register → pass **same** contract tests as fak
 |---|---|---|
 | **Fake** | `fake-listen`, `fake-think`, `fake-speak`, … | Always in CI; lab without engines |
 | **First-party** | `tts-engine`, `ingest-default`, `coral-transfer`, `coral-crm`, `file` edge, `modaudiostream` edge | Phase D–E |
-| **External** | `nextai-*`, Sarvam, customer HTTP | Phase F only |
+| **External** | `sarvam-*` (Phase F lab), later `nextai-*`, Bhashini, customer HTTP | Phase F only |
+
 
 TTS-Engine is **not** a special Speak path. Same `Speak` port as `nextai-tts`.
 
@@ -143,7 +156,7 @@ Before merging a vendor gateway:
 - [ ] Declares `Capability` (streaming/batch, cancel, sample rates)  
 - [ ] Maps vendor errors → `GatewayError` codes  
 - [ ] Secrets from vault/env only  
-- [ ] Registered under a stable id (`nextai-stt`)  
+- [ ] Registered under a stable id (`sarvam-stt`, `sarvam-llm`, `sarvam-tts`, …)  
 - [ ] Contract tests pass  
 - [ ] Profile can select it; failover list works  
 - [ ] No import from `internal/runtime/composer` or `thinkpath` into the gateway  

@@ -658,7 +658,8 @@ Operational note: prefer **create session on the instance that will take the WS*
 
 | Item | Why open | Constraint when closed |
 |---|---|---|
-| Next AI STT/LLM/TTS/MT wire formats | Engine docs not in hand | Must map to §9 ports; separate gateways |
+| Next AI STT/LLM/TTS/MT wire formats | Engine docs not in hand | Must map to §9 ports; separate gateways; **Phase F lab uses Sarvam** until Next AI docs arrive |
+| Sarvam STT/LLM/TTS wire formats | Public docs (REST + STT WS) | Phase F first real adapters: `sarvam-stt`, `sarvam-llm`, `sarvam-tts` |
 | Coral auth header/token exact shape | Estate convention | Middleware only; no new IdP |
 | Coral warm-transfer HTTP path | Estate endpoint naming | Payload shape locked in RULES_AND_SKILLS.md |
 | Ingest vector backend | pgvector vs external | Knowledge **port** unchanged |
