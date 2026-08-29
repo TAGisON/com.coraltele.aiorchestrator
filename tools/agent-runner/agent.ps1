@@ -275,7 +275,7 @@ function Clear-WorkerFromStatus {
     ($h | ConvertTo-Json -Depth 8) | Set-Content $StatusPath -Encoding UTF8
 }
 
-function Start-Pipeline([string]$StartPhase, [string]$PipeName) {
+function Start-Pipeline([string]$StartPhase, [string]$PipeName, [string[]]$PriorCompleted = @()) {
     if (-not $PipeName) { $PipeName = Get-DefaultPipelineName }
     $pipe = Load-PipelineDef $PipeName
     if ($pipe.phases -notcontains $StartPhase) {
@@ -289,7 +289,7 @@ function Start-Pipeline([string]$StartPhase, [string]$PipeName) {
         phase            = $StartPhase
         role             = $first
         loop             = 0
-        completed_phases = @()
+        completed_phases = @($PriorCompleted)
         message          = ($first + " ready. Monitor will assign worker.")
         metrics          = @{
             phase_started_at = (Get-Date).ToString("o")
@@ -693,7 +693,9 @@ switch ($Command) {
             if ($last) { $next = Get-NextPhase $last $pipe }
         }
         if (-not $next) { throw "No next feature. Pipeline complete or specify -From F-..." }
-        Start-Pipeline $next $pipe.name
+        $prior = @()
+        if ($st.completed_phases) { $prior = @($st.completed_phases) }
+        Start-Pipeline $next $pipe.name $prior
         Write-Host ("NEXT FEATURE STARTED " + $next)
     }
     "archive-round" {

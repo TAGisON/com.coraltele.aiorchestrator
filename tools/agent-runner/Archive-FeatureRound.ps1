@@ -106,14 +106,19 @@ Set-Content -Path (Join-Path $EvidenceRoot "INDEX.md") -Value $index -Encoding U
 
 Push-Location $EvidenceRoot
 try {
-    git add INDEX.md ("rounds/" + $FeatureId)
+    $ErrorActionPreference = "Continue"
+    git add INDEX.md ("rounds/" + $FeatureId) 2>&1 | Out-Null
     $pending = git status --porcelain
     if ($pending) {
-        git commit -m ("archive: " + $FeatureId + " " + $Result + " (app " + $short + ")")
+        git commit -m ("archive: " + $FeatureId + " " + $Result + " (app " + $short + ")") 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw ("git commit failed exit=" + $LASTEXITCODE) }
         Write-Host ("ARCHIVED " + $FeatureId + " -> " + $EvidenceRoot)
     }
     else {
         Write-Host ("ARCHIVED " + $FeatureId + " (no git changes)")
     }
 }
-finally { Pop-Location }
+finally {
+    $ErrorActionPreference = "Stop"
+    Pop-Location
+}
