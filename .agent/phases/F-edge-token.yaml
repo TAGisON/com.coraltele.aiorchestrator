@@ -1,0 +1,24 @@
+﻿id: F-edge-token
+name: Validate feature — Edge token mint validate
+pipeline: product-validation
+feature_id: F-edge-token
+status: must_test
+exit_criteria:
+  - Scenario for F-edge-token reviewed and approved in scenarios.md
+  - Fixtures for F-edge-token ready (or N/A documented)
+  - go_test / checks for F-edge-token pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-edge-token/
+out_of_scope:
+  - Other features (test only F-edge-token this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/edge/token
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-edge-token.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

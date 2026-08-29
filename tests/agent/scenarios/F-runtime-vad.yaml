@@ -1,0 +1,20 @@
+id: F-runtime-vad
+feature_id: F-runtime-vad
+title: Local VAD
+area: C-runtime
+status: must_test
+tags: [runtime]
+requires: []
+packages: [./internal/runtime/vad]
+fixtures: {}
+what: |
+  Local VAD decisions are unit-tested for speech/silence frames.
+how: |
+  go test ./internal/runtime/vad
+steps:
+  - action: go_test
+    packages: [./internal/runtime/vad]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

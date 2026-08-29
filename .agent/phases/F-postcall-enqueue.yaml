@@ -1,0 +1,25 @@
+﻿id: F-postcall-enqueue
+name: Validate feature — Postcall job on terminal
+pipeline: product-validation
+feature_id: F-postcall-enqueue
+status: must_test
+exit_criteria:
+  - Scenario for F-postcall-enqueue reviewed and approved in scenarios.md
+  - Fixtures for F-postcall-enqueue ready (or N/A documented)
+  - go_test / checks for F-postcall-enqueue pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-postcall-enqueue/
+out_of_scope:
+  - Other features (test only F-postcall-enqueue this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/store
+  - ./internal/control
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-postcall-enqueue.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

@@ -1,0 +1,20 @@
+id: F-control-health
+feature_id: F-control-health
+title: Control health endpoint
+area: B-control
+status: must_test
+tags: [control]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  GET /v1/health responds successfully for a running Control process.
+how: |
+  go test ./internal/control covering health handler
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

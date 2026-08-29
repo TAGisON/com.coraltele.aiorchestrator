@@ -1,0 +1,20 @@
+id: F-edge-file
+feature_id: F-edge-file
+title: File feeder edge
+area: D-edge
+status: must_test
+tags: [edge]
+requires: []
+packages: [./internal/edge/file]
+fixtures: {}
+what: |
+  File edge feeds PCM/frames into the runtime path in unit tests.
+how: |
+  go test ./internal/edge/file
+steps:
+  - action: go_test
+    packages: [./internal/edge/file]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

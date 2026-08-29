@@ -1,0 +1,20 @@
+{
+  "id": "job-contact-agent",
+  "modes": { "listen": true, "speak": true, "think": true },
+  "audio": { "canonical_sample_rate_hz": 16000 },
+  "routers": {
+    "listen": { "providers": ["fake-listen"] },
+    "speak": { "providers": ["fake-speak"] },
+    "think": { "providers": ["fake-think"] }
+  },
+  "skills": {
+    "allowed": ["warm_transfer"],
+    "definitions": {
+      "warm_transfer": {
+        "gateway": "coral-transfer",
+        "authority": "act",
+        "confirm": true
+      }
+    }
+  }
+}

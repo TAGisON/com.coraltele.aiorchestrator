@@ -1,0 +1,20 @@
+id: F-control-kb-upload
+feature_id: F-control-kb-upload
+title: KB document upload
+area: B-control
+status: must_test
+tags: [control, kb]
+requires: []
+packages: [./internal/control, ./internal/gateway/ingest]
+fixtures: {}
+what: |
+  POST /v1/kb/documents accepts upload and status path progresses via ingest-default.
+how: |
+  go test ./internal/control ./internal/gateway/ingest
+steps:
+  - action: go_test
+    packages: [./internal/control, ./internal/gateway/ingest]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

@@ -1,0 +1,20 @@
+id: F-sarvam-stt
+feature_id: F-sarvam-stt
+title: sarvam-stt Listen unit
+area: F-vendor
+status: must_test
+tags: [vendor, sarvam]
+requires: []
+packages: [./internal/gateway/sarvamstt]
+fixtures: {}
+what: |
+  sarvam-stt Listen unit/contract matches fake-listen shape without requiring live API.
+how: |
+  go test ./internal/gateway/sarvamstt
+steps:
+  - action: go_test
+    packages: [./internal/gateway/sarvamstt]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

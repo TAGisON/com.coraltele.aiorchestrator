@@ -1,0 +1,82 @@
+﻿{
+    "name":  "product-validation",
+    "first_role":  "scenario-planner",
+    "roles":  [
+                  "scenario-planner",
+                  "fixture-builder",
+                  "test-runner",
+                  "audit-validator",
+                  "test-reviewer",
+                  "test-summarizer"
+              ],
+    "skills":  {
+                   "scenario-planner":  "coral-validation-scenario-planner",
+                   "fixture-builder":  "coral-validation-fixture-builder",
+                   "test-runner":  "coral-validation-test-runner",
+                   "audit-validator":  "coral-validation-audit-validator",
+                   "test-reviewer":  "coral-validation-test-reviewer",
+                   "test-summarizer":  "coral-validation-test-summarizer"
+               },
+    "artifacts":  {
+                      "scenario-planner":  "scenarios.md",
+                      "fixture-builder":  "fixtures.md",
+                      "test-runner":  "run-log.md",
+                      "audit-validator":  "audit-report.md",
+                      "test-reviewer":  "review.md",
+                      "test-summarizer":  "summary.md"
+                  },
+    "fail_return":  {
+                        "test-reviewer":  "test-runner",
+                        "audit-validator":  "test-runner",
+                        "test-runner":  "fixture-builder",
+                        "fixture-builder":  "scenario-planner",
+                        "test-summarizer":  "test-runner"
+                    },
+    "max_fail_loops":  {
+                           "test-reviewer":  2
+                       },
+    "phases":  [
+                   "F-ports-contract",
+                   "F-router-registry",
+                   "F-fake-trio",
+                   "F-store-migrate",
+                   "F-control-health",
+                   "F-control-profile-crud",
+                   "F-control-profile-422",
+                   "F-control-session-lifecycle",
+                   "F-control-inject",
+                   "F-control-hot-swap",
+                   "F-control-sse-events",
+                   "F-control-playback-job",
+                   "F-control-kb-upload",
+                   "F-openapi",
+                   "F-runtime-session",
+                   "F-runtime-bus",
+                   "F-runtime-clock",
+                   "F-runtime-vad",
+                   "F-runtime-composer",
+                   "F-runtime-thinkpath",
+                   "F-edge-file",
+                   "F-edge-token",
+                   "F-edge-modaudiostream",
+                   "F-gw-ingest",
+                   "F-gw-coral-transfer",
+                   "F-gw-coral-crm",
+                   "F-audit-append",
+                   "F-analytics-events",
+                   "F-postcall-enqueue",
+                   "F-sarvam-stt",
+                   "F-sarvam-llm",
+                   "F-sarvam-tts",
+                   "F-sarvam-failover",
+                   "F-lock-no-pcm-broker",
+                   "F-lock-no-vendor-in-composer",
+                   "F-lock-no-secrets-in-git",
+                   "F-job-contact-agent",
+                   "F-job-captions",
+                   "F-job-playback-mom",
+                   "F-job-copilot"
+               ],
+    "prompt_kind":  "validation",
+    "manifest":  "tests/agent/MANIFEST.yaml"
+}

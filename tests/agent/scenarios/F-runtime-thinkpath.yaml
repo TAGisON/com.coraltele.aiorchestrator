@@ -1,0 +1,20 @@
+id: F-runtime-thinkpath
+feature_id: F-runtime-thinkpath
+title: Think path priority and hooks
+area: C-runtime
+status: must_test
+tags: [runtime, think]
+requires: []
+packages: [./internal/runtime/thinkpath]
+fixtures: {}
+what: |
+  Think path order rules > skills > grounding > LLM; knowledge/skill hooks work with fakes.
+how: |
+  go test ./internal/runtime/thinkpath
+steps:
+  - action: go_test
+    packages: [./internal/runtime/thinkpath]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

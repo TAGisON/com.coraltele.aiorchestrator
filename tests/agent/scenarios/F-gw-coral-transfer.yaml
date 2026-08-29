@@ -1,0 +1,20 @@
+id: F-gw-coral-transfer
+feature_id: F-gw-coral-transfer
+title: coral-transfer skill
+area: D-gateway
+status: must_test
+tags: [gateway, skill]
+requires: []
+packages: [./internal/gateway/coraltransfer]
+fixtures: {}
+what: |
+  coral-transfer Skill executes (HTTP may stub) and emits skill audit hook.
+how: |
+  go test ./internal/gateway/coraltransfer
+steps:
+  - action: go_test
+    packages: [./internal/gateway/coraltransfer]
+expect:
+  go_test: pass
+evidence:
+  kinds: [skill_audit]

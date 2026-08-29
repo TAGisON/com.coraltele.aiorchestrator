@@ -1,0 +1,20 @@
+id: F-control-profile-422
+feature_id: F-control-profile-422
+title: Invalid gateway id returns 422
+area: B-control
+status: must_test
+tags: [control, profile, negative]
+requires: []
+packages: [./internal/control, ./internal/profile]
+fixtures: {}
+what: |
+  Unknown or wrong-rail gateway id at publish yields profile_invalid HTTP 422.
+how: |
+  go test ./internal/control ./internal/profile
+steps:
+  - action: go_test
+    packages: [./internal/control, ./internal/profile]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

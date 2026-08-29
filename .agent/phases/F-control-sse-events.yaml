@@ -1,0 +1,24 @@
+﻿id: F-control-sse-events
+name: Validate feature — Session SSE events
+pipeline: product-validation
+feature_id: F-control-sse-events
+status: must_test
+exit_criteria:
+  - Scenario for F-control-sse-events reviewed and approved in scenarios.md
+  - Fixtures for F-control-sse-events ready (or N/A documented)
+  - go_test / checks for F-control-sse-events pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-control-sse-events/
+out_of_scope:
+  - Other features (test only F-control-sse-events this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/control
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-control-sse-events.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

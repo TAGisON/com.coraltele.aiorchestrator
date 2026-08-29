@@ -1,0 +1,20 @@
+id: F-control-playback-job
+feature_id: F-control-playback-job
+title: Playback job enqueue and get
+area: B-control
+status: must_test
+tags: [control, playback]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  POST /v1/jobs/playback enqueues a job and job get returns status/row.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [playback_job]

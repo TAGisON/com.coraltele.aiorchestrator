@@ -1,0 +1,20 @@
+id: F-gw-ingest
+feature_id: F-gw-ingest
+title: ingest-default Knowledge
+area: D-gateway
+status: must_test
+tags: [gateway, kb]
+requires: []
+packages: [./internal/gateway/ingest]
+fixtures: {}
+what: |
+  ingest-default Knowledge gateway indexes and retrieves uploaded documents.
+how: |
+  go test ./internal/gateway/ingest
+steps:
+  - action: go_test
+    packages: [./internal/gateway/ingest]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

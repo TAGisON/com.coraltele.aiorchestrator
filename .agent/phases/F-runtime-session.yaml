@@ -1,0 +1,24 @@
+﻿id: F-runtime-session
+name: Validate feature — Session actor lifecycle
+pipeline: product-validation
+feature_id: F-runtime-session
+status: must_test
+exit_criteria:
+  - Scenario for F-runtime-session reviewed and approved in scenarios.md
+  - Fixtures for F-runtime-session ready (or N/A documented)
+  - go_test / checks for F-runtime-session pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-runtime-session/
+out_of_scope:
+  - Other features (test only F-runtime-session this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/runtime/session
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-runtime-session.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

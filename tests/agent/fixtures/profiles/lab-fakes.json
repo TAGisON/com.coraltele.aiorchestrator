@@ -1,0 +1,10 @@
+{
+  "id": "lab-fakes",
+  "modes": { "listen": true, "speak": true, "think": true },
+  "audio": { "canonical_sample_rate_hz": 16000 },
+  "routers": {
+    "listen": { "providers": ["fake-listen"] },
+    "speak": { "providers": ["fake-speak"] },
+    "think": { "providers": ["fake-think"] }
+  }
+}

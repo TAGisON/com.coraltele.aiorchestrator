@@ -1,0 +1,24 @@
+﻿id: F-runtime-bus
+name: Validate feature — In-process event bus
+pipeline: product-validation
+feature_id: F-runtime-bus
+status: must_test
+exit_criteria:
+  - Scenario for F-runtime-bus reviewed and approved in scenarios.md
+  - Fixtures for F-runtime-bus ready (or N/A documented)
+  - go_test / checks for F-runtime-bus pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-runtime-bus/
+out_of_scope:
+  - Other features (test only F-runtime-bus this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/runtime/bus
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-runtime-bus.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

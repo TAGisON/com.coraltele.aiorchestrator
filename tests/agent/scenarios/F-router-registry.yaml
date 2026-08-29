@@ -1,0 +1,20 @@
+id: F-router-registry
+feature_id: F-router-registry
+title: Registry and profile validation
+area: A-ports
+status: must_test
+tags: [ports]
+requires: []
+packages: [./internal/router, ./internal/profile]
+fixtures: {}
+what: |
+  Profile gateway ids resolve via registry; wrong rail or unknown id rejected at selection or Validate.
+how: |
+  go test ./internal/router ./internal/profile
+steps:
+  - action: go_test
+    packages: [./internal/router, ./internal/profile]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

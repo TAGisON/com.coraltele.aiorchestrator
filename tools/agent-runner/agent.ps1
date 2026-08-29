@@ -1,12 +1,6 @@
 <#
 .SYNOPSIS
-  Coral agentic phase pipeline runner (v0: artifact + mail + human control).
-
-.EXAMPLE
-  .\tools\agent-runner\agent.ps1 start -From phase-a
-  .\tools\agent-runner\agent.ps1 next-prompt
-  .\tools\agent-runner\agent.ps1 complete-role -Result pass
-  .\tools\agent-runner\agent.ps1 status
+  Coral agentic pipeline runner (phase build + product validation).
 #>
 [CmdletBinding()]
 param(
@@ -20,50 +14,99 @@ param(
 
     [string]$From,
     [string]$Phase,
+    [string]$Pipeline = "",
     [string]$Id,
     [string]$Answer,
     [ValidateSet("pass", "fail", "blocker")]
     [string]$Result = "pass",
     [int]$Tail = 40,
-    [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    [string]$RepoRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $RepoRoot) {
+    if ($PSScriptRoot) {
+        $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    }
+    else {
+        $RepoRoot = (Resolve-Path (Join-Path $PWD ".\")).Path
+        if (-not (Test-Path (Join-Path $RepoRoot ".agent"))) {
+            $RepoRoot = "C:\Users\user\Documents\GitHub\com.coraltele.aiorchestrator"
+        }
+    }
+}
 $AgentDir = Join-Path $RepoRoot ".agent"
 $StatusPath = Join-Path $AgentDir "status.json"
 $AuditPath = Join-Path $AgentDir "audit.jsonl"
 $QueuePath = Join-Path $AgentDir "queue.json"
 $ConfigPath = Join-Path $AgentDir "config.yaml"
+$PipelinesDir = Join-Path $AgentDir "pipelines"
 $MailScript = Join-Path $RepoRoot "tools\notify\Send-AgentMail.ps1"
 
-$RoleOrder = @("planner", "coder", "reviewer", "summarizer")
-$SkillMap = @{
-    planner    = "coral-phase-planner"
-    coder      = "coral-phase-coder"
-    reviewer   = "coral-phase-reviewer"
-    summarizer = "coral-phase-summarizer"
+function ConvertTo-StringMap($obj) {
+    $h = @{}
+    if ($null -eq $obj) { return $h }
+    if ($obj -is [hashtable]) { return $obj }
+    $obj.PSObject.Properties | ForEach-Object { $h[$_.Name] = [string]$_.Value }
+    return $h
 }
 
-function Get-ConfigPhases {
-    if (-not (Test-Path $ConfigPath)) { return @("phase-a", "phase-b", "phase-c", "phase-d", "phase-e", "phase-f") }
-    $lines = Get-Content $ConfigPath
-    $inPhases = $false
-    $list = @()
-    foreach ($line in $lines) {
-        if ($line -match '^\s*phases:\s*$') { $inPhases = $true; continue }
-        if ($inPhases) {
-            if ($line -match '^\S') { break }
-            if ($line -match '^\s*-\s*(\S+)') { $list += $Matches[1] }
-        }
+function ConvertTo-IntMap($obj) {
+    $h = @{}
+    if ($null -eq $obj) { return $h }
+    if ($obj -is [hashtable]) {
+        foreach ($k in $obj.Keys) { $h[$k] = [int]$obj[$k] }
+        return $h
     }
-    if ($list.Count -eq 0) { return @("phase-a", "phase-b", "phase-c", "phase-d", "phase-e", "phase-f") }
-    return $list
+    $obj.PSObject.Properties | ForEach-Object { $h[$_.Name] = [int]$_.Value }
+    return $h
+}
+
+function Get-DefaultPipelineName {
+    if (-not (Test-Path $ConfigPath)) { return "coral-phase" }
+    foreach ($line in Get-Content $ConfigPath) {
+        if ($line -match '^\s*pipeline:\s*(\S+)') { return $Matches[1].Trim() }
+    }
+    return "coral-phase"
+}
+
+function Load-PipelineDef([string]$Name) {
+    if (-not $Name) { $Name = Get-DefaultPipelineName }
+    $path = Join-Path $PipelinesDir ($Name + ".json")
+    if (-not (Test-Path $path)) {
+        throw ("Unknown pipeline '" + $Name + "' (missing " + $path + ")")
+    }
+    $raw = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+    return [pscustomobject]@{
+        name           = [string]$raw.name
+        first_role     = [string]$raw.first_role
+        roles          = @($raw.roles)
+        skills         = ConvertTo-StringMap $raw.skills
+        artifacts      = ConvertTo-StringMap $raw.artifacts
+        fail_return    = ConvertTo-StringMap $raw.fail_return
+        max_fail_loops = ConvertTo-IntMap $raw.max_fail_loops
+        phases         = @($raw.phases)
+        prompt_kind    = $(if ($raw.prompt_kind) { [string]$raw.prompt_kind } else { "phase" })
+        manifest       = $(if ($raw.manifest) { [string]$raw.manifest } else { $null })
+    }
+}
+
+function Get-ActivePipelineName {
+    if (Test-Path $StatusPath) {
+        $st = Get-Content $StatusPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($st.pipeline) { return [string]$st.pipeline }
+    }
+    return Get-DefaultPipelineName
+}
+
+function Get-ActivePipeline {
+    return Load-PipelineDef (Get-ActivePipelineName)
 }
 
 function Read-Status {
     if (-not (Test-Path $StatusPath)) {
         return [pscustomobject]@{
-            pipeline   = "coral-phase"
+            pipeline   = Get-DefaultPipelineName
             state      = "idle"
             phase      = $null
             role       = $null
@@ -72,12 +115,12 @@ function Read-Status {
             message    = "No status yet. Run Install.ps1 then start."
         }
     }
-    return Get-Content $StatusPath -Raw | ConvertFrom-Json
+    return Get-Content $StatusPath -Raw -Encoding UTF8 | ConvertFrom-Json
 }
 
 function Write-Status([hashtable]$Hash) {
     $Hash["updated_at"] = (Get-Date).ToString("o")
-    ($Hash | ConvertTo-Json -Depth 6) | Set-Content $StatusPath -Encoding UTF8
+    ($Hash | ConvertTo-Json -Depth 8) | Set-Content $StatusPath -Encoding UTF8
 }
 
 function Write-Audit([string]$Cmd, [string]$Detail, [string]$ResultName = "ok") {
@@ -93,63 +136,70 @@ function Write-Audit([string]$Cmd, [string]$Detail, [string]$ResultName = "ok") 
         result = $ResultName
         detail = $Detail
     }
-    Add-Content -Path $AuditPath -Value (($row | ConvertTo-Json -Compress)) -Encoding UTF8
+    $line = ($row | ConvertTo-Json -Compress)
+    for ($i = 0; $i -lt 5; $i++) {
+        try {
+            Add-Content -Path $AuditPath -Value $line -Encoding UTF8 -ErrorAction Stop
+            return
+        }
+        catch {
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    Write-Warning "audit write skipped (file locked)"
 }
 
 function Send-Notify([string]$Subject, [string]$Body) {
     if ($env:AGENT_NO_MAIL -eq "1") {
-        Write-Host "(AGENT_NO_MAIL=1) skip mail: $Subject"
+        Write-Host ("(AGENT_NO_MAIL=1) skip mail: " + $Subject)
         return
     }
     if (-not (Test-Path $MailScript)) {
-        Write-Warning "Mail script missing: $MailScript"
+        Write-Warning "Mail script missing"
         return
     }
     $secrets = Join-Path $AgentDir "secrets.local.json"
     if (-not (Test-Path $secrets)) {
-        Write-Warning "No secrets.local.json — skip mail. Run Install.ps1"
+        Write-Warning "No secrets.local.json - skip mail. Run Install.ps1"
         return
     }
     try {
         & $MailScript -Subject $Subject -Body $Body -RepoRoot $RepoRoot
     }
     catch {
-        Write-Warning "Mail failed: $_"
+        Write-Warning ("Mail failed: " + $_)
     }
 }
 
 function Ensure-WorkDir([string]$PhaseId) {
-    $dir = Join-Path $AgentDir "work\$PhaseId"
+    $dir = Join-Path $AgentDir ("work\" + $PhaseId)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     return $dir
 }
 
-function Get-NextPhase([string]$Current) {
-    $phases = @(Get-ConfigPhases)
+function Get-NextPhase([string]$Current, $Pipe) {
+    $phases = @($Pipe.phases)
     $idx = [array]::IndexOf($phases, $Current)
     if ($idx -lt 0 -or $idx -ge $phases.Count - 1) { return $null }
     return $phases[$idx + 1]
 }
 
-function Get-NextRole([string]$Role) {
-    $idx = [array]::IndexOf($RoleOrder, $Role)
-    if ($idx -lt 0 -or $idx -ge $RoleOrder.Count - 1) { return $null }
-    return $RoleOrder[$idx + 1]
+function Get-NextRole([string]$Role, $Pipe) {
+    $roles = @($Pipe.roles)
+    $idx = [array]::IndexOf($roles, $Role)
+    if ($idx -lt 0 -or $idx -ge $roles.Count - 1) { return $null }
+    return $roles[$idx + 1]
 }
 
-function Get-ApprovalPath([string]$PhaseId, [string]$Role) {
-    $map = @{
-        planner    = "plan.md"
-        coder      = "implementation.md"
-        reviewer   = "review.md"
-        summarizer = "summary.md"
-    }
-    return Join-Path (Join-Path $AgentDir "work\$PhaseId") $map[$Role]
+function Get-ApprovalPath([string]$PhaseId, [string]$Role, $Pipe) {
+    $file = $Pipe.artifacts[$Role]
+    if (-not $file) { throw ("No artifact mapped for role=" + $Role + " pipeline=" + $Pipe.name) }
+    return Join-Path (Join-Path $AgentDir ("work\" + $PhaseId)) $file
 }
 
 function Parse-Approval([string]$Path) {
     if (-not (Test-Path $Path)) { return $null }
-    $raw = Get-Content $Path -Raw
+    $raw = Get-Content $Path -Raw -Encoding UTF8
     if ($raw -notmatch '(?s)#\s*agent-approval\s*\r?\n(.*)$') { return $null }
     $block = $Matches[1]
     $result = $null
@@ -157,334 +207,427 @@ function Parse-Approval([string]$Path) {
     return [pscustomobject]@{ result = $result; block = $block }
 }
 
-function Build-Prompt([string]$PhaseId, [string]$Role) {
-    $skill = $SkillMap[$Role]
-    $phaseFile = Join-Path $AgentDir "phases\$PhaseId.yaml"
-    $work = Join-Path $AgentDir "work\$PhaseId"
-    # Single-quoted here-string so leading dashes are not parsed as operators.
-    $prompt = @'
-You are running the Coral agentic phase pipeline.
+function Build-Prompt([string]$PhaseId, [string]$Role, $Pipe) {
+    $skill = $Pipe.skills[$Role]
+    $phaseFile = Join-Path $AgentDir ("phases\" + $PhaseId + ".yaml")
+    $work = Join-Path $AgentDir ("work\" + $PhaseId)
+    $kind = $Pipe.prompt_kind
+    $extra = ""
+    if ($kind -eq "validation") {
+        $man = $Pipe.manifest
+        if (-not $man) { $man = "tests/agent/MANIFEST.yaml" }
+        $extra = @"
 
-ROLE: __ROLE__
-SKILL: use skill `__SKILL__` (follow it strictly)
-PHASE: __PHASE__
-PHASE FILE: __PHASE_FILE__
-WORK DIR: __WORK__
-REPO: __REPO__
+Validation contract (ONE FEATURE this round):
+* PHASE/WAVE id is the feature id: $PhaseId — test ONLY this feature; do not expand to other F-* ids
+* Catalog: tests/agent/FEATURES.md + tests/agent/features/catalog.yaml
+* Scenario file: tests/agent/scenarios/$PhaseId.yaml (refine if needed)
+* Universal layout: $man (blocker class spec if missing)
+* Docs: docs/VALIDATION_PIPELINE.md
+* Skip fs_edge / live_vendor unless this feature requires them and they are configured
+* Test-summarizer: re-run this feature verify; commit validation trail only if green (never secrets)
+* Trail: all role artifacts under WORK DIR for this feature only
+"@
+    }
+    else {
+        $extra = @"
 
+Phase build rules:
+* Architecture locks: docs/architecture/PLATFORM_FIRST.md and phase docs
+* Planner: review git log of prior phases first
+* Summarizer: re-run verify then git commit only if green
+"@
+    }
+    $prompt = @"
+You are running the Coral agentic pipeline ($($Pipe.name)).
+
+ROLE: $Role
+SKILL: use skill $skill (follow it strictly)
+PHASE/WAVE: $PhaseId
+PHASE FILE: $phaseFile
+WORK DIR: $work
+REPO: $RepoRoot
+$extra
 Rules:
 * Separate session; do not trust other roles chat.
 * Read artifacts and git; write only your role outputs under WORK DIR.
 * End your artifact with # agent-approval (see .agent/templates/approval.md).
-* Architecture locks: docs/architecture/PLATFORM_FIRST.md and phase docs.
 
-When finished, tell the operator to run:
-  .\tools\agent-runner\agent.ps1 complete-role -Result <pass|fail|blocker>
-'@
-    $prompt = $prompt.Replace('__ROLE__', $Role).Replace('__SKILL__', $skill).
-        Replace('__PHASE__', $PhaseId).Replace('__PHASE_FILE__', $phaseFile).
-        Replace('__WORK__', $work).Replace('__REPO__', $RepoRoot)
+When finished, ensure # agent-approval is written. Monitor will advance automatically.
+"@
     return $prompt
 }
 
-function Start-Pipeline([string]$StartPhase) {
-    $phases = @(Get-ConfigPhases)
-    if ($phases -notcontains $StartPhase) { throw "Unknown phase: $StartPhase. Known: $($phases -join ', ')" }
-    Ensure-WorkDir $StartPhase | Out-Null
-    Write-Status @{
-        pipeline   = "coral-phase"
-        state      = "running"
-        phase      = $StartPhase
-        role       = "planner"
-        loop       = 0
-        message    = "Planner ready. Run next-prompt and paste into a new Cursor agent chat."
+function Clear-WorkerFromStatus {
+    $st = Read-Status
+    $h = [ordered]@{}
+    foreach ($p in $st.PSObject.Properties) {
+        if ($p.Name -eq "worker") { continue }
+        $h[$p.Name] = $p.Value
     }
-    Write-Audit "start" "from=$StartPhase role=planner"
-    $subj = "[aiorchestrator] $StartPhase · planner · STARTED"
-    $body = @"
-Pipeline started.
+    $h["updated_at"] = (Get-Date).ToString("o")
+    ($h | ConvertTo-Json -Depth 8) | Set-Content $StatusPath -Encoding UTF8
+}
 
-Phase: $StartPhase
-Role: planner
-Repo: $RepoRoot
-
-Next:
-  cd $RepoRoot
-  .\tools\agent-runner\agent.ps1 next-prompt
-  (paste into new Cursor agent chat)
-  .\tools\agent-runner\agent.ps1 complete-role -Result pass
-
-Status: .\tools\agent-runner\agent.ps1 status
-Stop:   .\tools\agent-runner\agent.ps1 stop
-"@
-    Send-Notify $subj $body
-    Write-Host $subj
-    Write-Host "Run: .\tools\agent-runner\agent.ps1 next-prompt"
+function Start-Pipeline([string]$StartPhase, [string]$PipeName) {
+    if (-not $PipeName) { $PipeName = Get-DefaultPipelineName }
+    $pipe = Load-PipelineDef $PipeName
+    if ($pipe.phases -notcontains $StartPhase) {
+        throw ("Unknown phase '" + $StartPhase + "' for pipeline " + $PipeName + "; allowed: " + ($pipe.phases -join ", "))
+    }
+    Ensure-WorkDir $StartPhase | Out-Null
+    $first = $pipe.first_role
+    Write-Status @{
+        pipeline         = $pipe.name
+        state            = "running"
+        phase            = $StartPhase
+        role             = $first
+        loop             = 0
+        completed_phases = @()
+        message          = ($first + " ready. Monitor will assign worker.")
+        metrics          = @{
+            phase_started_at = (Get-Date).ToString("o")
+            roles            = @{}
+        }
+    }
+    Write-Audit "start" ("pipeline=" + $pipe.name + " from=" + $StartPhase + " role=" + $first)
+    Send-Notify ("[aiorchestrator] " + $StartPhase + " " + $first + " STARTED") ("pipeline=" + $pipe.name + " Repo: " + $RepoRoot)
+    Write-Host ("STARTED pipeline=" + $pipe.name + " " + $StartPhase + " role=" + $first)
 }
 
 function Complete-CurrentRole([string]$ForcedResult) {
     $st = Read-Status
+    $pipe = Load-PipelineDef $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
+    $pipeName = $pipe.name
+
     if ($st.state -eq "stopped") { throw "Pipeline stopped. resume first." }
-    if ($st.state -eq "waiting_human") { throw "waiting_human — use decide / continue after answering queue." }
+    if ($st.state -eq "waiting_human") { throw "waiting_human - use decide / continue" }
     if (-not $st.phase -or -not $st.role) { throw "No active phase/role. start first." }
 
-    $path = Get-ApprovalPath $st.phase $st.role
+    $path = Get-ApprovalPath $st.phase $st.role $pipe
     $parsed = Parse-Approval $path
-    $res = $ForcedResult
-    if ($parsed -and $parsed.result) { $res = $parsed.result }
-    if (-not $res) { $res = "pass" }
+    if (-not $parsed -or -not $parsed.result) {
+        throw ("complete-role refused: missing # agent-approval result in " + $path)
+    }
+    $res = [string]$parsed.result
+    if ($ForcedResult -and $ForcedResult -ne $res) {
+        Write-Audit "complete-role" ("forced=" + $ForcedResult + " ignored; artifact=" + $res) "warn"
+    }
 
-    Write-Audit "complete-role" "file=$path" $res
+    Write-Audit "complete-role" ("file=" + $path) $res
+
+    $roleKey = [string]$st.role
+    $metrics = @{}
+    if ($st.metrics) {
+        $st.metrics.PSObject.Properties | ForEach-Object { $metrics[$_.Name] = $_.Value }
+    }
+    $rolesMet = @{}
+    if ($metrics["roles"]) {
+        $rm = $metrics["roles"]
+        if ($rm -is [hashtable]) { $rolesMet = $rm }
+        else { $rm.PSObject.Properties | ForEach-Object { $rolesMet[$_.Name] = $_.Value } }
+    }
+    $started = $null
+    if ($st.worker -and $st.worker.started_at) { $started = [datetime]$st.worker.started_at }
+    $ended = Get-Date
+    $dur = $null
+    if ($started) { $dur = [math]::Round(($ended - $started).TotalSeconds, 1) }
+    $rolesMet[$roleKey] = @{
+        result     = $res
+        pid        = $(if ($st.worker) { $st.worker.pid } else { $null })
+        session_id = $(if ($st.worker) { $st.worker.session_id } else { $null })
+        started_at = $(if ($st.worker) { $st.worker.started_at } else { $null })
+        ended_at   = $ended.ToString("o")
+        duration_s = $dur
+    }
+    $metrics["roles"] = $rolesMet
 
     if ($res -eq "blocker") {
         Write-Status @{
-            pipeline   = "coral-phase"
-            state      = "waiting_human"
-            phase      = $st.phase
-            role       = $st.role
-            loop       = [int]$st.loop
-            message    = "Blocker reported. See .agent/work/$($st.phase)/blockers.md and decide/continue."
+            pipeline         = $pipeName
+            state            = "waiting_human"
+            phase            = $st.phase
+            role             = $st.role
+            loop             = [int]$st.loop
+            completed_phases = @($st.completed_phases)
+            metrics          = $metrics
+            message          = "Blocker. See blockers.md"
         }
-        # try return_to from blockers — default plan -> planner
-        $returnTo = "planner"
-        if ($st.role -eq "coder") { $returnTo = "planner" }
-        if ($st.role -eq "reviewer") { $returnTo = "coder" }
-        Send-Notify "[aiorchestrator] $($st.phase) · $($st.role) · BLOCKER" @"
-Blocker on $($st.phase) / $($st.role).
-
-Suggested return: $returnTo
-Check: .agent\work\$($st.phase)\blockers.md
-
-Commands:
-  .\tools\agent-runner\agent.ps1 status
-  .\tools\agent-runner\agent.ps1 decide -Id B1 -Answer <text>
-  .\tools\agent-runner\agent.ps1 continue
-  or restart role via resume after editing status (advanced)
-"@
-        Write-Host "BLOCKER — mailed. State=waiting_human"
+        Send-Notify ("[aiorchestrator] " + $st.phase + " " + $st.role + " BLOCKER") "See blockers.md"
+        Write-Host "BLOCKER waiting_human"
         return
     }
 
     if ($res -eq "fail") {
         $loop = [int]$st.loop
-        if ($st.role -eq "reviewer") {
+        $returnTo = $pipe.fail_return[$st.role]
+        $maxLoops = 0
+        if ($pipe.max_fail_loops.ContainsKey($st.role)) {
+            $maxLoops = [int]$pipe.max_fail_loops[$st.role]
+        }
+        if ($returnTo -and $maxLoops -gt 0) {
             $loop++
-            $max = 2
-            if ($loop -gt $max) {
+            if ($loop -gt $maxLoops) {
                 Write-Status @{
-                    pipeline = "coral-phase"; state = "waiting_human"; phase = $st.phase
-                    role = $st.role; loop = $loop
-                    message = "Max coder-review loops exceeded. Human required."
+                    pipeline         = $pipeName
+                    state            = "waiting_human"
+                    phase            = $st.phase
+                    role             = $st.role
+                    loop             = $loop
+                    metrics          = $metrics
+                    completed_phases = @($st.completed_phases)
+                    message          = ("Max fail loops exceeded for " + $st.role)
                 }
-                Send-Notify "[aiorchestrator] $($st.phase) · MAX LOOPS" "Reviewer failed after $max loops. Human decision needed."
+                Write-Host "MAX LOOPS waiting_human"
                 return
             }
             Write-Status @{
-                pipeline = "coral-phase"; state = "running"; phase = $st.phase
-                role = "coder"; loop = $loop
-                message = "Reviewer FAIL → coder (loop $loop). Run next-prompt."
+                pipeline         = $pipeName
+                state            = "running"
+                phase            = $st.phase
+                role             = $returnTo
+                loop             = $loop
+                metrics          = $metrics
+                completed_phases = @($st.completed_phases)
+                message          = ($st.role + " FAIL -> " + $returnTo + " loop " + $loop)
             }
-            Send-Notify "[aiorchestrator] $($st.phase) · reviewer · FAIL → coder" "Loop=$loop. Fix per review.md then complete-role."
-            Write-Host "→ coder (loop $loop). next-prompt"
+            Write-Host ("ADVANCE -> " + $returnTo + " loop " + $loop)
             return
         }
-        if ($st.role -eq "coder") {
+        if ($returnTo) {
             Write-Status @{
-                pipeline = "coral-phase"; state = "running"; phase = $st.phase
-                role = "planner"; loop = 0
-                message = "Coder FAIL/plan issue → planner. Run next-prompt."
+                pipeline         = $pipeName
+                state            = "running"
+                phase            = $st.phase
+                role             = $returnTo
+                loop             = $loop
+                metrics          = $metrics
+                completed_phases = @($st.completed_phases)
+                message          = ($st.role + " FAIL -> " + $returnTo)
             }
-            Send-Notify "[aiorchestrator] $($st.phase) · coder · FAIL → planner" "Re-plan required. See implementation.md / blockers."
-            Write-Host "→ planner. next-prompt"
+            Write-Host ("ADVANCE -> " + $returnTo)
             return
         }
-        if ($st.role -eq "summarizer") {
-            Write-Status @{
-                pipeline = "coral-phase"; state = "running"; phase = $st.phase
-                role = "coder"; loop = [int]$st.loop
-                message = "Summarizer says exit not met → coder."
-            }
-            Send-Notify "[aiorchestrator] $($st.phase) · summarizer · FAIL → coder" "Exit criteria not met. See summary.md"
-            Write-Host "→ coder. next-prompt"
-            return
-        }
-        Write-Host "FAIL on $($st.role) — no automatic route; set waiting_human"
         Write-Status @{
-            pipeline = "coral-phase"; state = "waiting_human"; phase = $st.phase
-            role = $st.role; loop = [int]$st.loop; message = "Unhandled fail."
+            pipeline         = $pipeName
+            state            = "waiting_human"
+            phase            = $st.phase
+            role             = $st.role
+            loop             = $loop
+            metrics          = $metrics
+            completed_phases = @($st.completed_phases)
+            message          = "Unhandled fail."
         }
         return
     }
 
-    # pass
-    $nextRole = Get-NextRole $st.role
+    $nextRole = Get-NextRole $st.role $pipe
     if ($nextRole) {
         Write-Status @{
-            pipeline = "coral-phase"; state = "running"; phase = $st.phase
-            role = $nextRole; loop = [int]$st.loop
-            message = "$($st.role) PASS → $nextRole. Run next-prompt."
+            pipeline         = $pipeName
+            state            = "running"
+            phase            = $st.phase
+            role             = $nextRole
+            loop             = [int]$st.loop
+            metrics          = $metrics
+            completed_phases = @($st.completed_phases)
+            message          = ($st.role + " PASS -> " + $nextRole)
         }
-        Send-Notify "[aiorchestrator] $($st.phase) · $($st.role) · PASS → $nextRole" @"
-$($st.role) passed for $($st.phase).
-
-Next role: $nextRole
-  .\tools\agent-runner\agent.ps1 next-prompt
-"@
-        Write-Host "→ $nextRole. next-prompt"
+        Send-Notify ("[aiorchestrator] " + $st.phase + " " + $st.role + " PASS") ("Next: " + $nextRole)
+        Write-Host ("ADVANCE -> " + $nextRole)
         return
     }
 
-    # summarizer pass → phase done
-    $nextPhase = Get-NextPhase $st.phase
-    Send-Notify "[aiorchestrator] $($st.phase) · PHASE COMPLETE" @"
-Phase $($st.phase) completed (summarizer pass).
-
-Work: .agent\work\$($st.phase)\
-Next phase: $(if ($nextPhase) { $nextPhase } else { '(none — pipeline done)' })
-"@
+    $nextPhase = Get-NextPhase $st.phase $pipe
+    $done = @()
+    if ($st.completed_phases) { $done = @($st.completed_phases) }
+    $done += $st.phase
+    Send-Notify ("[aiorchestrator] " + $st.phase + " PHASE COMPLETE") ("Next: " + $nextPhase)
     if ($nextPhase) {
         Ensure-WorkDir $nextPhase | Out-Null
         Write-Status @{
-            pipeline = "coral-phase"; state = "running"; phase = $nextPhase
-            role = "planner"; loop = 0
-            message = "Phase $($st.phase) done → $nextPhase planner. Run next-prompt."
+            pipeline         = $pipeName
+            state            = "running"
+            phase            = $nextPhase
+            role             = $pipe.first_role
+            loop             = 0
+            completed_phases = $done
+            metrics          = @{
+                phase_started_at = (Get-Date).ToString("o")
+                roles            = @{}
+                prior_phase      = $st.phase
+                prior_metrics    = $metrics
+            }
+            message          = ($st.phase + " done -> " + $nextPhase + " " + $pipe.first_role)
         }
-        Write-Audit "phase-complete" "$($st.phase) -> $nextPhase"
-        Write-Host "PHASE DONE → $nextPhase planner. next-prompt"
+        Write-Audit "phase-complete" ($st.phase + " -> " + $nextPhase)
+        Write-Host ("PHASE DONE -> " + $nextPhase)
     }
     else {
         Write-Status @{
-            pipeline = "coral-phase"; state = "pipeline_done"; phase = $st.phase
-            role = $null; loop = 0; message = "All phases complete."
+            pipeline         = $pipeName
+            state            = "pipeline_done"
+            phase            = $st.phase
+            role             = $null
+            loop             = 0
+            completed_phases = $done
+            metrics          = $metrics
+            message          = "All phases complete."
         }
         Write-Audit "pipeline-done" $st.phase
-        Send-Notify "[aiorchestrator] PIPELINE DONE" "All configured phases finished."
         Write-Host "PIPELINE DONE"
     }
 }
 
-# --- command dispatch ---
 switch ($Command) {
     "mail-test" {
-        Send-Notify "[aiorchestrator] mail test" "If you received this, SMTP secrets work.`nRepo: $RepoRoot"
+        Send-Notify "[aiorchestrator] mail test" ("Repo: " + $RepoRoot)
     }
     "start" {
         $p = $From
         if (-not $p) { $p = $Phase }
-        if (-not $p) { $p = "phase-a" }
-        Start-Pipeline $p
+        $pipeName = $Pipeline
+        if (-not $pipeName) { $pipeName = Get-DefaultPipelineName }
+        $pipe = Load-PipelineDef $pipeName
+        if (-not $p) { $p = $pipe.phases[0] }
+        Start-Pipeline $p $pipeName
     }
     "status" {
-        $st = Read-Status
-        $st | ConvertTo-Json -Depth 5
+        Read-Status | ConvertTo-Json -Depth 8
     }
     "audit" {
         if (-not (Test-Path $AuditPath)) { Write-Host "(no audit yet)"; break }
-        Get-Content $AuditPath -Tail $Tail
+        Get-Content $AuditPath -Tail $Tail -Encoding UTF8
     }
     "stop" {
         $st = Read-Status
+        $pipeName = $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
         Write-Status @{
-            pipeline = "coral-phase"; state = "stopped"; phase = $st.phase
-            role = $st.role; loop = [int]$st.loop
-            message = "Stopped by operator. resume to continue."
-            prior_state = $st.state
+            pipeline         = $pipeName
+            state            = "stopped"
+            phase            = $st.phase
+            role             = $st.role
+            loop             = [int]$st.loop
+            completed_phases = @($st.completed_phases)
+            metrics          = $st.metrics
+            message          = "Stopped by operator."
+            prior_state      = $st.state
         }
         Write-Audit "stop" "operator"
-        Send-Notify "[aiorchestrator] STOPPED" "Phase=$($st.phase) Role=$($st.role)`nResume: .\tools\agent-runner\agent.ps1 resume"
         Write-Host "Stopped."
     }
     "resume" {
         $st = Read-Status
         if ($st.state -ne "stopped" -and $st.state -ne "waiting_human") {
-            Write-Host "Nothing to resume (state=$($st.state))."
+            Write-Host ("Nothing to resume state=" + $st.state)
             break
         }
-        if (-not $st.phase) { throw "No phase on status." }
+        $pipe = Load-PipelineDef $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
         $role = $st.role
-        if (-not $role) { $role = "planner" }
+        if (-not $role) { $role = $pipe.first_role }
         Write-Status @{
-            pipeline = "coral-phase"; state = "running"; phase = $st.phase
-            role = $role; loop = [int]$st.loop
-            message = "Resumed. Run next-prompt."
+            pipeline         = $pipe.name
+            state            = "running"
+            phase            = $st.phase
+            role             = $role
+            loop             = [int]$st.loop
+            completed_phases = @($st.completed_phases)
+            metrics          = $st.metrics
+            message          = "Resumed. Monitor will assign."
         }
-        Write-Audit "resume" "$($st.phase)/$role"
-        Send-Notify "[aiorchestrator] RESUMED" "Phase=$($st.phase) Role=$role"
-        Write-Host "Resumed → $role. next-prompt"
+        Write-Audit "resume" ($st.phase + "/" + $role)
+        Write-Host ("Resumed -> " + $role)
     }
     "restart-phase" {
         $p = $Phase
-        if (-not $p) { throw "Specify -Phase phase-a" }
-        $work = Join-Path $AgentDir "work\$p"
+        if (-not $p) { throw "Specify -Phase phase-a (or validation-v1)" }
+        $st = Read-Status
+        $pipeName = $Pipeline
+        if (-not $pipeName) {
+            $pipeName = $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
+        }
+        $pipe = Load-PipelineDef $pipeName
+        if ($pipe.phases -notcontains $p) {
+            throw ("Phase " + $p + " not in pipeline " + $pipeName)
+        }
+        $work = Join-Path $AgentDir ("work\" + $p)
         if (Test-Path $work) {
             $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-            $archive = Join-Path $AgentDir "work\_archive\$p-$stamp"
+            $archive = Join-Path $AgentDir ("work\_archive\" + $p + "-" + $stamp)
             New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
             Move-Item $work $archive
-            Write-Host "Archived to $archive"
+            Write-Host ("Archived " + $archive)
         }
         Ensure-WorkDir $p | Out-Null
         Write-Status @{
-            pipeline = "coral-phase"; state = "running"; phase = $p
-            role = "planner"; loop = 0
-            message = "Phase $p restarted at planner."
+            pipeline         = $pipe.name
+            state            = "running"
+            phase            = $p
+            role             = $pipe.first_role
+            loop             = 0
+            completed_phases = @()
+            metrics          = @{ phase_started_at = (Get-Date).ToString("o"); roles = @{} }
+            message          = ("Phase " + $p + " restarted at " + $pipe.first_role + ".")
         }
-        Write-Audit "restart-phase" $p
-        Send-Notify "[aiorchestrator] $p · RESTARTED" "Back to planner. next-prompt"
-        Write-Host "Restarted $p at planner."
+        Write-Audit "restart-phase" ($pipe.name + "/" + $p)
+        Write-Host ("Restarted " + $p + " pipeline=" + $pipe.name)
     }
     "continue" {
         $st = Read-Status
         if ($st.state -ne "waiting_human") {
-            Write-Host "Not waiting_human (state=$($st.state))."
+            Write-Host ("Not waiting_human state=" + $st.state)
             break
         }
+        $pipeName = $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
         Write-Status @{
-            pipeline = "coral-phase"; state = "running"; phase = $st.phase
-            role = $st.role; loop = [int]$st.loop
-            message = "Continued after human. Run next-prompt (or complete-role if artifact already fixed)."
+            pipeline         = $pipeName
+            state            = "running"
+            phase            = $st.phase
+            role             = $st.role
+            loop             = [int]$st.loop
+            completed_phases = @($st.completed_phases)
+            metrics          = $st.metrics
+            message          = "Continued after human."
         }
         Write-Audit "continue" "operator"
-        Send-Notify "[aiorchestrator] CONTINUED" "Phase=$($st.phase) Role=$($st.role)"
-        Write-Host "Continued. next-prompt"
+        Write-Host "Continued."
     }
     "decide" {
         if (-not $Id) { throw "Provide -Id and -Answer" }
         $queue = @()
         if (Test-Path $QueuePath) {
-            $queue = @(Get-Content $QueuePath -Raw | ConvertFrom-Json)
+            $queue = @(Get-Content $QueuePath -Raw -Encoding UTF8 | ConvertFrom-Json)
         }
         $queue += [pscustomobject]@{
-            id         = $Id
-            answer     = $Answer
-            at         = (Get-Date).ToString("o")
-            phase      = (Read-Status).phase
+            id     = $Id
+            answer = $Answer
+            at     = (Get-Date).ToString("o")
+            phase  = (Read-Status).phase
         }
         ($queue | ConvertTo-Json -Depth 5) | Set-Content $QueuePath -Encoding UTF8
-        Write-Audit "decide" "$Id=$Answer"
-        Write-Host "Recorded decision $Id. Use continue when ready."
-        Send-Notify "[aiorchestrator] DECISION $Id" "Answer: $Answer"
+        Write-Audit "decide" ($Id + "=" + $Answer)
+        Write-Host ("Recorded decision " + $Id)
     }
     "next-prompt" {
         $st = Read-Status
         if ($st.state -eq "stopped") { throw "Stopped. resume first." }
         if ($st.state -eq "pipeline_done") { Write-Host "Pipeline done."; break }
         if (-not $st.phase -or -not $st.role) { throw "No active role. start first." }
-        $prompt = Build-Prompt $st.phase $st.role
-        $out = Join-Path $AgentDir "work\$($st.phase)\NEXT_PROMPT_$($st.role).txt"
+        $pipe = Load-PipelineDef $(if ($st.pipeline) { [string]$st.pipeline } else { Get-DefaultPipelineName })
+        $prompt = Build-Prompt $st.phase $st.role $pipe
+        $out = Join-Path $AgentDir ("work\" + $st.phase + "\NEXT_PROMPT_" + $st.role + ".txt")
         Ensure-WorkDir $st.phase | Out-Null
         Set-Content -Path $out -Value $prompt -Encoding UTF8
-        Write-Host "===== PASTE INTO NEW CURSOR AGENT CHAT ($($st.role)) ====="
+        Write-Host ("PROMPT_FILE=" + $out)
         Write-Host $prompt
-        Write-Host "===== ALSO SAVED: $out ====="
-        Write-Audit "next-prompt" "$($st.phase)/$($st.role)"
+        Write-Audit "next-prompt" ($st.phase + "/" + $st.role)
     }
     "complete-role" {
         Complete-CurrentRole $Result
     }
     "assign-role" {
         $worker = Join-Path $PSScriptRoot "Start-RoleWorker.ps1"
-        & powershell -NoProfile -File $worker -RepoRoot $RepoRoot
+        & $worker -RepoRoot $RepoRoot
     }
     "monitor-start" {
         $mon = Join-Path $PSScriptRoot "Monitor.ps1"
@@ -492,17 +635,20 @@ switch ($Command) {
         if (Test-Path $pidFile) {
             $old = [int]((Get-Content $pidFile -Raw).Trim())
             if (Get-Process -Id $old -ErrorAction SilentlyContinue) {
-                Write-Host "Monitor already running pid=$old"
+                Write-Host ("Monitor already running pid=" + $old)
                 break
             }
         }
-        $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
+        $argList = @(
             "-NoProfile", "-ExecutionPolicy", "Bypass",
             "-File", $mon, "-IntervalSec", "60", "-RepoRoot", $RepoRoot
-        ) -PassThru -WindowStyle Minimized
-        Write-Host "Monitor started pid=$($p.Id) (poll every 60s)"
-        Write-Audit "monitor-start" "pid=$($p.Id)"
-        Send-Notify "[aiorchestrator] MONITOR STARTED" "pid=$($p.Id)`nPoll=60s`nRepo=$RepoRoot"
+        )
+        $p = Start-Process -FilePath "powershell.exe" -ArgumentList $argList -PassThru -WindowStyle Hidden
+        Start-Sleep -Seconds 2
+        $mp = if (Test-Path $pidFile) { (Get-Content $pidFile -Raw).Trim() } else { [string]$p.Id }
+        Write-Host ("Monitor started pid=" + $mp + " (Hidden, poll 60s, dispatch-only)")
+        Write-Audit "monitor-start" ("pid=" + $mp + " window=Hidden")
+        Send-Notify "[aiorchestrator] MONITOR STARTED" ("pid=" + $mp)
     }
     "monitor-stop" {
         $pidFile = Join-Path $AgentDir "monitor.pid"
@@ -510,9 +656,8 @@ switch ($Command) {
             $old = [int]((Get-Content $pidFile -Raw).Trim())
             Stop-Process -Id $old -Force -ErrorAction SilentlyContinue
             Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
-            Write-Host "Monitor stopped pid=$old"
-            Write-Audit "monitor-stop" "pid=$old"
-            Send-Notify "[aiorchestrator] MONITOR STOPPED" "pid=$old"
+            Write-Host ("Monitor stopped pid=" + $old)
+            Write-Audit "monitor-stop" ("pid=" + $old)
         }
         else {
             Write-Host "No monitor.pid"

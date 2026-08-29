@@ -1,0 +1,23 @@
+id: F-lock-no-vendor-in-composer
+feature_id: F-lock-no-vendor-in-composer
+title: Composer has no vendor imports
+area: locks
+status: must_test
+tags: [locks, composer]
+requires: []
+packages: [./internal/runtime/composer]
+fixtures: {}
+what: |
+  internal/runtime/composer must not import sarvam, nextai, or other vendor SDK packages.
+how: |
+  go list imports on composer package; reject vendor import paths; go test package.
+steps:
+  - action: review
+    note: go list -f Imports ./internal/runtime/composer — no sarvam/nextai/vendor SDK imports
+  - action: go_test
+    packages: [./internal/runtime/composer]
+expect:
+  go_test: pass
+  review: no_vendor_imports
+evidence:
+  kinds: []

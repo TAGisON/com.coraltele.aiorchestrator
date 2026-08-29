@@ -1,0 +1,20 @@
+id: F-runtime-bus
+feature_id: F-runtime-bus
+title: In-process event bus
+area: C-runtime
+status: must_test
+tags: [runtime, bus]
+requires: []
+packages: [./internal/runtime/bus]
+fixtures: {}
+what: |
+  Events deliver in-process; live PCM path does not require Kafka or Redis.
+how: |
+  go test ./internal/runtime/bus
+steps:
+  - action: go_test
+    packages: [./internal/runtime/bus]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

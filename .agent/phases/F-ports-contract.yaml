@@ -1,0 +1,24 @@
+﻿id: F-ports-contract
+name: Validate feature — Port contracts for fake gateways
+pipeline: product-validation
+feature_id: F-ports-contract
+status: must_test
+exit_criteria:
+  - Scenario for F-ports-contract reviewed and approved in scenarios.md
+  - Fixtures for F-ports-contract ready (or N/A documented)
+  - go_test / checks for F-ports-contract pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-ports-contract/
+out_of_scope:
+  - Other features (test only F-ports-contract this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/gateway/fake
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-ports-contract.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

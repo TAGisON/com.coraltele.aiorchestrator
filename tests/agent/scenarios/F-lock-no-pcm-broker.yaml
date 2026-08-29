@@ -1,0 +1,23 @@
+id: F-lock-no-pcm-broker
+feature_id: F-lock-no-pcm-broker
+title: No Kafka Redis for live PCM
+area: locks
+status: must_test
+tags: [locks]
+requires: []
+packages: [./internal/runtime/bus]
+fixtures: {}
+what: |
+  Live PCM stays in-memory via bus/runtime; no Kafka/Redis broker for audio path.
+how: |
+  go test ./internal/runtime/bus plus review that composer/runtime do not wire Kafka/Redis for PCM.
+steps:
+  - action: go_test
+    packages: [./internal/runtime/bus]
+  - action: review
+    note: Confirm no Kafka/Redis client used for live PCM path in runtime/composer/edge
+expect:
+  go_test: pass
+  review: no_pcm_broker
+evidence:
+  kinds: []

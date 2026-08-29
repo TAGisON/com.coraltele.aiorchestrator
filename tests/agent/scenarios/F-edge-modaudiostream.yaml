@@ -1,0 +1,20 @@
+id: F-edge-modaudiostream
+feature_id: F-edge-modaudiostream
+title: mod_audio_stream edge unit
+area: D-edge
+status: must_test
+tags: [edge]
+requires: []
+packages: [./internal/edge/modaudiostream]
+fixtures: {}
+what: |
+  mod_audio_stream edge protocol/unit tests pass without a live FreeSWITCH.
+how: |
+  go test ./internal/edge/modaudiostream
+steps:
+  - action: go_test
+    packages: [./internal/edge/modaudiostream]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

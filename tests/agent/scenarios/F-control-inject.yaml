@@ -1,0 +1,20 @@
+id: F-control-inject
+feature_id: F-control-inject
+title: Session text inject
+area: B-control
+status: must_test
+tags: [control, session]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  Text inject with and without speak flag is accepted for an active session.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

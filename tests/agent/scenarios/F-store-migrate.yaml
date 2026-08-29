@@ -1,0 +1,20 @@
+id: F-store-migrate
+feature_id: F-store-migrate
+title: Postgres migrations
+area: B-durable
+status: must_test
+tags: [durable, store]
+requires: []
+packages: [./internal/store]
+fixtures: {}
+what: |
+  Migrations create profile, profile_version, session, audit_event, playback_job, postcall_job and related E tables cleanly.
+how: |
+  go test ./internal/store
+steps:
+  - action: go_test
+    packages: [./internal/store]
+expect:
+  go_test: pass
+evidence:
+  kinds: [schema]

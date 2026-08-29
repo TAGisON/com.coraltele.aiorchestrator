@@ -1,0 +1,20 @@
+id: F-edge-fs-live
+feature_id: F-edge-fs-live
+title: Live FreeSWITCH E2E
+area: D-edge
+status: deferred
+tags: [edge, fs, deferred]
+requires: [fs_edge]
+packages: []
+fixtures: {}
+what: |
+  Live FS call to session with inject round-trip on lab (deferred until human provides call-server endpoint).
+how: |
+  Skip until fs_edge available; then full call with audit/analytics/postcall.
+steps:
+  - action: skip
+    reason: Call-server endpoint not provided; wave validation-v1 excludes live FreeSWITCH
+expect:
+  skip: true
+evidence:
+  kinds: [audit, analytics, postcall]

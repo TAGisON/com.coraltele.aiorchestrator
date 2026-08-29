@@ -1,0 +1,20 @@
+id: F-sarvam-live
+feature_id: F-sarvam-live
+title: Live Sarvam when API key present
+area: F-vendor
+status: optional_live
+tags: [vendor, sarvam, optional_live]
+requires: [live_vendor]
+packages: [./internal/gateway/sarvamstt]
+fixtures: {}
+what: |
+  Real Sarvam STT/LLM/TTS when API key present (env-gated).
+how: |
+  Skip unless live_vendor / API key available; then go test live packages.
+steps:
+  - action: skip
+    reason: optional_live: requires live_vendor and Sarvam API key; not gated on in validation-v1 CI
+expect:
+  skip: true
+evidence:
+  kinds: []

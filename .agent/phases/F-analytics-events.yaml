@@ -1,0 +1,25 @@
+﻿id: F-analytics-events
+name: Validate feature — Analytics event catalog
+pipeline: product-validation
+feature_id: F-analytics-events
+status: must_test
+exit_criteria:
+  - Scenario for F-analytics-events reviewed and approved in scenarios.md
+  - Fixtures for F-analytics-events ready (or N/A documented)
+  - go_test / checks for F-analytics-events pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-analytics-events/
+out_of_scope:
+  - Other features (test only F-analytics-events this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/store
+  - ./internal/control
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-analytics-events.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

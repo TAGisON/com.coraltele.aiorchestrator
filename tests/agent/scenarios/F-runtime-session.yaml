@@ -1,0 +1,20 @@
+id: F-runtime-session
+feature_id: F-runtime-session
+title: Session actor lifecycle
+area: C-runtime
+status: must_test
+tags: [runtime]
+requires: []
+packages: [./internal/runtime/session]
+fixtures: {}
+what: |
+  Session actor progresses Created through terminal without FreeSWITCH.
+how: |
+  go test ./internal/runtime/session
+steps:
+  - action: go_test
+    packages: [./internal/runtime/session]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

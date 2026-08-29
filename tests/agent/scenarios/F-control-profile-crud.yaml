@@ -1,0 +1,21 @@
+id: F-control-profile-crud
+feature_id: F-control-profile-crud
+title: Profile create and version publish
+area: B-control
+status: must_test
+tags: [control, profile]
+requires: []
+packages: [./internal/control]
+fixtures:
+  profile: fixtures/profiles/lab-fakes.json
+what: |
+  Create draft profile, publish immutable version, and get version by id.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

@@ -1,0 +1,24 @@
+id: F-job-contact-agent
+feature_id: F-job-contact-agent
+title: Contact agent profile fixture
+area: jobs
+status: must_test
+tags: [jobs, profile]
+requires: []
+packages: [./internal/profile]
+fixtures:
+  profile: fixtures/profiles/job-contact-agent.json
+what: |
+  Contact Talk agent profile fixture expresses listen+speak+think with coral-transfer skill and validates.
+how: |
+  Load fixtures/profiles/job-contact-agent.json; go test ./internal/profile validate path.
+steps:
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/job-contact-agent.json
+  - action: go_test
+    packages: [./internal/profile]
+expect:
+  file_exists: true
+  go_test: pass
+evidence:
+  kinds: []

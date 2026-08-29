@@ -1,0 +1,20 @@
+id: F-gw-tts-engine
+feature_id: F-gw-tts-engine
+title: TTS-Engine Speak gateway
+area: D-gateway
+status: deferred
+tags: [gateway, deferred]
+requires: []
+packages: []
+fixtures: {}
+what: |
+  First-party TTS-Engine Speak gateway (deferred in product until engine ready).
+how: |
+  Skip for validation-v1; no package under test yet.
+steps:
+  - action: skip
+    reason: TTS-Engine Speak gateway deferred in product; no package under test in validation-v1
+expect:
+  skip: true
+evidence:
+  kinds: []

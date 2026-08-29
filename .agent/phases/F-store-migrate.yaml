@@ -1,0 +1,24 @@
+﻿id: F-store-migrate
+name: Validate feature — Postgres migrations
+pipeline: product-validation
+feature_id: F-store-migrate
+status: must_test
+exit_criteria:
+  - Scenario for F-store-migrate reviewed and approved in scenarios.md
+  - Fixtures for F-store-migrate ready (or N/A documented)
+  - go_test / checks for F-store-migrate pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-store-migrate/
+out_of_scope:
+  - Other features (test only F-store-migrate this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/store
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-store-migrate.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

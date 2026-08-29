@@ -1,0 +1,27 @@
+{
+  "name": "coral-phase",
+  "first_role": "planner",
+  "roles": ["planner", "coder", "reviewer", "summarizer"],
+  "skills": {
+    "planner": "coral-phase-planner",
+    "coder": "coral-phase-coder",
+    "reviewer": "coral-phase-reviewer",
+    "summarizer": "coral-phase-summarizer"
+  },
+  "artifacts": {
+    "planner": "plan.md",
+    "coder": "implementation.md",
+    "reviewer": "review.md",
+    "summarizer": "summary.md"
+  },
+  "fail_return": {
+    "reviewer": "coder",
+    "coder": "planner",
+    "summarizer": "coder"
+  },
+  "max_fail_loops": {
+    "reviewer": 2
+  },
+  "phases": ["phase-a", "phase-b", "phase-c", "phase-d", "phase-e", "phase-f"],
+  "prompt_kind": "phase"
+}

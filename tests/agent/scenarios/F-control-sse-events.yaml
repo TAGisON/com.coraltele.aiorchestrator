@@ -1,0 +1,20 @@
+id: F-control-sse-events
+feature_id: F-control-sse-events
+title: Session SSE events
+area: B-control
+status: must_test
+tags: [control, sse]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  GET /v1/sessions/{id}/events exposes the SSE catalog/stream matching analytics event names.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [sse_catalog]

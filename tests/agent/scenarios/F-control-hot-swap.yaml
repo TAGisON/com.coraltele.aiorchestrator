@@ -1,0 +1,20 @@
+id: F-control-hot-swap
+feature_id: F-control-hot-swap
+title: Hot-swap allowed profile fields only
+area: B-control
+status: must_test
+tags: [control, session]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  PATCH only accepts hot_swap_allowed keys; money/PII fields cannot be mid-session swapped.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

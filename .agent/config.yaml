@@ -1,4 +1,5 @@
 repo: com.coraltele.aiorchestrator
+# Default pipeline for `agent.ps1 start` when -Pipeline omitted
 pipeline: coral-phase
 version: 1
 
@@ -8,33 +9,22 @@ mail:
 
 monitor:
   interval_sec: 60
-  assign_opens_new_cursor_window: true
+  # false = write NEXT_PROMPT + DISPATCH only (no Cursor/console popups).
+  # true  = also open a new Cursor window (irritating; opt-in only).
+  assign_opens_new_cursor_window: false
+  # Monitor itself starts Hidden (no Minimized PowerShell on the desktop).
+  window_style: Hidden
 
 limits:
   max_coder_review_loops: 2
 
-roles:
-  - planner
-  - coder
-  - reviewer
-  - summarizer
-
-phases:
-  - phase-a
-  - phase-b
-  - phase-c
-  - phase-d
-  - phase-e
-  - phase-f
-
-skills:
-  planner: coral-phase-planner
-  coder: coral-phase-coder
-  reviewer: coral-phase-reviewer
-  summarizer: coral-phase-summarizer
+# Role/skill/artifact maps live in .agent/pipelines/<name>.json
+# - coral-phase: planner → coder → reviewer → summarizer
+# - product-validation: scenario-planner → … → test-summarizer
 
 docs:
   platform_first: docs/architecture/PLATFORM_FIRST.md
   ports: docs/architecture/PORTS.md
   control_api: docs/architecture/CONTROL_API.md
   solution: docs/SOLUTION.md
+  validation: docs/VALIDATION_PIPELINE.md

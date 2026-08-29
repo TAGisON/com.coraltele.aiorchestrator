@@ -1,0 +1,20 @@
+id: F-postcall-enqueue
+feature_id: F-postcall-enqueue
+title: Postcall job on terminal
+area: E-observe
+status: must_test
+tags: [observe, postcall]
+requires: []
+packages: [./internal/store, ./internal/control]
+fixtures: {}
+what: |
+  postcall_job is enqueued when session reaches terminal or playback completes.
+how: |
+  go test ./internal/store ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/store, ./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [postcall_job]

@@ -1,0 +1,26 @@
+﻿# superseded: use per-feature phases F-*
+id: validation-v1
+name: Product validation wave â€” Control + files + audit (no FS)
+pipeline: product-validation
+platform_first: post Aâ€“F validation
+exit_criteria:
+  - tests/agent/FEATURES.md + features/catalog.yaml list every product feature to test
+  - Every catalog must_test feature has scenarios/F-*.yaml with what/how/steps
+  - Fixtures for job families under fixtures/profiles/ without secrets
+  - Run-FeatureScenarios.ps1 (or equivalent) records pass/fail/skip for all must_test ids
+  - go test ./... green; audit-report covers E-observe evidence
+  - deferred (FS, TTS-Engine, interpret) and optional_live explicitly skipped with reason
+  - test-reviewer confirms no silent drops from FEATURES.md; summarizer closes wave
+out_of_scope:
+  - FreeSWITCH / call-server E2E (deferred until human provides endpoint)
+  - Product feature coding outside validation assets (use coral-phase for that)
+  - Committing API keys
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/MANIFEST.yaml
+  - tests/agent/README.md
+  - docs/architecture/CONTROL_API.md
+  - docs/VALIDATION_PIPELINE.md
+depends_on: coral-phase Aâ€“F complete (or equivalent surface)
+

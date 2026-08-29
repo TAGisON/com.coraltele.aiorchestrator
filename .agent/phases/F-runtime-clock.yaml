@@ -1,0 +1,24 @@
+﻿id: F-runtime-clock
+name: Validate feature — Live and playback clocks
+pipeline: product-validation
+feature_id: F-runtime-clock
+status: must_test
+exit_criteria:
+  - Scenario for F-runtime-clock reviewed and approved in scenarios.md
+  - Fixtures for F-runtime-clock ready (or N/A documented)
+  - go_test / checks for F-runtime-clock pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-runtime-clock/
+out_of_scope:
+  - Other features (test only F-runtime-clock this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/runtime/clock
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-runtime-clock.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

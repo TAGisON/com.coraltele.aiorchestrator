@@ -1,0 +1,24 @@
+﻿id: F-lock-no-vendor-in-composer
+name: Validate feature — Composer has no vendor imports
+pipeline: product-validation
+feature_id: F-lock-no-vendor-in-composer
+status: must_test
+exit_criteria:
+  - Scenario for F-lock-no-vendor-in-composer reviewed and approved in scenarios.md
+  - Fixtures for F-lock-no-vendor-in-composer ready (or N/A documented)
+  - go_test / checks for F-lock-no-vendor-in-composer pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-lock-no-vendor-in-composer/
+out_of_scope:
+  - Other features (test only F-lock-no-vendor-in-composer this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/runtime/composer
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-lock-no-vendor-in-composer.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

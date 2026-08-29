@@ -1,0 +1,24 @@
+﻿id: F-control-session-lifecycle
+name: Validate feature — Session create get stop
+pipeline: product-validation
+feature_id: F-control-session-lifecycle
+status: must_test
+exit_criteria:
+  - Scenario for F-control-session-lifecycle reviewed and approved in scenarios.md
+  - Fixtures for F-control-session-lifecycle ready (or N/A documented)
+  - go_test / checks for F-control-session-lifecycle pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-control-session-lifecycle/
+out_of_scope:
+  - Other features (test only F-control-session-lifecycle this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/control
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-control-session-lifecycle.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

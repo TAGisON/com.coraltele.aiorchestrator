@@ -1,0 +1,60 @@
+product: com.coraltele.aiorchestrator
+wave: per-feature
+version: 3
+
+# One pipeline phase = one feature id (F-*). Same monitor as coral-phase.
+# Start: agent.ps1 start -Pipeline product-validation -From F-ports-contract
+
+catalog:
+  human: tests/agent/FEATURES.md
+  machine: tests/agent/features/catalog.yaml
+  scenarios_dir: tests/agent/scenarios
+  rule: Each round tests ONLY the current phase feature_id end-to-end through all validation roles.
+
+surface_areas:
+  - A-ports
+  - B-durable
+  - B-control
+  - C-runtime
+  - D-edge
+  - D-gateway
+  - E-observe
+  - F-vendor
+  - locks
+  - jobs
+
+unavailable_until_human:
+  - fs_edge
+  - live_call_server
+
+boot:
+  binary: ./cmd/aiorchestrator
+  note: Prefer go test harness for CI; live HTTP when agent boots binary locally.
+
+harness:
+  verify: go test ./... -count=1
+  feature_runner: tools/agent-runner/Run-FeatureScenarios.ps1
+  unit_tag_note: Live Sarvam may be env-gated; skip when SARVAM_API_KEY missing.
+  results_dir: tests/agent/results
+
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - docs/VALIDATION_PIPELINE.md
+  - docs/architecture/CONTROL_API.md
+  - docs/architecture/PORTS.md
+  - docs/architecture/PROFILE_SCHEMA.md
+  - docs/architecture/ANALYTICS_AND_POSTCALL.md
+  - docs/architecture/PLATFORM_FIRST.md
+  - docs/product/PRODUCT_DECISIONS.md
+  - docs/SOLUTION.md
+
+evidence:
+  require_audit_on_session_terminal: true
+  require_analytics_catalog: true
+  postcall_job_on_terminal: true
+
+secrets:
+  file: .agent/secrets.local.json
+  env: [SARVAM_API_KEY]
+  never_commit: true

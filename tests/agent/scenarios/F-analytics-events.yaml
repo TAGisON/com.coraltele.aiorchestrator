@@ -1,0 +1,20 @@
+id: F-analytics-events
+feature_id: F-analytics-events
+title: Analytics event catalog
+area: E-observe
+status: must_test
+tags: [observe, analytics]
+requires: []
+packages: [./internal/store, ./internal/control]
+fixtures: {}
+what: |
+  Analytics catalog events (session_started/completed/failed, turn, hop_latency, etc.) persist as implemented.
+how: |
+  go test ./internal/store ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/store, ./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [analytics_event]

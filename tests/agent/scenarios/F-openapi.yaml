@@ -1,0 +1,20 @@
+id: F-openapi
+feature_id: F-openapi
+title: OpenAPI matches Control surface
+area: B-control
+status: must_test
+tags: [control, openapi]
+requires: []
+packages: []
+fixtures: {}
+what: |
+  Published OpenAPI at api/openapi.yaml covers Control routes used by tests.
+how: |
+  Assert api/openapi.yaml exists; spot-check paths against Control surface.
+steps:
+  - action: file_exists
+    path: api/openapi.yaml
+expect:
+  file_exists: true
+evidence:
+  kinds: []

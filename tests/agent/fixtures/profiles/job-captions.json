@@ -1,0 +1,8 @@
+{
+  "id": "job-captions",
+  "modes": { "listen": true, "speak": false, "think": false },
+  "audio": { "canonical_sample_rate_hz": 16000 },
+  "routers": {
+    "listen": { "providers": ["fake-listen"] }
+  }
+}

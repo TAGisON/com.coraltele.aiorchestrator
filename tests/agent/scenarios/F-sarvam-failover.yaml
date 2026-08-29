@@ -1,0 +1,21 @@
+id: F-sarvam-failover
+feature_id: F-sarvam-failover
+title: Sarvam failover to fakes
+area: F-vendor
+status: must_test
+tags: [vendor, failover]
+requires: []
+packages: [./internal/gateway/sarvam]
+fixtures:
+  profile: fixtures/profiles/lab-sarvam-failover.json
+what: |
+  Profile with [sarvam-*, fake-*] fails over to fakes when Sarvam errors.
+how: |
+  go test ./internal/gateway/sarvam
+steps:
+  - action: go_test
+    packages: [./internal/gateway/sarvam]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

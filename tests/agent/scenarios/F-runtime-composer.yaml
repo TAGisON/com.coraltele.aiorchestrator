@@ -1,0 +1,20 @@
+id: F-runtime-composer
+feature_id: F-runtime-composer
+title: Talk composer and barge-in
+area: C-runtime
+status: must_test
+tags: [runtime, composer]
+requires: []
+packages: [./internal/runtime/composer]
+fixtures: {}
+what: |
+  Talk turn machine runs with fake Speak; barge-in path is exercised.
+how: |
+  go test ./internal/runtime/composer
+steps:
+  - action: go_test
+    packages: [./internal/runtime/composer]
+expect:
+  go_test: pass
+evidence:
+  kinds: [barge_in_optional]

@@ -1,0 +1,13 @@
+{
+  "id": "job-copilot",
+  "modes": { "listen": false, "speak": false, "think": true },
+  "audio": { "canonical_sample_rate_hz": 16000 },
+  "grounding": { "required": true },
+  "routers": {
+    "think": { "providers": ["fake-think"] },
+    "knowledge": { "providers": ["ingest-default"] }
+  },
+  "knowledge": {
+    "http_kb": { "gateway": "ingest-default" }
+  }
+}

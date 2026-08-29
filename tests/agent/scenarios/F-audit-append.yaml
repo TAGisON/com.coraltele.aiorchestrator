@@ -1,0 +1,20 @@
+id: F-audit-append
+feature_id: F-audit-append
+title: Audit events append-only
+area: E-observe
+status: must_test
+tags: [observe, audit]
+requires: []
+packages: [./internal/store, ./internal/control]
+fixtures: {}
+what: |
+  Session/turn terminal writes append-only audit_event rows.
+how: |
+  go test ./internal/store ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/store, ./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [audit_event]

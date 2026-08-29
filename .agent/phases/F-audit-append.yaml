@@ -1,0 +1,25 @@
+﻿id: F-audit-append
+name: Validate feature — Audit events append-only
+pipeline: product-validation
+feature_id: F-audit-append
+status: must_test
+exit_criteria:
+  - Scenario for F-audit-append reviewed and approved in scenarios.md
+  - Fixtures for F-audit-append ready (or N/A documented)
+  - go_test / checks for F-audit-append pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-audit-append/
+out_of_scope:
+  - Other features (test only F-audit-append this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/store
+  - ./internal/control
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-audit-append.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

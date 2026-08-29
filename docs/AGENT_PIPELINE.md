@@ -17,36 +17,46 @@ $env:AGENT_NO_MAIL = "0"   # or "1" to skip mail while testing
 
 ---
 
-## Recommended auto flow (independent sessions + monitor)
+## Recommended auto flow (quiet dispatch + monitor)
+
+**Default:** no new Cursor windows, no Minimized PowerShell on the desktop. Monitor runs **Hidden**. `assign-role` writes `NEXT_PROMPT_<role>.txt` + `DISPATCH_<role>.json` only. You (or a parent agent Task) run that prompt; monitor advances when `# agent-approval` appears.
 
 ```powershell
-# Terminal 1 — start pipeline at Phase B (or phase-a)
 $env:AGENT_NO_MAIL = "1"   # until secrets installed
-.\tools\agent-runner\agent.ps1 start -From phase-b
-.\tools\agent-runner\agent.ps1 monitor-start
+.\tools\agent-runner\agent.ps1 start -From phase-c
+.\tools\agent-runner\agent.ps1 monitor-start   # Hidden background poll
 
 # Monitor every ~60s:
-# - if no worker PID → Start-RoleWorker (new Cursor window + prompt)
-# - if role wrote # agent-approval → complete-role and assign next role
+# - if role not yet dispatched → quiet file dispatch (once; no UI)
+# - if # agent-approval present → complete-role → next role dispatch
+# - never re-opens Cursor when a dispatch is already pending
 ```
 
-Each role must run in the **Cursor window opened for that role** (true session independence). Do not reuse the planner window for coder/reviewer.
+Opt-in old behavior (opens Cursor — usually unwanted):
+
+```yaml
+# .agent/config.yaml
+monitor:
+  assign_opens_new_cursor_window: true
+```
+
+Or one-shot: `.\tools\agent-runner\Start-RoleWorker.ps1 -OpenCursor`
 
 ```powershell
-.\tools\agent-runner\agent.ps1 status          # includes worker.pid when assigned
-.\tools\agent-runner\agent.ps1 assign-role      # force re-assign current role
+.\tools\agent-runner\agent.ps1 status
+.\tools\agent-runner\agent.ps1 assign-role      # rewrite prompt only (idempotent unless Force)
 .\tools\agent-runner\agent.ps1 monitor-stop
-.\tools\agent-runner\agent.ps1 stop | resume | restart-phase -Phase phase-a
+.\tools\agent-runner\agent.ps1 stop | resume | restart-phase -Phase phase-c
 .\tools\agent-runner\agent.ps1 decide -Id D1 -Answer "..."
 .\tools\agent-runner\agent.ps1 continue
 ```
 
-Manual fallback (no monitor):
+Manual fallback:
 
 ```powershell
 .\tools\agent-runner\agent.ps1 next-prompt
-# paste into a NEW Cursor agent chat
-.\tools\agent-runner\agent.ps1 complete-role -Result pass
+# run prompt in an existing agent session / Task — do not need a new Cursor window
+.\tools\agent-runner\agent.ps1 complete-role   # reads result from artifact only (no rubber-stamp)
 ```
 
 ---
@@ -64,25 +74,36 @@ Manual fallback (no monitor):
 
 ## Status fields (monitor)
 
-`.agent/status.json` includes when a worker is assigned:
+`.agent/status.json` when a role is dispatched (default quiet mode):
 
 ```json
 "worker": {
-  "pid": 12345,
+  "pid": null,
   "session_id": "a1b2c3d4e5f6",
   "role": "coder",
-  "phase": "phase-b",
+  "phase": "phase-c",
   "prompt_file": "...",
   "started_at": "...",
-  "status": "assigned"
+  "status": "dispatched",
+  "mode": "dispatch"
 }
 ```
 
-When the role finishes, monitor clears `worker` after `complete-role`.
+`mode: cursor` only when explicitly opted in (then `pid` is set). Monitor does **not** re-dispatch while status is `dispatched`/`assigned`. Clears `worker` after `complete-role`.
+
+## This repo — how many phases?
+
+**Build (`coral-phase`):** 6 total — `phase-a` … `phase-f` (PLATFORM_FIRST). Catalog complete on main.
+
+**Validation (`product-validation`):** see `docs/VALIDATION_PIPELINE.md` — start with `validation-v1` (no FS yet).
+
+```powershell
+.\tools\agent-runner\agent.ps1 start -Pipeline product-validation -From validation-v1
+```
 
 ---
 
-## Roles (global skills)
+## Roles (global skills) — coral-phase
 
 | Role | Skill (`~/.cursor/skills/`) |
 |---|---|
@@ -91,10 +112,11 @@ When the role finishes, monitor clears `worker` after `complete-role`.
 | Reviewer | `coral-phase-reviewer` |
 | Summarizer | `coral-phase-summarizer` |
 
+Validation roles: `coral-validation-*` (see VALIDATION_PIPELINE.md).
+
 Global rules: `Documents/GitHub/.cursor/rules/coral-agent-*.mdc` (includes commits rule).
 
 ---
 
-## This repo phases
-
-`.agent/phases/*.yaml` from `docs/architecture/PLATFORM_FIRST.md` (phase-a … phase-f).
+Phase YAML catalog: `.agent/phases/*.yaml` (build A–F + `validation-v1`).
+Defs: `.agent/pipelines/coral-phase.json`, `product-validation.json`.

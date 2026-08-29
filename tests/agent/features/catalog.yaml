@@ -1,0 +1,324 @@
+version: 1
+product: com.coraltele.aiorchestrator
+wave: validation-v1
+source: tests/agent/FEATURES.md
+
+features:
+  - id: F-ports-contract
+    area: A-ports
+    status: must_test
+    title: Port contracts for fake gateways
+    packages: [./internal/gateway/fake]
+    evidence: []
+
+  - id: F-router-registry
+    area: A-ports
+    status: must_test
+    title: Registry and profile validation
+    packages: [./internal/router, ./internal/profile]
+    evidence: []
+
+  - id: F-fake-trio
+    area: A-ports
+    status: must_test
+    title: Fake Listen Think Speak usable together
+    packages: [./internal/gateway/fake, ./internal/runtime/composer]
+    evidence: []
+
+  - id: F-store-migrate
+    area: B-durable
+    status: must_test
+    title: Postgres migrations
+    packages: [./internal/store]
+    evidence: [schema]
+
+  - id: F-control-health
+    area: B-control
+    status: must_test
+    title: Control health endpoint
+    packages: [./internal/control]
+    evidence: []
+
+  - id: F-control-profile-crud
+    area: B-control
+    status: must_test
+    title: Profile create and version publish
+    packages: [./internal/control]
+    evidence: []
+
+  - id: F-control-profile-422
+    area: B-control
+    status: must_test
+    title: Invalid gateway id returns 422
+    packages: [./internal/control, ./internal/profile]
+    evidence: []
+
+  - id: F-control-session-lifecycle
+    area: B-control
+    status: must_test
+    title: Session create get stop
+    packages: [./internal/control]
+    evidence: [audit_on_terminal]
+
+  - id: F-control-inject
+    area: B-control
+    status: must_test
+    title: Session text inject
+    packages: [./internal/control]
+    evidence: []
+
+  - id: F-control-hot-swap
+    area: B-control
+    status: must_test
+    title: Hot-swap allowed profile fields only
+    packages: [./internal/control]
+    evidence: []
+
+  - id: F-control-sse-events
+    area: B-control
+    status: must_test
+    title: Session SSE events
+    packages: [./internal/control]
+    evidence: [sse_catalog]
+
+  - id: F-control-playback-job
+    area: B-control
+    status: must_test
+    title: Playback job enqueue and get
+    packages: [./internal/control]
+    evidence: [playback_job]
+
+  - id: F-control-kb-upload
+    area: B-control
+    status: must_test
+    title: KB document upload
+    packages: [./internal/control, ./internal/gateway/ingest]
+    evidence: []
+
+  - id: F-openapi
+    area: B-control
+    status: must_test
+    title: OpenAPI matches Control surface
+    check: file_exists
+    path: api/openapi.yaml
+    packages: []
+    evidence: []
+
+  - id: F-runtime-session
+    area: C-runtime
+    status: must_test
+    title: Session actor lifecycle
+    packages: [./internal/runtime/session]
+    evidence: []
+
+  - id: F-runtime-bus
+    area: C-runtime
+    status: must_test
+    title: In-process event bus
+    packages: [./internal/runtime/bus]
+    evidence: []
+
+  - id: F-runtime-clock
+    area: C-runtime
+    status: must_test
+    title: Live and playback clocks
+    packages: [./internal/runtime/clock]
+    evidence: []
+
+  - id: F-runtime-vad
+    area: C-runtime
+    status: must_test
+    title: Local VAD
+    packages: [./internal/runtime/vad]
+    evidence: []
+
+  - id: F-runtime-composer
+    area: C-runtime
+    status: must_test
+    title: Talk composer and barge-in
+    packages: [./internal/runtime/composer]
+    evidence: [barge_in_optional]
+
+  - id: F-runtime-thinkpath
+    area: C-runtime
+    status: must_test
+    title: Think path priority and hooks
+    packages: [./internal/runtime/thinkpath]
+    evidence: []
+
+  - id: F-edge-file
+    area: D-edge
+    status: must_test
+    title: File feeder edge
+    packages: [./internal/edge/file]
+    evidence: []
+
+  - id: F-edge-token
+    area: D-edge
+    status: must_test
+    title: Edge token mint validate
+    packages: [./internal/edge/token]
+    evidence: []
+
+  - id: F-edge-modaudiostream
+    area: D-edge
+    status: must_test
+    title: mod_audio_stream edge unit
+    packages: [./internal/edge/modaudiostream]
+    evidence: []
+
+  - id: F-edge-fs-live
+    area: D-edge
+    status: deferred
+    title: Live FreeSWITCH E2E
+    requires: [fs_edge]
+    packages: []
+    evidence: [audit, analytics, postcall]
+
+  - id: F-gw-ingest
+    area: D-gateway
+    status: must_test
+    title: ingest-default Knowledge
+    packages: [./internal/gateway/ingest]
+    evidence: []
+
+  - id: F-gw-coral-transfer
+    area: D-gateway
+    status: must_test
+    title: coral-transfer skill
+    packages: [./internal/gateway/coraltransfer]
+    evidence: [skill_audit]
+
+  - id: F-gw-coral-crm
+    area: D-gateway
+    status: must_test
+    title: coral-crm skill
+    packages: [./internal/gateway/coralcrm]
+    evidence: [skill_audit]
+
+  - id: F-gw-tts-engine
+    area: D-gateway
+    status: deferred
+    title: TTS-Engine Speak gateway
+    packages: []
+    evidence: []
+
+  - id: F-audit-append
+    area: E-observe
+    status: must_test
+    title: Audit events append-only
+    packages: [./internal/store, ./internal/control]
+    evidence: [audit_event]
+
+  - id: F-analytics-events
+    area: E-observe
+    status: must_test
+    title: Analytics event catalog
+    packages: [./internal/store, ./internal/control]
+    evidence: [analytics_event]
+
+  - id: F-postcall-enqueue
+    area: E-observe
+    status: must_test
+    title: Postcall job on terminal
+    packages: [./internal/store, ./internal/control]
+    evidence: [postcall_job]
+
+  - id: F-sarvam-stt
+    area: F-vendor
+    status: must_test
+    title: sarvam-stt Listen unit
+    packages: [./internal/gateway/sarvamstt]
+    evidence: []
+
+  - id: F-sarvam-llm
+    area: F-vendor
+    status: must_test
+    title: sarvam-llm Think unit
+    packages: [./internal/gateway/sarvamllm]
+    evidence: []
+
+  - id: F-sarvam-tts
+    area: F-vendor
+    status: must_test
+    title: sarvam-tts Speak unit
+    packages: [./internal/gateway/sarvamtts]
+    evidence: []
+
+  - id: F-sarvam-failover
+    area: F-vendor
+    status: must_test
+    title: Sarvam failover to fakes
+    packages: [./internal/gateway/sarvam]
+    evidence: []
+
+  - id: F-sarvam-live
+    area: F-vendor
+    status: optional_live
+    title: Live Sarvam when API key present
+    requires: [live_vendor]
+    packages: [./internal/gateway/sarvamstt]
+    evidence: []
+
+  - id: F-lock-no-pcm-broker
+    area: locks
+    status: must_test
+    title: No Kafka Redis for live PCM
+    check: review_plus_bus
+    packages: [./internal/runtime/bus]
+    evidence: []
+
+  - id: F-lock-no-vendor-in-composer
+    area: locks
+    status: must_test
+    title: Composer has no vendor imports
+    check: go_list_imports
+    packages: [./internal/runtime/composer]
+    evidence: []
+
+  - id: F-lock-no-secrets-in-git
+    area: locks
+    status: must_test
+    title: Secrets not in git or fixtures
+    check: git_and_fixture_scan
+    packages: []
+    evidence: []
+
+  - id: F-job-contact-agent
+    area: jobs
+    status: must_test
+    title: Contact agent profile fixture
+    fixtures: [fixtures/profiles/job-contact-agent.json]
+    packages: [./internal/profile]
+    evidence: []
+
+  - id: F-job-captions
+    area: jobs
+    status: must_test
+    title: Captions listen-only profile fixture
+    fixtures: [fixtures/profiles/job-captions.json]
+    packages: [./internal/profile]
+    evidence: []
+
+  - id: F-job-playback-mom
+    area: jobs
+    status: must_test
+    title: Playback MoM profile fixture
+    fixtures: [fixtures/profiles/job-playback-mom.json]
+    packages: [./internal/profile, ./internal/control]
+    evidence: []
+
+  - id: F-job-interpret
+    area: jobs
+    status: deferred
+    title: Two-way interpret profile
+    packages: []
+    evidence: []
+
+  - id: F-job-copilot
+    area: jobs
+    status: must_test
+    title: Grounded copilot profile fixture
+    fixtures: [fixtures/profiles/job-copilot.json]
+    packages: [./internal/profile, ./internal/gateway/ingest]
+    evidence: []

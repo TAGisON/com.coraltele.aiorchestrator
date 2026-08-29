@@ -1,0 +1,12 @@
+{
+  "id": "job-playback-mom",
+  "modes": { "listen": true, "speak": false, "think": true },
+  "audio": { "canonical_sample_rate_hz": 16000 },
+  "routers": {
+    "listen": { "providers": ["fake-listen"] },
+    "think": { "providers": ["fake-think"] }
+  },
+  "templates": {
+    "mom": { "id": "mom-default" }
+  }
+}

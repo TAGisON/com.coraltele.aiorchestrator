@@ -1,0 +1,24 @@
+id: F-job-captions
+feature_id: F-job-captions
+title: Captions listen-only profile fixture
+area: jobs
+status: must_test
+tags: [jobs, profile]
+requires: []
+packages: [./internal/profile]
+fixtures:
+  profile: fixtures/profiles/job-captions.json
+what: |
+  Captions/listen-only profile fixture has listen true and speak/think false and validates.
+how: |
+  Load fixtures/profiles/job-captions.json; go test ./internal/profile.
+steps:
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/job-captions.json
+  - action: go_test
+    packages: [./internal/profile]
+expect:
+  file_exists: true
+  go_test: pass
+evidence:
+  kinds: []

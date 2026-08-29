@@ -1,0 +1,21 @@
+id: F-fake-trio
+feature_id: F-fake-trio
+title: Fake Listen Think Speak usable together
+area: A-ports
+status: must_test
+tags: [ports, fakes]
+requires: []
+packages: [./internal/gateway/fake, ./internal/runtime/composer]
+fixtures:
+  profile: fixtures/profiles/lab-fakes.json
+what: |
+  Talk/unit path can run entirely on fake-listen, fake-think, and fake-speak without vendor SDKs.
+how: |
+  go test ./internal/gateway/fake ./internal/runtime/composer
+steps:
+  - action: go_test
+    packages: [./internal/gateway/fake, ./internal/runtime/composer]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

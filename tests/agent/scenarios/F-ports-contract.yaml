@@ -1,0 +1,21 @@
+id: F-ports-contract
+feature_id: F-ports-contract
+title: Port contracts for fake gateways
+area: A-ports
+status: must_test
+tags: [ports]
+requires: []
+packages: [./internal/gateway/fake]
+fixtures: {}
+what: |
+  Every Listen/Think/Speak/Translate/Knowledge/Skill fake passes port contract tests; GatewayError and capability shapes hold.
+how: |
+  go test ./internal/gateway/fake
+steps:
+  - action: go_test
+    packages: [./internal/gateway/fake]
+expect:
+  go_test: pass
+evidence:
+  kinds: []
+  note: none required

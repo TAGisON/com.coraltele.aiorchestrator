@@ -1,0 +1,24 @@
+﻿id: F-edge-file
+name: Validate feature — File feeder edge
+pipeline: product-validation
+feature_id: F-edge-file
+status: must_test
+exit_criteria:
+  - Scenario for F-edge-file reviewed and approved in scenarios.md
+  - Fixtures for F-edge-file ready (or N/A documented)
+  - go_test / checks for F-edge-file pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-edge-file/
+out_of_scope:
+  - Other features (test only F-edge-file this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/edge/file
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-edge-file.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

@@ -1,0 +1,24 @@
+﻿id: F-edge-modaudiostream
+name: Validate feature — mod_audio_stream edge unit
+pipeline: product-validation
+feature_id: F-edge-modaudiostream
+status: must_test
+exit_criteria:
+  - Scenario for F-edge-modaudiostream reviewed and approved in scenarios.md
+  - Fixtures for F-edge-modaudiostream ready (or N/A documented)
+  - go_test / checks for F-edge-modaudiostream pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-edge-modaudiostream/
+out_of_scope:
+  - Other features (test only F-edge-modaudiostream this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/edge/modaudiostream
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-edge-modaudiostream.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

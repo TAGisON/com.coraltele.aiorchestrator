@@ -1,0 +1,20 @@
+id: F-edge-token
+feature_id: F-edge-token
+title: Edge token mint validate
+area: D-edge
+status: must_test
+tags: [edge]
+requires: []
+packages: [./internal/edge/token]
+fixtures: {}
+what: |
+  Edge attach tokens mint and validate correctly.
+how: |
+  go test ./internal/edge/token
+steps:
+  - action: go_test
+    packages: [./internal/edge/token]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

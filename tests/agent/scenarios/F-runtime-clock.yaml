@@ -1,0 +1,20 @@
+id: F-runtime-clock
+feature_id: F-runtime-clock
+title: Live and playback clocks
+area: C-runtime
+status: must_test
+tags: [runtime]
+requires: []
+packages: [./internal/runtime/clock]
+fixtures: {}
+what: |
+  Live and playback clocks select correctly per session/job.
+how: |
+  go test ./internal/runtime/clock
+steps:
+  - action: go_test
+    packages: [./internal/runtime/clock]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

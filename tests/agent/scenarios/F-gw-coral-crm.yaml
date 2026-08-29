@@ -1,0 +1,20 @@
+id: F-gw-coral-crm
+feature_id: F-gw-coral-crm
+title: coral-crm skill
+area: D-gateway
+status: must_test
+tags: [gateway, skill]
+requires: []
+packages: [./internal/gateway/coralcrm]
+fixtures: {}
+what: |
+  coral-crm Skill executes (may stub) with skill audit.
+how: |
+  go test ./internal/gateway/coralcrm
+steps:
+  - action: go_test
+    packages: [./internal/gateway/coralcrm]
+expect:
+  go_test: pass
+evidence:
+  kinds: [skill_audit]

@@ -8,13 +8,17 @@
 4. `docs/architecture/PORTS.md` — Go port freeze  
 5. `.agent/phases/*.yaml` — executable phase exit criteria  
 
-## Agentic pipeline
+## Agentic pipelines
 
-Operator guide: `docs/AGENT_PIPELINE.md`  
+| Pipeline | Guide | Roles |
+|---|---|---|
+| `coral-phase` | `docs/AGENT_PIPELINE.md` | planner → coder → reviewer → summarizer |
+| `product-validation` | `docs/VALIDATION_PIPELINE.md` | scenario-planner → fixture-builder → test-runner → audit-validator → test-reviewer → test-summarizer |
+
 CLI: `tools/agent-runner/agent.ps1`  
-
-Roles (global skills): planner → coder → reviewer → summarizer.  
-Handoff via `.agent/work/<phase>/` artifacts + `# agent-approval`, not agent-to-agent chat.
+Defs: `.agent/pipelines/*.json`  
+Universal QA contract: `tests/agent/MANIFEST.yaml` + feature inventory `tests/agent/FEATURES.md`  
+Handoff via `.agent/work/<phase>/` + `# agent-approval`, not agent-to-agent chat.
 
 ## Hard rules
 

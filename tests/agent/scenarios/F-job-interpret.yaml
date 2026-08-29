@@ -1,0 +1,20 @@
+id: F-job-interpret
+feature_id: F-job-interpret
+title: Two-way interpret profile
+area: jobs
+status: deferred
+tags: [jobs, deferred]
+requires: []
+packages: []
+fixtures: {}
+what: |
+  Two-way interpret profile using translate rail (deferred until MT depth is ready).
+how: |
+  Skip for validation-v1; MT/interpret depth deferred.
+steps:
+  - action: skip
+    reason: Two-way interpret / translate-rail profile deferred until MT depth is ready
+expect:
+  skip: true
+evidence:
+  kinds: []

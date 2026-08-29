@@ -1,0 +1,20 @@
+id: F-sarvam-llm
+feature_id: F-sarvam-llm
+title: sarvam-llm Think unit
+area: F-vendor
+status: must_test
+tags: [vendor, sarvam]
+requires: []
+packages: [./internal/gateway/sarvamllm]
+fixtures: {}
+what: |
+  sarvam-llm Think unit/contract passes without requiring live API.
+how: |
+  go test ./internal/gateway/sarvamllm
+steps:
+  - action: go_test
+    packages: [./internal/gateway/sarvamllm]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

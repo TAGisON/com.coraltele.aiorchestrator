@@ -1,0 +1,21 @@
+id: F-control-session-lifecycle
+feature_id: F-control-session-lifecycle
+title: Session create get stop
+area: B-control
+status: must_test
+tags: [control, session]
+requires: []
+packages: [./internal/control]
+fixtures:
+  profile: fixtures/profiles/lab-fakes.json
+what: |
+  Session create pins a profile version; get returns state; stop reaches terminal.
+how: |
+  go test ./internal/control
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: [audit_on_terminal]

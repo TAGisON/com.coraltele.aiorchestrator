@@ -1,0 +1,24 @@
+﻿id: F-job-captions
+name: Validate feature — Captions listen-only profile fixture
+pipeline: product-validation
+feature_id: F-job-captions
+status: must_test
+exit_criteria:
+  - Scenario for F-job-captions reviewed and approved in scenarios.md
+  - Fixtures for F-job-captions ready (or N/A documented)
+  - go_test / checks for F-job-captions pass; run-log records result
+  - audit-report covers evidence expectations for this feature (or N/A)
+  - test-reviewer pass; summarizer closes round with trail in .agent/work/F-job-captions/
+out_of_scope:
+  - Other features (test only F-job-captions this round)
+  - Live FreeSWITCH unless this feature is F-edge-fs-live and human unlocked
+  - Committing secrets
+  - Product feature coding (use coral-phase)
+packages:
+  - ./internal/profile
+docs:
+  - tests/agent/FEATURES.md
+  - tests/agent/features/catalog.yaml
+  - tests/agent/scenarios/F-job-captions.yaml
+  - tests/agent/MANIFEST.yaml
+  - docs/VALIDATION_PIPELINE.md

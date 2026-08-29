@@ -1,0 +1,24 @@
+id: F-job-playback-mom
+feature_id: F-job-playback-mom
+title: Playback MoM profile fixture
+area: jobs
+status: must_test
+tags: [jobs, profile, playback]
+requires: []
+packages: [./internal/profile, ./internal/control]
+fixtures:
+  profile: fixtures/profiles/job-playback-mom.json
+what: |
+  Playback meeting pack profile fixture expresses listen+think with MoM template and validates with control playback path.
+how: |
+  Load fixtures/profiles/job-playback-mom.json; go test ./internal/profile ./internal/control.
+steps:
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/job-playback-mom.json
+  - action: go_test
+    packages: [./internal/profile, ./internal/control]
+expect:
+  file_exists: true
+  go_test: pass
+evidence:
+  kinds: []

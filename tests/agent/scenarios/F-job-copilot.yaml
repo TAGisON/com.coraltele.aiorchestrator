@@ -1,0 +1,24 @@
+id: F-job-copilot
+feature_id: F-job-copilot
+title: Grounded copilot profile fixture
+area: jobs
+status: must_test
+tags: [jobs, profile, knowledge]
+requires: []
+packages: [./internal/profile, ./internal/gateway/ingest]
+fixtures:
+  profile: fixtures/profiles/job-copilot.json
+what: |
+  Grounded copilot profile fixture uses fake-think plus ingest-default knowledge and validates.
+how: |
+  Load fixtures/profiles/job-copilot.json; go test ./internal/profile ./internal/gateway/ingest.
+steps:
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/job-copilot.json
+  - action: go_test
+    packages: [./internal/profile, ./internal/gateway/ingest]
+expect:
+  file_exists: true
+  go_test: pass
+evidence:
+  kinds: []
