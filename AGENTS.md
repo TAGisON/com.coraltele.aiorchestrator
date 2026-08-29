@@ -17,8 +17,10 @@
 
 CLI: `tools/agent-runner/agent.ps1`  
 Defs: `.agent/pipelines/*.json`  
-Universal QA contract: `tests/agent/MANIFEST.yaml` + feature inventory `tests/agent/FEATURES.md`  
-Handoff via `.agent/work/<phase>/` + `# agent-approval`, not agent-to-agent chat.
+Universal QA contract: `tests/agent/` (FEATURES + scenarios)  
+Evidence / summaries: sibling worktree `com.coraltele.aiorchestrator-validation-evidence` (branch `validation-evidence`)  
+Handoff via `.agent/work/<phase>/` + `# agent-approval`; trails archived out of this repo after each feature.  
+Validation pauses after each feature (`next-feature` to continue).
 
 ## Hard rules
 

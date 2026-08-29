@@ -78,5 +78,7 @@
                    "F-job-copilot"
                ],
     "prompt_kind":  "validation",
-    "manifest":  "tests/agent/MANIFEST.yaml"
+    "manifest":  "tests/agent/MANIFEST.yaml",
+    "pause_after_phase":  true,
+    "evidence_worktree":  "C:/Users/user/Documents/GitHub/com.coraltele.aiorchestrator-validation-evidence"
 }

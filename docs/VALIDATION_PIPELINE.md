@@ -1,33 +1,36 @@
 # Product validation pipeline — operator guide
 
-**Purpose:** Multi-agent QA for any repo that ships `tests/agent/MANIFEST.yaml` — invent scenarios, build fixtures, run harness, validate audit evidence, review, summarize.
+**Purpose:** Multi-agent QA for feature contracts in `tests/agent/` — one feature per round, then pause. Run trails are archived outside this app repo.
 
-**Companion:** Phase build stays on `docs/AGENT_PIPELINE.md` (`coral-phase`). This doc is `product-validation` only.
+**Companion:** Phase build stays on `docs/AGENT_PIPELINE.md` (`coral-phase`).
 
 ---
 
-## Universal contract
+## Split: contract vs evidence
+
+| Location | What lives here |
+|---|---|
+| **This app repo** `tests/agent/` | Feature contract only: FEATURES.md, catalog, scenarios, fixtures |
+| **Evidence worktree** `../com.coraltele.aiorchestrator-validation-evidence` | Run trails: scenarios.md, run-log, audit, review, summary, INDEX |
+
+Open dashboard: `com.coraltele.aiorchestrator-validation-evidence/INDEX.md`  
+Branch: `validation-evidence` (orphan worktree).
+
+---
+
+## Universal contract (app)
 
 | Path | Role |
 |---|---|
-| `tests/agent/MANIFEST.yaml` | Required. Missing → scenario-planner **blocker** `spec` |
-| `tests/agent/FEATURES.md` | Human feature inventory — **what** must be tested |
-| `tests/agent/features/catalog.yaml` | Machine index (ids, packages, status) |
-| `tests/agent/scenarios/F-*.yaml` | One scenario per feature id |
-| `tests/agent/fixtures/` | Profiles, audio, transcripts, … |
-| Global skills `coral-validation-*` | Drive roles; same skills every repo |
-
-This repo’s V1 wave covers **all must_test features** in FEATURES.md (ports → control → runtime → edges → audit → Sarvam). **No FreeSWITCH** until you provide a call-server endpoint (`F-edge-fs-live` deferred).
-
-Quick harness (no agents):
-
-```powershell
-.\tools\agent-runner\Run-FeatureScenarios.ps1
-```
+| `tests/agent/MANIFEST.yaml` | Required |
+| `tests/agent/FEATURES.md` | What must be tested |
+| `tests/agent/features/catalog.yaml` | Machine index |
+| `tests/agent/scenarios/F-*.yaml` | One scenario definition per feature |
+| Global skills `coral-validation-*` | Drive roles |
 
 ---
 
-## Roles
+## Roles (artifacts written under `.agent/work/<F-id>/`, then archived)
 
 | Role | Skill | Artifact |
 |---|---|---|
@@ -38,35 +41,31 @@ Quick harness (no agents):
 | test-reviewer | coral-validation-test-reviewer | review.md |
 | test-summarizer | coral-validation-test-summarizer | summary.md |
 
-Fail loops (from `.agent/pipelines/product-validation.json`): reviewer → runner; auditor → runner; runner → fixture-builder; fixture-builder → planner; summarizer → runner.
-
 ---
 
-## Start (one feature per round)
-
-Same monitor as coding. Phases are feature ids (`F-ports-contract`, …) in `.agent/pipelines/product-validation.json`.
+## Start one feature, then pause
 
 ```powershell
 cd C:\Users\user\Documents\GitHub\com.coraltele.aiorchestrator
 $env:AGENT_NO_MAIL = "1"
 .\tools\agent-runner\agent.ps1 start -Pipeline product-validation -From F-ports-contract
 .\tools\agent-runner\agent.ps1 monitor-start
-.\tools\agent-runner\agent.ps1 assign-role   # writes NEXT_PROMPT + DISPATCH only
+.\tools\agent-runner\agent.ps1 assign-role
 ```
 
-Each round: scenario-planner → … → test-summarizer for **that feature only**, then auto-advance to the next `F-*` phase. Trail: `.agent/work/<feature-id>/`.
-
-Parent agent / you run the prompt; monitor advances on `# agent-approval`.
+On summarizer **pass**: trail is copied into the evidence worktree and committed there; pipeline state becomes **`waiting_human`** (does not start the next feature).
 
 ```powershell
-.\tools\agent-runner\agent.ps1 start -Pipeline coral-phase -From phase-a
+.\tools\agent-runner\agent.ps1 next-feature
+# or: .\tools\agent-runner\agent.ps1 next-feature -From F-fake-trio
 ```
+
+`pause_after_phase: true` is set in `.agent/pipelines/product-validation.json`.
 
 ---
 
-## Adding a wave later (e.g. FS)
+## Adding FS later
 
-1. Human provides FS/call-server endpoint → record via `decide` or MANIFEST  
-2. New phase YAML (e.g. `validation-fs`) + scenarios tagged `requires: [fs_edge]`  
-3. Append phase id to `.agent/pipelines/product-validation.json` `phases`  
-4. `start -Pipeline product-validation -From validation-fs`
+1. Human provides call-server endpoint  
+2. Flip `F-edge-fs-live` to must_test / add phase  
+3. `next-feature -From F-edge-fs-live`

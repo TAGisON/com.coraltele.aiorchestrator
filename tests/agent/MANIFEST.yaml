@@ -1,27 +1,21 @@
 product: com.coraltele.aiorchestrator
 wave: per-feature
-version: 3
+version: 4
 
-# One pipeline phase = one feature id (F-*). Same monitor as coral-phase.
-# Start: agent.ps1 start -Pipeline product-validation -From F-ports-contract
+# App repo holds the FEATURE CONTRACT only (what to test).
+# Run trails / summaries live in the sibling worktree (see evidence).
 
 catalog:
   human: tests/agent/FEATURES.md
   machine: tests/agent/features/catalog.yaml
   scenarios_dir: tests/agent/scenarios
-  rule: Each round tests ONLY the current phase feature_id end-to-end through all validation roles.
+  rule: Each round tests ONLY the current phase feature_id. Pipeline pauses after each feature.
 
-surface_areas:
-  - A-ports
-  - B-durable
-  - B-control
-  - C-runtime
-  - D-edge
-  - D-gateway
-  - E-observe
-  - F-vendor
-  - locks
-  - jobs
+evidence:
+  worktree: ../com.coraltele.aiorchestrator-validation-evidence
+  index: ../com.coraltele.aiorchestrator-validation-evidence/INDEX.md
+  rounds: ../com.coraltele.aiorchestrator-validation-evidence/rounds/
+  note: Do not store run-log/summary trails in this application repo.
 
 unavailable_until_human:
   - fs_edge
@@ -34,8 +28,8 @@ boot:
 harness:
   verify: go test ./... -count=1
   feature_runner: tools/agent-runner/Run-FeatureScenarios.ps1
+  archive: tools/agent-runner/Archive-FeatureRound.ps1
   unit_tag_note: Live Sarvam may be env-gated; skip when SARVAM_API_KEY missing.
-  results_dir: tests/agent/results
 
 docs:
   - tests/agent/FEATURES.md
@@ -48,11 +42,6 @@ docs:
   - docs/architecture/PLATFORM_FIRST.md
   - docs/product/PRODUCT_DECISIONS.md
   - docs/SOLUTION.md
-
-evidence:
-  require_audit_on_session_terminal: true
-  require_analytics_catalog: true
-  postcall_job_on_terminal: true
 
 secrets:
   file: .agent/secrets.local.json

@@ -8,7 +8,7 @@ param(
     [ValidateSet(
         "start", "status", "audit", "stop", "resume", "restart-phase",
         "continue", "decide", "next-prompt", "complete-role", "mail-test",
-        "monitor-start", "monitor-stop", "assign-role"
+        "monitor-start", "monitor-stop", "assign-role", "next-feature", "archive-round"
     )]
     [string]$Command = "status",
 
@@ -88,6 +88,12 @@ function Load-PipelineDef([string]$Name) {
         phases         = @($raw.phases)
         prompt_kind    = $(if ($raw.prompt_kind) { [string]$raw.prompt_kind } else { "phase" })
         manifest       = $(if ($raw.manifest) { [string]$raw.manifest } else { $null })
+        pause_after_phase = $(
+            if ($null -ne $raw.pause_after_phase) { [bool]$raw.pause_after_phase }
+            elseif ([string]$raw.name -eq "product-validation") { $true }
+            else { $false }
+        )
+        evidence_worktree = $(if ($raw.evidence_worktree) { [string]$raw.evidence_worktree } else { $null })
     }
 }
 
@@ -443,6 +449,45 @@ function Complete-CurrentRole([string]$ForcedResult) {
     if ($st.completed_phases) { $done = @($st.completed_phases) }
     $done += $st.phase
     Send-Notify ("[aiorchestrator] " + $st.phase + " PHASE COMPLETE") ("Next: " + $nextPhase)
+
+    # Archive validation trails outside the app tree (product-validation).
+    if ($pipeName -eq "product-validation") {
+        $arch = Join-Path $PSScriptRoot "Archive-FeatureRound.ps1"
+        if (Test-Path $arch) {
+            try {
+                & $arch -RepoRoot $RepoRoot -FeatureId ([string]$st.phase) -Result "pass" -AppCommit (git -C $RepoRoot rev-parse HEAD)
+            }
+            catch {
+                Write-Warning ("Archive-FeatureRound failed: " + $_)
+            }
+        }
+    }
+
+    $pauseAfter = $false
+    if ($pipe.PSObject.Properties.Name -contains "pause_after_phase") {
+        $pauseAfter = [bool]$pipe.pause_after_phase
+    }
+    elseif ($pipeName -eq "product-validation") {
+        $pauseAfter = $true
+    }
+
+    if ($pauseAfter) {
+        Write-Status @{
+            pipeline         = $pipeName
+            state            = "waiting_human"
+            phase            = $st.phase
+            role             = $null
+            loop             = 0
+            completed_phases = $done
+            metrics          = $metrics
+            next_phase       = $nextPhase
+            message          = ($st.phase + " PASS. Paused. Evidence archived. Start next with: agent.ps1 next-feature" + $(if ($nextPhase) { " (next=$nextPhase)" } else { " (none)" }))
+        }
+        Write-Audit "phase-complete-paused" ($st.phase + " next=" + $nextPhase)
+        Write-Host ("PHASE DONE (paused) " + $st.phase + " next=" + $nextPhase)
+        return
+    }
+
     if ($nextPhase) {
         Ensure-WorkDir $nextPhase | Out-Null
         Write-Status @{
@@ -628,6 +673,36 @@ switch ($Command) {
     "assign-role" {
         $worker = Join-Path $PSScriptRoot "Start-RoleWorker.ps1"
         & $worker -RepoRoot $RepoRoot
+    }
+    "next-feature" {
+        $st = Read-Status
+        $pipe = Load-PipelineDef $(if ($st.pipeline) { [string]$st.pipeline } else { "product-validation" })
+        if ($st.state -notin @("waiting_human", "stopped", "idle")) {
+            throw ("next-feature only when paused/stopped; state=" + $st.state)
+        }
+        $next = $null
+        if ($st.next_phase) { $next = [string]$st.next_phase }
+        if (-not $next -and $From) { $next = $From }
+        if (-not $next -and $Phase) { $next = $Phase }
+        if (-not $next) {
+            $last = $null
+            if ($st.completed_phases -and @($st.completed_phases).Count -gt 0) {
+                $last = [string](@($st.completed_phases)[-1])
+            }
+            elseif ($st.phase) { $last = [string]$st.phase }
+            if ($last) { $next = Get-NextPhase $last $pipe }
+        }
+        if (-not $next) { throw "No next feature. Pipeline complete or specify -From F-..." }
+        Start-Pipeline $next $pipe.name
+        Write-Host ("NEXT FEATURE STARTED " + $next)
+    }
+    "archive-round" {
+        $st = Read-Status
+        $fid = $Phase
+        if (-not $fid) { $fid = $st.phase }
+        if (-not $fid) { throw "Specify -Phase F-..." }
+        $arch = Join-Path $PSScriptRoot "Archive-FeatureRound.ps1"
+        & $arch -RepoRoot $RepoRoot -FeatureId $fid -Result "pass" -AppCommit (git -C $RepoRoot rev-parse HEAD)
     }
     "monitor-start" {
         $mon = Join-Path $PSScriptRoot "Monitor.ps1"
