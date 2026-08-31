@@ -1,9 +1,6 @@
 {
-  "id": "job-contact-agent",
-  "metadata": {
-    "display_name": "Contact agent (fixture)",
-    "family": "contact-agent"
-  },
+  "id": "cc-sales",
+  "metadata": { "display_name": "CC Sales", "family": "contact-agent" },
   "modes": { "listen": true, "speak": true, "think": true, "talk": true },
   "audio": { "canonical_sample_rate_hz": 16000 },
   "language": {
@@ -14,27 +11,27 @@
   },
   "hot_swap_allowed": ["language.primary"],
   "persona": {
-    "name": "Support",
-    "voice": {
-      "fake-speak": "lab-voice",
-      "sarvam-tts": "shubh"
-    }
+    "name": "Sales Mira",
+    "instructions": "You are a concise sales contact agent. Qualify interest; never invent pricing.",
+    "voice": { "fake-speak": "lab-voice-sales", "sarvam-tts": "shubh" }
   },
   "response": {
     "ladder": ["clip", "template", "llm"],
     "clips": {
-      "clip-apology-en": {
-        "text": "Sorry — please hold while we connect you."
-      },
+      "clip-apology-en": { "text": "Sorry — connecting you to a sales specialist." },
       "greeting-en": {
-        "text": "Welcome to support.",
+        "text": "Hi — Sales desk. How can I help today?",
         "when": { "regex": "(?i)\\b(hi|hello|hey)\\b" }
+      },
+      "pricing-en": {
+        "text": "I can share list pricing after we confirm your product interest.",
+        "when": { "regex": "(?i)\\b(price|pricing|cost|quote)\\b" }
       }
     },
     "templates": {
       "clarify": {
-        "text": "Could you rephrase that?",
-        "when": { "regex": "(?i)\\b(what|huh)\\b" }
+        "text": "Which product line are you asking about?",
+        "when": { "regex": "(?i)\\b(what|huh|which)\\b" }
       }
     }
   },

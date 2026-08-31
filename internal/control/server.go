@@ -21,7 +21,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
-// Runtime is the minimal session-actor surface Control needs (Phase C + cc-2 language).
+// Runtime is the minimal session-actor surface Control needs (Phase C + cc-2 language + lab inject).
 type Runtime interface {
 	StartSession(ctx context.Context, p RuntimeStart) error
 	StopSession(ctx context.Context, sessionID, reason string) (terminalState string, err error)
@@ -29,6 +29,8 @@ type Runtime interface {
 	SwitchLanguage(sessionID, primary string) error
 	// Languages returns live actor language state when running.
 	Languages(sessionID string) (detected, active string, ok bool)
+	// InjectText runs a lab Talk turn from text (CONTROL_API POST …/inject).
+	InjectText(ctx context.Context, sessionID, text string) error
 }
 
 // RuntimeStart is create-time actor spawn input.
@@ -107,6 +109,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}", s.handleGetSession)
 	s.mux.HandleFunc("PATCH /v1/sessions/{id}/profile-fields", s.handlePatchProfileFields)
+	s.mux.HandleFunc("POST /v1/sessions/{id}/inject", s.handleInject)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/transcript", s.handleGetTranscript)

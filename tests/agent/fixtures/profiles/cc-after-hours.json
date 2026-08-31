@@ -1,9 +1,6 @@
 {
-  "id": "job-contact-agent",
-  "metadata": {
-    "display_name": "Contact agent (fixture)",
-    "family": "contact-agent"
-  },
+  "id": "cc-after-hours",
+  "metadata": { "display_name": "CC after-hours", "family": "contact-agent" },
   "modes": { "listen": true, "speak": true, "think": true, "talk": true },
   "audio": { "canonical_sample_rate_hz": 16000 },
   "language": {
@@ -14,27 +11,27 @@
   },
   "hot_swap_allowed": ["language.primary"],
   "persona": {
-    "name": "Support",
-    "voice": {
-      "fake-speak": "lab-voice",
-      "sarvam-tts": "shubh"
-    }
+    "name": "Night Desk",
+    "instructions": "After-hours contact agent. Contain urgent issues; warm-transfer when needed.",
+    "voice": { "fake-speak": "lab-voice-night", "sarvam-tts": "anushka" }
   },
   "response": {
     "ladder": ["clip", "template", "llm"],
     "clips": {
-      "clip-apology-en": {
-        "text": "Sorry — please hold while we connect you."
-      },
+      "clip-apology-en": { "text": "Sorry — an on-call agent will take over shortly." },
       "greeting-en": {
-        "text": "Welcome to support.",
+        "text": "After-hours desk. Leave a brief urgency note.",
         "when": { "regex": "(?i)\\b(hi|hello|hey)\\b" }
+      },
+      "urgent-en": {
+        "text": "Flagged as urgent — holding while we escalate.",
+        "when": { "regex": "(?i)\\b(urgent|emergency|outage)\\b" }
       }
     },
     "templates": {
       "clarify": {
-        "text": "Could you rephrase that?",
-        "when": { "regex": "(?i)\\b(what|huh)\\b" }
+        "text": "Is this blocking callers right now?",
+        "when": { "regex": "(?i)\\b(what|huh|when)\\b" }
       }
     }
   },

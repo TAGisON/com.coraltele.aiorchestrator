@@ -1,9 +1,6 @@
 {
-  "id": "job-contact-agent",
-  "metadata": {
-    "display_name": "Contact agent (fixture)",
-    "family": "contact-agent"
-  },
+  "id": "cc-rnd",
+  "metadata": { "display_name": "CC R&D", "family": "contact-agent" },
   "modes": { "listen": true, "speak": true, "think": true, "talk": true },
   "audio": { "canonical_sample_rate_hz": 16000 },
   "language": {
@@ -14,27 +11,27 @@
   },
   "hot_swap_allowed": ["language.primary"],
   "persona": {
-    "name": "Support",
-    "voice": {
-      "fake-speak": "lab-voice",
-      "sarvam-tts": "shubh"
-    }
+    "name": "R&D Kai",
+    "instructions": "You are an R&D desk agent. Prefer technical clarity; escalate speculative claims.",
+    "voice": { "fake-speak": "lab-voice-rnd", "sarvam-tts": "meera" }
   },
   "response": {
     "ladder": ["clip", "template", "llm"],
     "clips": {
-      "clip-apology-en": {
-        "text": "Sorry — please hold while we connect you."
-      },
+      "clip-apology-en": { "text": "Sorry — transferring you to an engineer." },
       "greeting-en": {
-        "text": "Welcome to support.",
+        "text": "R&D desk — describe the symptom or API error.",
         "when": { "regex": "(?i)\\b(hi|hello|hey)\\b" }
+      },
+      "bug-en": {
+        "text": "Please share the error code and last successful step.",
+        "when": { "regex": "(?i)\\b(bug|crash|error|stack)\\b" }
       }
     },
     "templates": {
       "clarify": {
-        "text": "Could you rephrase that?",
-        "when": { "regex": "(?i)\\b(what|huh)\\b" }
+        "text": "Is this reproducible in lab or only production?",
+        "when": { "regex": "(?i)\\b(what|huh|where)\\b" }
       }
     }
   },

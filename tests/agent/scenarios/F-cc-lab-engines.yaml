@@ -1,0 +1,20 @@
+id: F-cc-lab-engines
+feature_id: F-cc-lab-engines
+title: Contact Agent lab engines binding + inject
+area: jobs
+status: must_test
+tags: [contact-agent, lab, engines]
+requires: []
+packages: [./internal/control]
+fixtures: {}
+what: |
+  Tenant engines GET/PUT and session gateway_binding pin; lab inject produces durable transcript turns for CC behaviour profile.
+how: |
+  go test ./internal/control — tenant engines + TestInject_ClipTurnAndTranscript
+steps:
+  - action: go_test
+    packages: [./internal/control]
+expect:
+  go_test: pass
+evidence:
+  kinds: []

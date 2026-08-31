@@ -29,7 +29,7 @@ It is a **profile family** (`metadata.family: contact-agent`), not a separate pr
 | Voice | Persona voice required for Talk/Speak; bound to Speak gateway | cc-3 |
 | Response ladder | clip → template → LLM; vendor fail → clip + escalate | cc-4 |
 | Transcript / disposition | Durable transcript APIs + disposition path | cc-5 (done: `GET …/transcript`, `GET …/disposition`, postcall upsert) |
-| Lab validation | Lab surfaces for engines / language / ladder | cc-6 |
+| Lab validation | Lab Tenant Engines panel, CC behaviour presets, system-bound Talk demo, LAB.md smoke + scenario checklist | cc-6 (lab surfaces landed) |
 
 ---
 

@@ -292,6 +292,25 @@ features:
     packages: [./internal/profile]
     evidence: []
 
+  - id: F-cc-lab-engines
+    area: jobs
+    status: must_test
+    title: Contact Agent lab engines binding + inject
+    packages: [./internal/control]
+    evidence: []
+
+  - id: F-cc-behaviour-presets
+    area: jobs
+    status: must_test
+    title: Contact Agent same-tenant behaviour presets
+    fixtures:
+      - fixtures/profiles/cc-sales.json
+      - fixtures/profiles/cc-rnd.json
+      - fixtures/profiles/cc-after-hours.json
+      - fixtures/profiles/job-contact-agent.json
+    packages: [./internal/profile, ./internal/runtime/composer]
+    evidence: []
+
   - id: F-job-captions
     area: jobs
     status: must_test

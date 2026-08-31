@@ -1,10 +1,131 @@
 const API = ""; // same origin
 
+/** Contact Agent behaviour presets — engines come from tenant binding, not profile failover. */
+const ccBase = {
+  modes: { listen: true, speak: true, think: true, talk: true },
+  audio: { canonical_sample_rate_hz: 16000 },
+  language: {
+    behaviour: "none",
+    auto_detect: true,
+    mid_call_switch: true,
+    allowed: ["en-IN", "hi-IN"],
+  },
+  hot_swap_allowed: ["language.primary"],
+  fallback: {
+    listen_down: { speak_canned: "clip-apology-en", skill: "warm_transfer" },
+    think_down: { speak_canned: "clip-apology-en", skill: "warm_transfer" },
+    speak_down: { text_sink: true, skill: "warm_transfer" },
+  },
+  skills: {
+    allowed: ["warm_transfer"],
+    definitions: {
+      warm_transfer: {
+        gateway: "coral-transfer",
+        authority: "act",
+        confirm: true,
+      },
+    },
+  },
+};
+
 const presets = {
+  "cc-sales": {
+    ...structuredClone(ccBase),
+    id: "cc-sales",
+    metadata: { display_name: "CC Sales", family: "contact-agent" },
+    persona: {
+      name: "Sales Mira",
+      instructions: "You are a concise sales contact agent. Qualify interest; never invent pricing.",
+      voice: { "fake-speak": "lab-voice-sales", "sarvam-tts": "shubh" },
+    },
+    response: {
+      ladder: ["clip", "template", "llm"],
+      clips: {
+        "clip-apology-en": { text: "Sorry — connecting you to a sales specialist." },
+        "greeting-en": {
+          text: "Hi — Sales desk. How can I help today?",
+          when: { regex: "(?i)\\b(hi|hello|hey)\\b" },
+        },
+        "pricing-en": {
+          text: "I can share list pricing after we confirm your product interest.",
+          when: { regex: "(?i)\\b(price|pricing|cost|quote)\\b" },
+        },
+      },
+      templates: {
+        clarify: {
+          text: "Which product line are you asking about?",
+          when: { regex: "(?i)\\b(what|huh|which)\\b" },
+        },
+      },
+    },
+  },
+  "cc-rnd": {
+    ...structuredClone(ccBase),
+    id: "cc-rnd",
+    metadata: { display_name: "CC R&D", family: "contact-agent" },
+    persona: {
+      name: "R&D Kai",
+      instructions: "You are an R&D desk agent. Prefer technical clarity; escalate speculative claims.",
+      voice: { "fake-speak": "lab-voice-rnd", "sarvam-tts": "meera" },
+    },
+    response: {
+      ladder: ["clip", "template", "llm"],
+      clips: {
+        "clip-apology-en": { text: "Sorry — transferring you to an engineer." },
+        "greeting-en": {
+          text: "R&D desk — describe the symptom or API error.",
+          when: { regex: "(?i)\\b(hi|hello|hey)\\b" },
+        },
+        "bug-en": {
+          text: "Please share the error code and last successful step.",
+          when: { regex: "(?i)\\b(bug|crash|error|stack)\\b" },
+        },
+      },
+      templates: {
+        clarify: {
+          text: "Is this reproducible in lab or only production?",
+          when: { regex: "(?i)\\b(what|huh|where)\\b" },
+        },
+      },
+    },
+  },
+  "cc-after-hours": {
+    ...structuredClone(ccBase),
+    id: "cc-after-hours",
+    metadata: { display_name: "CC after-hours", family: "contact-agent" },
+    persona: {
+      name: "Night Desk",
+      instructions: "After-hours contact agent. Contain urgent issues; warm-transfer when needed.",
+      voice: { "fake-speak": "lab-voice-night", "sarvam-tts": "anushka" },
+    },
+    response: {
+      ladder: ["clip", "template", "llm"],
+      clips: {
+        "clip-apology-en": { text: "Sorry — an on-call agent will take over shortly." },
+        "greeting-en": {
+          text: "After-hours desk. Leave a brief urgency note.",
+          when: { regex: "(?i)\\b(hi|hello|hey)\\b" },
+        },
+        "urgent-en": {
+          text: "Flagged as urgent — holding while we escalate.",
+          when: { regex: "(?i)\\b(urgent|emergency|outage)\\b" },
+        },
+      },
+      templates: {
+        clarify: {
+          text: "Is this blocking callers right now?",
+          when: { regex: "(?i)\\b(what|huh|when)\\b" },
+        },
+      },
+    },
+  },
+  // Legacy / non-CC — profile-owned routers (may include failover lists).
   fakes: {
     id: "lab-fakes",
+    metadata: { display_name: "Lab fakes (legacy)", family: "lab" },
     modes: { listen: true, speak: true, think: true },
     audio: { canonical_sample_rate_hz: 16000 },
+    persona: { voice: { "fake-speak": "lab-voice" } },
     routers: {
       listen: { providers: ["fake-listen"] },
       speak: { providers: ["fake-speak"] },
@@ -13,8 +134,10 @@ const presets = {
   },
   sarvam: {
     id: "lab-sarvam-failover",
+    metadata: { display_name: "Sarvam+fake failover (legacy non-CC)", family: "lab" },
     modes: { listen: true, speak: true, think: true },
     audio: { canonical_sample_rate_hz: 16000 },
+    persona: { voice: { "sarvam-tts": "shubh", "fake-speak": "lab-voice" } },
     routers: {
       listen: { providers: ["sarvam-stt", "fake-listen"] },
       speak: { providers: ["sarvam-tts", "fake-speak"] },
@@ -23,6 +146,7 @@ const presets = {
   },
   captions: {
     id: "job-captions",
+    metadata: { display_name: "Captions listen-only (legacy)", family: "captions" },
     modes: { listen: true, speak: false, think: false },
     audio: { canonical_sample_rate_hz: 16000 },
     language: { behaviour: "captions", primary: "en-IN" },
@@ -33,6 +157,7 @@ const presets = {
 };
 
 let sse = null;
+let gatewayCatalog = null;
 const apiLogEl = () => document.getElementById("apiLog");
 
 function logApi(method, path, status, body) {
@@ -66,6 +191,7 @@ document.querySelectorAll("nav button").forEach((btn) => {
     btn.classList.add("active");
     document.querySelectorAll(".tab").forEach((t) => { t.hidden = true; });
     document.getElementById("tab-" + btn.dataset.tab).hidden = false;
+    if (btn.dataset.tab === "engines") loadEngines().catch(() => {});
   });
 });
 
@@ -91,9 +217,70 @@ async function refreshOverview() {
   }
 }
 
+function fillGatewayLists(data) {
+  gatewayCatalog = data;
+  const byPort = { listen: [], think: [], speak: [] };
+  const items = data.gateways || data || [];
+  const list = Array.isArray(items) ? items : Object.values(items).flat();
+  for (const g of list) {
+    const id = g.id || g.gateway_id || g;
+    const port = (g.port || g.kind || "").toLowerCase();
+    if (port.includes("listen") && byPort.listen.indexOf(id) < 0) byPort.listen.push(id);
+    if (port.includes("think") && byPort.think.indexOf(id) < 0) byPort.think.push(id);
+    if (port.includes("speak") && byPort.speak.indexOf(id) < 0) byPort.speak.push(id);
+  }
+  const fill = (listId, ids) => {
+    const el = document.getElementById(listId);
+    el.innerHTML = ids.map((id) => `<option value="${id}"></option>`).join("");
+  };
+  fill("gwListenList", byPort.listen.length ? byPort.listen : ["fake-listen", "sarvam-stt"]);
+  fill("gwThinkList", byPort.think.length ? byPort.think : ["fake-think", "sarvam-llm"]);
+  fill("gwSpeakList", byPort.speak.length ? byPort.speak : ["fake-speak", "sarvam-tts"]);
+}
+
 async function loadGateways() {
   const data = await api("GET", "/v1/gateways");
   document.getElementById("gatewaysJson").textContent = JSON.stringify(data, null, 2);
+  fillGatewayLists(data);
+}
+
+async function loadEngines() {
+  try {
+    if (!gatewayCatalog) await loadGateways().catch(() => {});
+    const data = await api("GET", "/v1/tenant/engines");
+    document.getElementById("engListen").value = data.listen || "";
+    document.getElementById("engThink").value = data.think || "";
+    document.getElementById("engSpeak").value = data.speak || "";
+    document.getElementById("engSource").textContent = data.source || "?";
+    document.getElementById("engTenant").textContent = data.tenant_id || "default";
+    document.getElementById("enginesJson").textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById("enginesJson").textContent = JSON.stringify(e, null, 2);
+  }
+}
+
+async function saveEngines() {
+  const body = {
+    listen: document.getElementById("engListen").value.trim(),
+    think: document.getElementById("engThink").value.trim(),
+    speak: document.getElementById("engSpeak").value.trim(),
+  };
+  const data = await api("PUT", "/v1/tenant/engines", body);
+  document.getElementById("engSource").textContent = data.source || "store";
+  document.getElementById("engTenant").textContent = data.tenant_id || "default";
+  document.getElementById("enginesJson").textContent = JSON.stringify(data, null, 2);
+}
+
+function suggestFakeEngines() {
+  document.getElementById("engListen").value = "fake-listen";
+  document.getElementById("engThink").value = "fake-think";
+  document.getElementById("engSpeak").value = "fake-speak";
+}
+
+function suggestSarvamEngines() {
+  document.getElementById("engListen").value = "sarvam-stt";
+  document.getElementById("engThink").value = "sarvam-llm";
+  document.getElementById("engSpeak").value = "sarvam-tts";
 }
 
 function applyPreset() {
@@ -101,7 +288,13 @@ function applyPreset() {
   const doc = structuredClone(presets[key]);
   document.getElementById("pubId").value = doc.id;
   document.getElementById("profId").value = doc.id;
+  if (doc.metadata && doc.metadata.display_name) {
+    document.getElementById("profName").value = doc.metadata.display_name;
+  }
   document.getElementById("profDoc").value = JSON.stringify(doc, null, 2);
+  if (String(key).startsWith("cc-")) {
+    document.getElementById("sessProfile").value = doc.id;
+  }
 }
 
 async function createProfile() {
@@ -141,7 +334,39 @@ async function createSession() {
   const clock = document.getElementById("sessClock").value;
   const data = await api("POST", "/v1/sessions", { profile_id, profile_version: "latest", clock });
   document.getElementById("inspId").value = data.session_id;
+  document.getElementById("helperSid").value = data.session_id;
+  document.getElementById("sessBinding").textContent = JSON.stringify({
+    session_id: data.session_id,
+    gateway_binding: data.gateway_binding,
+    state: data.state,
+    profile_id: data.profile_id,
+  }, null, 2);
   await loadSessions();
+}
+
+async function injectText() {
+  const id = document.getElementById("helperSid").value.trim() || document.getElementById("inspId").value.trim();
+  const text = document.getElementById("injectText").value;
+  if (!id) return;
+  const data = await api("POST", `/v1/sessions/${encodeURIComponent(id)}/inject`, { text, speak: true });
+  document.getElementById("sessBinding").textContent = JSON.stringify(data, null, 2);
+}
+
+async function patchLanguage() {
+  const id = document.getElementById("helperSid").value.trim() || document.getElementById("inspId").value.trim();
+  const primary = document.getElementById("patchLang").value.trim();
+  if (!id) return;
+  const data = await api("PATCH", `/v1/sessions/${encodeURIComponent(id)}/profile-fields`, {
+    "language.primary": primary,
+  });
+  document.getElementById("sessBinding").textContent = JSON.stringify(data, null, 2);
+}
+
+function openInspectHelper() {
+  const id = document.getElementById("helperSid").value.trim();
+  if (id) document.getElementById("inspId").value = id;
+  document.querySelector('nav button[data-tab="inspect"]').click();
+  inspectSession().catch(() => {});
 }
 
 async function loadSessions() {
@@ -158,6 +383,7 @@ async function loadSessions() {
       </td>`;
     tr.querySelector('[data-act="insp"]').onclick = () => {
       document.getElementById("inspId").value = s.session_id;
+      document.getElementById("helperSid").value = s.session_id;
       inspectSession();
       document.querySelector('nav button[data-tab="inspect"]').click();
     };
@@ -173,11 +399,23 @@ async function stopSession(id) {
   await inspectSession();
 }
 
+function summarizeSession(sess) {
+  const gb = sess.gateway_binding || {};
+  const parts = [
+    `gateway_binding: listen=${gb.listen || "—"} think=${gb.think || "—"} speak=${gb.speak || "—"}`,
+    `detected_language=${sess.detected_language || "—"}`,
+    `active_language=${sess.active_language || "—"}`,
+  ];
+  document.getElementById("inspSummary").textContent = parts.join(" · ");
+}
+
 async function inspectSession() {
   const id = document.getElementById("inspId").value.trim();
   if (!id) return;
+  document.getElementById("helperSid").value = id;
   const sess = await api("GET", `/v1/sessions/${encodeURIComponent(id)}`);
   document.getElementById("inspSession").textContent = JSON.stringify(sess, null, 2);
+  summarizeSession(sess);
   try {
     const audit = await api("GET", `/v1/sessions/${encodeURIComponent(id)}/audit`);
     document.getElementById("inspAudit").textContent = JSON.stringify(audit, null, 2);
@@ -189,6 +427,30 @@ async function inspectSession() {
     document.getElementById("inspAnalytics").textContent = JSON.stringify(an, null, 2);
   } catch (e) {
     document.getElementById("inspAnalytics").textContent = JSON.stringify(e, null, 2);
+  }
+  await loadTranscript().catch(() => {});
+  await loadDisposition().catch(() => {});
+}
+
+async function loadTranscript() {
+  const id = document.getElementById("inspId").value.trim();
+  if (!id) return;
+  try {
+    const data = await api("GET", `/v1/sessions/${encodeURIComponent(id)}/transcript`);
+    document.getElementById("inspTranscript").textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById("inspTranscript").textContent = JSON.stringify(e, null, 2);
+  }
+}
+
+async function loadDisposition() {
+  const id = document.getElementById("inspId").value.trim();
+  if (!id) return;
+  try {
+    const data = await api("GET", `/v1/sessions/${encodeURIComponent(id)}/disposition`);
+    document.getElementById("inspDisposition").textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById("inspDisposition").textContent = JSON.stringify(e, null, 2);
   }
 }
 
@@ -224,3 +486,4 @@ refreshOverview();
 loadProfiles().catch(() => {});
 loadSessions().catch(() => {});
 loadGateways().catch(() => {});
+loadEngines().catch(() => {});

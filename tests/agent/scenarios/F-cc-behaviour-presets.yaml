@@ -1,0 +1,33 @@
+id: F-cc-behaviour-presets
+feature_id: F-cc-behaviour-presets
+title: Contact Agent same-tenant behaviour presets
+area: jobs
+status: must_test
+tags: [contact-agent, lab, profiles]
+requires: []
+packages: [./internal/profile, ./internal/runtime/composer]
+fixtures:
+  profiles:
+    - fixtures/profiles/cc-sales.json
+    - fixtures/profiles/cc-rnd.json
+    - fixtures/profiles/cc-after-hours.json
+    - fixtures/profiles/job-contact-agent.json
+what: |
+  ≥2 Contact Agent behaviour fixtures share family contact-agent (engines not encoded as failover lists);
+  clip ladder and pinned think_down covered by composer tests referenced from LAB.md scenario checklist.
+how: |
+  Fixtures exist with metadata.family contact-agent; go test ./internal/profile and ./internal/runtime/composer
+steps:
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/cc-sales.json
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/cc-rnd.json
+  - action: file_exists
+    path: tests/agent/fixtures/profiles/job-contact-agent.json
+  - action: go_test
+    packages: [./internal/profile, ./internal/runtime/composer]
+expect:
+  file_exists: true
+  go_test: pass
+evidence:
+  kinds: []

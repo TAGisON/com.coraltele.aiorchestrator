@@ -56,6 +56,7 @@
       border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem;
     }
     .panel h2 { margin: 0 0 0.75rem; font-size: 0.95rem; }
+    .panel h3 { margin: 0 0 0.5rem; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
     .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; align-items: flex-end; }
     label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.75rem; color: var(--muted); }
     input, select, textarea {
@@ -77,6 +78,7 @@
       font-size: 0.75rem; background: var(--bg); padding: 0.75rem; border-radius: 8px;
       white-space: pre-wrap; word-break: break-word;
     }
+    .hint { color: var(--muted); font-size: 0.8rem; line-height: 1.45; margin: 0 0 0.75rem; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
@@ -98,6 +100,7 @@
   <main>
     <nav id="nav">
       <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="engines">Tenant Engines</button>
       <button data-tab="gateways">Gateways</button>
       <button data-tab="profiles">Profiles</button>
       <button data-tab="sessions">Sessions</button>
@@ -115,12 +118,44 @@
           </div>
         </div>
         <div class="panel">
-          <h2>Quick start</h2>
+          <h2>Quick start — Contact Agent CC</h2>
           <ol style="color:var(--muted); font-size:0.9rem; line-height:1.5;">
             <li>Confirm store is <strong>postgres</strong> (DATABASE_URL).</li>
-            <li>Create + publish a profile (fakes or Sarvam routers).</li>
-            <li>Create a session, stop it, then inspect audit / analytics.</li>
+            <li>Open <strong>Tenant Engines</strong> — PUT single listen/think/speak ids (fakes offline, or Sarvam when keyed). Never comma failover lists.</li>
+            <li>Publish ≥2 <strong>Contact Agent</strong> behaviour presets (Sales + R&amp;D / after-hours) — not the legacy failover presets.</li>
+            <li>Create a Talk session; confirm <code>gateway_binding</code> matches tenant engines.</li>
+            <li>Inject turns / language PATCH / clip match → Inspect transcript, disposition, analytics.</li>
           </ol>
+          <p class="hint">Legacy presets (fakes / sarvam+fake failover / captions) remain for non-CC lab work only. See <code>docs/LAB.md</code>.</p>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-engines" hidden>
+        <div class="panel">
+          <h2>Tenant Engines (system STT / LLM / TTS)</h2>
+          <p class="hint">One id per slot for the tenant. Contact Agent sessions pin these as <code>gateway_binding</code>. Source is store row or env fallback (<code>SYSTEM_LISTEN</code> / <code>SYSTEM_THINK</code> / <code>SYSTEM_SPEAK</code>).</p>
+          <div class="row">
+            <label>listen
+              <input id="engListen" list="gwListenList" value="fake-listen" />
+            </label>
+            <label>think
+              <input id="engThink" list="gwThinkList" value="fake-think" />
+            </label>
+            <label>speak
+              <input id="engSpeak" list="gwSpeakList" value="fake-speak" />
+            </label>
+            <datalist id="gwListenList"></datalist>
+            <datalist id="gwThinkList"></datalist>
+            <datalist id="gwSpeakList"></datalist>
+          </div>
+          <div class="row">
+            <button class="action" onclick="loadEngines()">Refresh GET</button>
+            <button class="action" onclick="saveEngines()">Save PUT</button>
+            <button class="action secondary" onclick="suggestFakeEngines()">Suggest fakes</button>
+            <button class="action secondary" onclick="suggestSarvamEngines()">Suggest Sarvam</button>
+          </div>
+          <p class="hint">Current source: <strong id="engSource">…</strong> · tenant: <strong id="engTenant">default</strong></p>
+          <pre class="log" id="enginesJson"></pre>
         </div>
       </section>
 
@@ -137,20 +172,27 @@
           <div class="panel">
             <h2>Create profile</h2>
             <div class="row">
-              <label>id <input id="profId" value="lab-fakes" /></label>
-              <label>display_name <input id="profName" value="Lab fakes" /></label>
+              <label>id <input id="profId" value="cc-sales" /></label>
+              <label>display_name <input id="profName" value="CC Sales" /></label>
             </div>
             <button class="action" onclick="createProfile()">Create</button>
           </div>
           <div class="panel">
             <h2>Publish version</h2>
             <div class="row">
-              <label>profile id <input id="pubId" value="lab-fakes" /></label>
+              <label>profile id <input id="pubId" value="cc-sales" /></label>
               <label>preset
                 <select id="preset" onchange="applyPreset()">
-                  <option value="fakes">fakes (listen/speak/think)</option>
-                  <option value="sarvam">sarvam + fake failover</option>
-                  <option value="captions">captions listen-only</option>
+                  <optgroup label="Contact Agent (behaviour — engines from tenant)">
+                    <option value="cc-sales">CC Sales</option>
+                    <option value="cc-rnd">CC R&amp;D</option>
+                    <option value="cc-after-hours">CC after-hours</option>
+                  </optgroup>
+                  <optgroup label="Legacy / non-CC">
+                    <option value="fakes">legacy: fakes (profile routers)</option>
+                    <option value="sarvam">legacy: sarvam + fake failover</option>
+                    <option value="captions">legacy: captions listen-only</option>
+                  </optgroup>
                 </select>
               </label>
             </div>
@@ -170,13 +212,26 @@
 
       <section class="tab" id="tab-sessions" hidden>
         <div class="panel">
-          <h2>Create session</h2>
+          <h2>Create session (realtime / Talk)</h2>
+          <p class="hint">For Contact Agent demo, use a CC preset profile id. Session pins tenant engines — not profile comma failover.</p>
           <div class="row">
-            <label>profile_id <input id="sessProfile" value="lab-fakes" /></label>
+            <label>profile_id <input id="sessProfile" value="cc-sales" /></label>
             <label>clock
               <select id="sessClock"><option>live</option><option>playback</option></select>
             </label>
             <button class="action" onclick="createSession()">Create</button>
+          </div>
+          <pre class="log" id="sessBinding"></pre>
+        </div>
+        <div class="panel">
+          <h2>Lab helpers (active session)</h2>
+          <div class="row">
+            <label>session_id <input id="helperSid" style="min-width:280px" /></label>
+            <label>inject text <input id="injectText" value="hello" style="min-width:220px" /></label>
+            <button class="action" onclick="injectText()">Inject final</button>
+            <button class="action secondary" onclick="patchLanguage()">PATCH language.primary</button>
+            <label>lang <input id="patchLang" value="hi-IN" style="min-width:100px" /></label>
+            <button class="action secondary" onclick="openInspectHelper()">Open Inspect</button>
           </div>
         </div>
         <div class="panel">
@@ -194,12 +249,17 @@
             <label>session_id <input id="inspId" style="min-width:280px" /></label>
             <button class="action" onclick="inspectSession()">Load</button>
             <button class="action secondary" onclick="stopSession(document.getElementById('inspId').value)">Stop</button>
+            <button class="action secondary" onclick="loadTranscript()">Transcript</button>
+            <button class="action secondary" onclick="loadDisposition()">Disposition</button>
           </div>
+          <p class="hint" id="inspSummary">gateway_binding / languages appear after Load.</p>
         </div>
         <div class="grid2">
           <div class="panel"><h2>Session</h2><pre class="log" id="inspSession"></pre></div>
           <div class="panel"><h2>Audit</h2><pre class="log" id="inspAudit"></pre></div>
           <div class="panel"><h2>Analytics</h2><pre class="log" id="inspAnalytics"></pre></div>
+          <div class="panel"><h2>Transcript</h2><pre class="log" id="inspTranscript"></pre></div>
+          <div class="panel"><h2>Disposition</h2><pre class="log" id="inspDisposition"></pre></div>
           <div class="panel"><h2>SSE (live tail)</h2>
             <button class="action secondary" onclick="toggleSSE()">Toggle SSE</button>
             <pre class="log" id="inspSSE"></pre>

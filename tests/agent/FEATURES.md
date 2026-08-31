@@ -116,6 +116,8 @@ These are **profiles of the same platform**. V1 validates that profile documents
 | Id | Family | What we need to test | Status |
 |---|---|---|---|
 | `F-job-contact-agent` | Contact Talk agent | Fixture profile listen+speak+think+skill transfer; unit/session path | must_test (fixture + unit) |
+| `F-cc-lab-engines` | Contact Agent lab engines | Tenant engines + session `gateway_binding` + lab inject/transcript | must_test |
+| `F-cc-behaviour-presets` | Contact Agent behaviour presets | ≥2 same-tenant CC fixtures (Sales/R&D/after-hours); clip/think_down unit | must_test |
 | `F-job-captions` | Captions / Listen-only | Fixture listen-only; SSE/text path unit | must_test (fixture + unit) |
 | `F-job-playback-mom` | Playback meeting pack | Playback job + think template fixture | must_test (fixture + unit) |
 | `F-job-interpret` | Two-way interpret | Translate rail profile | deferred (MT depth) |
