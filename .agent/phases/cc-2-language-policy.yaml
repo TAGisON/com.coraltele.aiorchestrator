@@ -1,0 +1,30 @@
+id: cc-2-language-policy
+name: Language auto-detect + lock (CC Phase 2)
+pipeline: contact-agent-cc
+exit_criteria:
+  - docs/product/LANGUAGE_POLICY.md exists — auto-detect default; lock after first confident detection; switch only user/operator
+  - Sarvam STT empty/auto → language_code unknown (not hard-coded en-IN)
+  - Session stores detected_language + active_language; set on first confident Listen final
+  - Later turns ignore ambient re-detect unless explicit switch (PATCH language.primary or playbook/rule)
+  - Think + Speak use session active_language
+  - Contact-agent profile defaults auto_detect true; no forced primary in CC presets
+  - Unit/gateway tests cover unknown mapping + lock behaviour (or documented N/A with fake)
+  - go test packages touched green
+out_of_scope:
+  - coral-file language UI
+  - Full MT one_way/two_way interpret
+  - Voice mapping by language (cc-3 may consume active_language)
+  - Response ladder (cc-4)
+  - Committing secrets
+docs:
+  - docs/product/CONTACT_AGENT.md
+  - docs/product/LANGUAGE_POLICY.md
+  - docs/architecture/RUNTIME.md
+  - docs/architecture/PROFILE_SCHEMA.md
+  - docs/architecture/CONTROL_API.md
+packages:
+  - ./internal/gateway/sarvamstt
+  - ./internal/gateway/sarvam
+  - ./internal/runtime
+  - ./internal/control
+  - ./internal/store

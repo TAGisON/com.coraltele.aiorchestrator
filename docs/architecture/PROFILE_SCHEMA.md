@@ -1,12 +1,20 @@
 # Profile schema — architecture lock
 
 **Status:** LOCKED (schema shape; field validation evolves with implementation)  
-**Date:** 27 August 2026  
-**Parents:** `docs/product/PRODUCT_DECISIONS.md`, `SOLUTION.md`
+**Date:** 27 August 2026 (CC engines update 31 August 2026)  
+**Parents:** `docs/product/PRODUCT_DECISIONS.md`, `SOLUTION.md`, `docs/product/SYSTEM_ENGINES.md`, `docs/product/CONTACT_AGENT.md`
 
 A **profile** is a versioned configuration bundle. A **persona** is a subsection (voice, tone, instructions) — not a separate database entity. Product language “agent” means a **running instance** of a profile on a session, not another object type.
 
 Profiles are stored in PostgreSQL (`profile` + immutable `profile_version` rows). Sessions **pin** one version at create.
+
+### Contact Agent engines (V1)
+
+For `metadata.family: contact-agent`, profiles are **behaviour only**: persona, rules, skills, grounding, language, voice. **Listen / Think / Speak gateway ids inherit tenant system engines** (`docs/product/SYSTEM_ENGINES.md`). Session create persists `gateway_binding`.
+
+- `routers.listen|think|speak.providers` are **optional** on the CC path (deprecated for new CC profiles). If both profile lists and tenant engines are set and differ, **tenant engines win**; publish/session may warn.
+- Knowledge / skill / translate routers remain profile-owned.
+- **Voice required for Talk/Speak** (persona `voice_id` / voice) — enforced in cc-3; document now so schema readers expect it.
 
 ---
 
@@ -182,6 +190,7 @@ PSTN paths often use **8 kHz**; wideband and meeting paths use **16 kHz** or hig
 - Each skill in `skills.allowed` must have a `definitions` entry.  
 - Gateway ids in routers must exist in the process registry (or tenant gateway table).  
 - Live clock: every selected Listen/Speak provider must advertise `streaming`.
+- **`family: contact-agent`:** do **not** require profile-level `routers.listen|think|speak.providers` when tenant engines are configured (env or `tenant_engines` row). Warn if profile lists conflict with tenant engines.
 
 ---
 

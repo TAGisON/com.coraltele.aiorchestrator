@@ -13,6 +13,7 @@
 | Pipeline | Guide | Roles |
 |---|---|---|
 | `coral-phase` | `docs/AGENT_PIPELINE.md` | planner → coder → reviewer → summarizer |
+| `contact-agent-cc` | `docs/AGENT_PIPELINE.md` | planner → coder → reviewer → summarizer (CC vertical: tenant engines → language → voice → ladder → transcript → lab) |
 | `product-validation` | `docs/VALIDATION_PIPELINE.md` | scenario-planner → fixture-builder → test-runner → audit-validator → test-reviewer → test-summarizer |
 
 CLI: `tools/agent-runner/agent.ps1`  

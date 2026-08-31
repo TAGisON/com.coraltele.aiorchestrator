@@ -1,0 +1,35 @@
+{
+  "name": "contact-agent-cc",
+  "first_role": "planner",
+  "roles": ["planner", "coder", "reviewer", "summarizer"],
+  "skills": {
+    "planner": "coral-phase-planner",
+    "coder": "coral-phase-coder",
+    "reviewer": "coral-phase-reviewer",
+    "summarizer": "coral-phase-summarizer"
+  },
+  "artifacts": {
+    "planner": "plan.md",
+    "coder": "implementation.md",
+    "reviewer": "review.md",
+    "summarizer": "summary.md"
+  },
+  "fail_return": {
+    "reviewer": "coder",
+    "coder": "planner",
+    "summarizer": "coder"
+  },
+  "max_fail_loops": {
+    "reviewer": 2
+  },
+  "phases": [
+    "cc-1-tenant-engines",
+    "cc-2-language-policy",
+    "cc-3-voice-binding",
+    "cc-4-response-ladder",
+    "cc-5-transcript-disposition",
+    "cc-6-lab-validation"
+  ],
+  "prompt_kind": "phase",
+  "pause_after_phase": true
+}

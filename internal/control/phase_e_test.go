@@ -24,6 +24,7 @@ import (
 )
 
 func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
@@ -124,6 +125,7 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 }
 
 func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
@@ -208,6 +210,7 @@ func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
 }
 
 func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)

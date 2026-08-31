@@ -29,12 +29,13 @@ type Runtime interface {
 
 // RuntimeStart is create-time actor spawn input.
 type RuntimeStart struct {
-	SessionID  string
-	TenantID   string
-	Clock      string
-	SampleRate int
-	Profile    profile.Document
-	Document   json.RawMessage
+	SessionID      string
+	TenantID       string
+	Clock          string
+	SampleRate     int
+	Profile        profile.Document
+	Document       json.RawMessage
+	GatewayBinding *store.GatewayBinding
 }
 
 // Config for the control HTTP server.
@@ -95,6 +96,8 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
+	s.mux.HandleFunc("GET /v1/tenant/engines", s.handleGetTenantEngines)
+	s.mux.HandleFunc("PUT /v1/tenant/engines", s.handlePutTenantEngines)
 	s.mux.HandleFunc("POST /v1/profiles", s.handleCreateProfile)
 	s.mux.HandleFunc("POST /v1/profiles/{id}/versions", s.handlePublishProfile)
 	s.mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
@@ -297,13 +300,25 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "pinned profile corrupt", nil)
 		return
 	}
+	tenantID := resolveTenantID(r, req.TenantID)
+	binding, _, err := s.resolveTenantEngines(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, CodeInternal, "resolve tenant engines failed", nil)
+		return
+	}
+	if err := validateGatewayBinding(s.reg, binding); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, CodeProfileInvalid, err.Error(), map[string]any{"reason": "capability_gate"})
+		return
+	}
+	warnProfileEngineConflict(doc, binding)
+	bindingCopy := binding
 	sid, err := newID()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "id generate failed", nil)
 		return
 	}
 	edgeToken, err := token.Issue(s.cfg.EdgeTokenSecret, token.Claims{
-		TenantID:  req.TenantID,
+		TenantID:  tenantID,
 		SessionID: sid,
 		ProfileID: pv.ProfileID,
 	}, s.cfg.EdgeTokenTTL)
@@ -314,7 +329,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	rate := profile.SampleRateHz(doc)
 	sess := store.Session{
 		ID:                    sid,
-		TenantID:              req.TenantID,
+		TenantID:              tenantID,
 		ProfileID:             pv.ProfileID,
 		ProfileVersion:        pv.Version,
 		Clock:                 clock,
@@ -324,6 +339,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		Caller:                req.Caller,
 		RecordingRef:          req.RecordingRef,
 		Metadata:              req.Metadata,
+		GatewayBinding:        &bindingCopy,
 	}
 	if err := s.repo.CreateSession(r.Context(), sess); err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "create session failed", nil)
@@ -332,12 +348,13 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	state := sess.State
 	if s.rt != nil {
 		if err := s.rt.StartSession(r.Context(), RuntimeStart{
-			SessionID:  sess.ID,
-			TenantID:   sess.TenantID,
-			Clock:      sess.Clock,
-			SampleRate: sess.CanonicalSampleRateHz,
-			Profile:    doc,
-			Document:   pv.Document,
+			SessionID:      sess.ID,
+			TenantID:       sess.TenantID,
+			Clock:          sess.Clock,
+			SampleRate:     sess.CanonicalSampleRateHz,
+			Profile:        doc,
+			Document:       pv.Document,
+			GatewayBinding: sess.GatewayBinding,
 		}); err != nil {
 			_, _ = s.repo.UpdateSessionState(r.Context(), sess.ID, store.StateFailed)
 			ge, ok := port.AsGatewayError(err)
@@ -368,6 +385,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		"clock":                    sess.Clock,
 		"canonical_sample_rate_hz": sess.CanonicalSampleRateHz,
 		"state":                    state,
+		"gateway_binding":          sess.GatewayBinding,
 		"edge_token":               edgeToken,
 		"edge_wss_url":             s.cfg.EdgeBaseURL + "?token=" + edgeToken,
 	})
@@ -407,7 +425,7 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "get session failed", nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"session_id":               sess.ID,
 		"profile_id":               sess.ProfileID,
 		"profile_version":          sess.ProfileVersion,
@@ -415,7 +433,11 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		"state":                    sess.State,
 		"owner_instance":           sess.OwnerInstance,
 		"canonical_sample_rate_hz": sess.CanonicalSampleRateHz,
-	})
+	}
+	if sess.GatewayBinding != nil {
+		out["gateway_binding"] = sess.GatewayBinding
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 type stopReq struct {

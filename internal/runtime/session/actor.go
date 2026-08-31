@@ -13,6 +13,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/clock"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
 // Lifecycle states (RUNTIME.md §5). Terminal covers Completed|Cancelled|Failed.
@@ -78,13 +79,14 @@ func (m *Memory) GetSlots() map[string]string {
 
 // Actor is one session runtime unit.
 type Actor struct {
-	ID         string
-	TenantID   string
-	ClockKind  string
-	SampleRate port.SampleRateHz
-	FrameMs    int
-	Profile    profile.Document
-	Reg        port.Registry
+	ID             string
+	TenantID       string
+	ClockKind      string
+	SampleRate     port.SampleRateHz
+	FrameMs        int
+	Profile        profile.Document
+	Reg            port.Registry
+	GatewayBinding *store.GatewayBinding // pinned at create (CC); metadata for later phases
 
 	Bus         *bus.Bus
 	Clock       clock.Scheduler
@@ -307,14 +309,15 @@ func (a *Actor) drainFeederFrames(frames <-chan port.PCMFrame) {
 
 // StartParams configures a new actor.
 type StartParams struct {
-	SessionID  string
-	TenantID   string
-	Clock      string
-	SampleRate int
-	FrameMs    int
-	Profile    profile.Document
-	ProfileRaw json.RawMessage // optional; if Profile empty, parsed from raw
-	Reg        port.Registry
+	SessionID      string
+	TenantID       string
+	Clock          string
+	SampleRate     int
+	FrameMs        int
+	Profile        profile.Document
+	ProfileRaw     json.RawMessage // optional; if Profile empty, parsed from raw
+	Reg            port.Registry
+	GatewayBinding *store.GatewayBinding
 }
 
 // Manager owns actors keyed by session id.
@@ -365,18 +368,19 @@ func (m *Manager) Start(ctx context.Context, p StartParams) (*Actor, error) {
 		frameMs = 20
 	}
 	a := &Actor{
-		ID:         p.SessionID,
-		TenantID:   p.TenantID,
-		ClockKind:  clockKind,
-		SampleRate: port.SampleRateHz(rate),
-		FrameMs:    frameMs,
-		Profile:    doc,
-		Reg:        reg,
-		Bus:        bus.New(),
-		Clock:      clock.New(clockKind, frameMs),
-		Memory:     NewMemory(),
-		Attachments: nil,
-		state:      StateCreated,
+		ID:             p.SessionID,
+		TenantID:       p.TenantID,
+		ClockKind:      clockKind,
+		SampleRate:     port.SampleRateHz(rate),
+		FrameMs:        frameMs,
+		Profile:        doc,
+		Reg:            reg,
+		GatewayBinding: p.GatewayBinding,
+		Bus:            bus.New(),
+		Clock:          clock.New(clockKind, frameMs),
+		Memory:         NewMemory(),
+		Attachments:    nil,
+		state:          StateCreated,
 	}
 	m.mu.Lock()
 	if _, exists := m.actors[p.SessionID]; exists {

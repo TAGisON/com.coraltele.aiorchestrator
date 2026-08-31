@@ -1,12 +1,12 @@
 # Control API — Coral-facing OpenAPI shape
 
 **Status:** LOCKED (route + body shape; exact auth header still open)  
-**Date:** 27 August 2026  
-**Parents:** `SOLUTION.md` §11, `PLATFORM_FIRST.md`, `PROFILE_SCHEMA.md`
+**Date:** 27 August 2026 (tenant engines 31 August 2026)  
+**Parents:** `SOLUTION.md` §11, `PLATFORM_FIRST.md`, `PROFILE_SCHEMA.md`, `docs/product/SYSTEM_ENGINES.md`
 
 This is the **HTTP surface Coral Java / admin / dialplan helpers** call. It is independent of Listen/Speak vendors. Publish as OpenAPI 3 when coding `internal/control`.
 
-Auth: Coral estate token (middleware). Every request carries or resolves `tenant_id` + optional `coral_user_id`.
+Auth: Coral estate token (middleware). Every request carries or resolves `tenant_id` + optional `coral_user_id`. Tenant scope for engines also accepts `X-Tenant-ID` (lab).
 
 Base path: `/v1` (versioned so vendors never force a breaking API).
 
@@ -17,8 +17,10 @@ Base path: `/v1` (versioned so vendors never force a breaking API).
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/health` | Process + PG; optional gateway summary |
-| `POST` | `/v1/sessions` | Create session; pin profile; optional edge token |
-| `GET` | `/v1/sessions/{id}` | Status |
+| `GET` | `/v1/tenant/engines` | Active Listen/Think/Speak gateway ids for tenant |
+| `PUT` | `/v1/tenant/engines` | Upsert tenant engines (validate registry ids) |
+| `POST` | `/v1/sessions` | Create session; pin profile + `gateway_binding`; optional edge token |
+| `GET` | `/v1/sessions/{id}` | Status including `gateway_binding` |
 | `POST` | `/v1/sessions/{id}/attachments` | Bind feeder/sink metadata (non-FS) |
 | `POST` | `/v1/sessions/{id}/inject` | Text in (Speak / push) |
 | `PATCH` | `/v1/sessions/{id}/profile-fields` | Hot-swap allowed fields only |
@@ -38,6 +40,34 @@ WSS edge (not REST): `GET /edge/fs?token=…` — see `EDGE_FS.md`.
 ---
 
 ## 2. Core request/response shapes
+
+### `GET /v1/tenant/engines`
+
+Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Returns active gateway ids (DB row, else env `SYSTEM_LISTEN` / `SYSTEM_THINK` / `SYSTEM_SPEAK` with lab defaults `sarvam-stt` / `sarvam-llm` / `sarvam-tts`).
+
+```json
+{
+  "tenant_id": "default",
+  "listen": "sarvam-stt",
+  "think": "sarvam-llm",
+  "speak": "sarvam-tts",
+  "source": "env"
+}
+```
+
+`source` is `store` | `env`.
+
+### `PUT /v1/tenant/engines`
+
+```json
+{
+  "listen": "sarvam-stt",
+  "think": "sarvam-llm",
+  "speak": "sarvam-tts"
+}
+```
+
+Validates each id against the process gateway registry (correct port). Unknown or wrong-port id → `422` + `bad_request` (or `profile_invalid` if treated as config invalid). Returns the stored binding with `source: "store"`.
 
 ### `POST /v1/sessions`
 
@@ -60,14 +90,21 @@ WSS edge (not REST): `GET /edge/fs?token=…` — see `EDGE_FS.md`.
   "clock": "live",
   "canonical_sample_rate_hz": 16000,
   "state": "Created",
+  "gateway_binding": {
+    "listen": "sarvam-stt",
+    "think": "sarvam-llm",
+    "speak": "sarvam-tts"
+  },
   "edge_token": "eyJ…",
   "edge_wss_url": "wss://orch/edge/fs?token=…"
 }
 ```
 
+Session create resolves tenant engines → capability-checks each gateway → persists `gateway_binding` on the session row and passes it into runtime start.
+
 ### `GET /v1/sessions/{id}`
 
-Returns `state` (`Created`|`Attached`|`Running`|`Draining`|`Completed`|`Cancelled`|`Failed`), pinned version, clock, `owner_instance`, error if Failed.
+Returns `state` (`Created`|`Attached`|`Running`|`Draining`|`Completed`|`Cancelled`|`Failed`), pinned version, clock, `owner_instance`, `gateway_binding` (when set), error if Failed.
 
 ### `POST /v1/sessions/{id}/inject`
 

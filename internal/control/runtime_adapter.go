@@ -13,12 +13,13 @@ type SessionRuntime struct {
 
 func (r *SessionRuntime) StartSession(ctx context.Context, p RuntimeStart) error {
 	_, err := r.Mgr.Start(ctx, session.StartParams{
-		SessionID:  p.SessionID,
-		TenantID:   p.TenantID,
-		Clock:      p.Clock,
-		SampleRate: p.SampleRate,
-		Profile:    p.Profile,
-		ProfileRaw: p.Document,
+		SessionID:      p.SessionID,
+		TenantID:       p.TenantID,
+		Clock:          p.Clock,
+		SampleRate:     p.SampleRate,
+		Profile:        p.Profile,
+		ProfileRaw:     p.Document,
+		GatewayBinding: p.GatewayBinding,
 	})
 	return err
 }

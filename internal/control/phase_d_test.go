@@ -97,6 +97,7 @@ func TestProfile_AcceptsIngestAndCoralSkills(t *testing.T) {
 }
 
 func TestSession_EdgeTokenSigned(t *testing.T) {
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
 	registerPhaseD(t, reg, mem)

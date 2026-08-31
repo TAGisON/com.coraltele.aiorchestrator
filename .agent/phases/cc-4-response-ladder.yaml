@@ -1,0 +1,27 @@
+id: cc-4-response-ladder
+name: Response ladder clip → template → LLM (CC Phase 4)
+pipeline: contact-agent-cc
+exit_criteria:
+  - Profile schema documents response.ladder + response.clips (and/or extends fallback + templates)
+  - Runtime evaluates ladder before free LLM — clip and template can close a turn without Think
+  - Vendor/gateway total failure on CC path uses clip + escalate skill — no mid-session vendor switch
+  - Analytics emits response_tier dimension (clip|template|llm|refuse|escalate) on turn_completed or equivalent
+  - At least one unit/integration test proves clip path skips LLM
+  - go test packages touched green
+out_of_scope:
+  - Full clip asset upload UI / object store admin
+  - coral-file clip manager
+  - Meeting/MoM templates (CC disposition only if already in path)
+  - Committing secrets
+docs:
+  - docs/product/CONTACT_AGENT.md
+  - docs/architecture/PROFILE_SCHEMA.md
+  - docs/architecture/RUNTIME.md
+  - docs/architecture/ANALYTICS_AND_POSTCALL.md
+  - docs/architecture/RULES_AND_SKILLS.md
+packages:
+  - ./internal/profile
+  - ./internal/runtime/composer
+  - ./internal/runtime/thinkpath
+  - ./internal/runtime/observe
+  - ./internal/control

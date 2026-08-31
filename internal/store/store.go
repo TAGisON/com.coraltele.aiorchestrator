@@ -47,20 +47,21 @@ const (
 
 // Session is a durable session row.
 type Session struct {
-	ID                     string
-	TenantID               string
-	ProfileID              string
-	ProfileVersion         int
-	Clock                  string
-	State                  string
-	OwnerInstance          string
-	CanonicalSampleRateHz  int
-	CoralUserID            string
-	Caller                 json.RawMessage
-	RecordingRef           string
-	Metadata               json.RawMessage
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                    string
+	TenantID              string
+	ProfileID             string
+	ProfileVersion        int
+	Clock                 string
+	State                 string
+	OwnerInstance         string
+	CanonicalSampleRateHz int
+	CoralUserID           string
+	Caller                json.RawMessage
+	RecordingRef          string
+	Metadata              json.RawMessage
+	GatewayBinding        *GatewayBinding
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // Store is the durable PG-backed repository.
@@ -190,13 +191,14 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.pool.Exec(ctx, `
 INSERT INTO session (
   id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
-  canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata
+  canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding
 ) VALUES (
   $1, NULLIF($2,''), $3, $4, $5, $6, NULLIF($7,''),
-  $8, NULLIF($9,''), $10, NULLIF($11,''), $12
+  $8, NULLIF($9,''), $10, NULLIF($11,''), $12, $13
 )`,
 		sess.ID, sess.TenantID, sess.ProfileID, sess.ProfileVersion, sess.Clock, sess.State, sess.OwnerInstance,
 		sess.CanonicalSampleRateHz, sess.CoralUserID, nullJSON(sess.Caller), sess.RecordingRef, nullJSON(sess.Metadata),
+		marshalGatewayBinding(sess.GatewayBinding),
 	)
 	return err
 }
@@ -204,15 +206,15 @@ INSERT INTO session (
 func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	var sess Session
 	var tenant, owner, coral, rec *string
-	var caller, meta []byte
+	var caller, meta, binding []byte
 	err := s.pool.QueryRow(ctx, `
 SELECT id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
-       canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata,
+       canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
        created_at, updated_at
 FROM session WHERE id=$1
 `, id).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
-		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta,
+		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -235,21 +237,22 @@ FROM session WHERE id=$1
 	}
 	sess.Caller = caller
 	sess.Metadata = meta
+	sess.GatewayBinding = scanGatewayBinding(binding)
 	return sess, nil
 }
 
 func (s *Store) UpdateSessionState(ctx context.Context, id, state string) (Session, error) {
 	var sess Session
 	var tenant, owner, coral, rec *string
-	var caller, meta []byte
+	var caller, meta, binding []byte
 	err := s.pool.QueryRow(ctx, `
 UPDATE session SET state=$2, updated_at=now() WHERE id=$1
 RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
-          canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata,
+          canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
           created_at, updated_at
 `, id, state).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
-		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta,
+		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -272,6 +275,7 @@ RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instan
 	}
 	sess.Caller = caller
 	sess.Metadata = meta
+	sess.GatewayBinding = scanGatewayBinding(binding)
 	return sess, nil
 }
 

@@ -16,6 +16,7 @@ import (
 
 func testServer(t *testing.T) (*control.Server, *store.Memory) {
 	t.Helper()
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
@@ -23,6 +24,13 @@ func testServer(t *testing.T) (*control.Server, *store.Memory) {
 	mem := store.NewMemory()
 	srv := control.New(mem, reg, control.Config{})
 	return srv, mem
+}
+
+func setFakeSystemEngines(t *testing.T) {
+	t.Helper()
+	t.Setenv("SYSTEM_LISTEN", "fake-listen")
+	t.Setenv("SYSTEM_THINK", "fake-think")
+	t.Setenv("SYSTEM_SPEAK", "fake-speak")
 }
 
 func TestHealth_OK(t *testing.T) {
@@ -113,6 +121,9 @@ func TestSession_CreateGetStop(t *testing.T) {
 	if created["profile_version"].(float64) != 1 {
 		t.Fatalf("version %v", created["profile_version"])
 	}
+	if created["gateway_binding"] == nil {
+		t.Fatal("missing gateway_binding")
+	}
 
 	rr = httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/sessions/"+sid, nil))
@@ -158,6 +169,7 @@ func publishOK(t *testing.T, srv *control.Server, id, body string) {
 }
 
 func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
+	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)

@@ -10,19 +10,20 @@ import (
 
 // Memory is an in-process Repository for tests without Postgres.
 type Memory struct {
-	mu         sync.Mutex
-	profiles   map[string]Profile
-	versions   map[string][]ProfileVersion
-	sessions   map[string]Session
-	kbDocs     map[string]KBDocument
-	kbChunks   map[string][]KBChunk // document_id → chunks
-	playJobs   map[string]PlaybackJob
-	auditSeq   int64
-	audits     []AuditEvent
+	mu           sync.Mutex
+	profiles     map[string]Profile
+	versions     map[string][]ProfileVersion
+	sessions     map[string]Session
+	engines      map[string]TenantEngines
+	kbDocs       map[string]KBDocument
+	kbChunks     map[string][]KBChunk // document_id → chunks
+	playJobs     map[string]PlaybackJob
+	auditSeq     int64
+	audits       []AuditEvent
 	analyticsSeq int64
-	analytics  []AnalyticsEvent
-	postJobs   map[string]PostcallJob
-	healthy    bool
+	analytics    []AnalyticsEvent
+	postJobs     map[string]PostcallJob
+	healthy      bool
 }
 
 func NewMemory() *Memory {
@@ -30,6 +31,7 @@ func NewMemory() *Memory {
 		profiles: make(map[string]Profile),
 		versions: make(map[string][]ProfileVersion),
 		sessions: make(map[string]Session),
+		engines:  make(map[string]TenantEngines),
 		kbDocs:   make(map[string]KBDocument),
 		kbChunks: make(map[string][]KBChunk),
 		playJobs: make(map[string]PlaybackJob),
@@ -179,6 +181,24 @@ func (m *Memory) UpdateSessionState(ctx context.Context, id, state string) (Sess
 	s.UpdatedAt = time.Now().UTC()
 	m.sessions[id] = s
 	return s, nil
+}
+
+func (m *Memory) GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	te, ok := m.engines[tenantID]
+	if !ok {
+		return TenantEngines{}, ErrNotFound
+	}
+	return te, nil
+}
+
+func (m *Memory) UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	te.UpdatedAt = time.Now().UTC()
+	m.engines[te.TenantID] = te
+	return te, nil
 }
 
 func (m *Memory) CreateKBDocument(ctx context.Context, doc KBDocument) error {

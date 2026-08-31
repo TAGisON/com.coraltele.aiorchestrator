@@ -26,6 +26,20 @@ func TestMigrationSQL_HasPhaseBTables(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasCCTenantEngines(t *testing.T) {
+	body, err := os.ReadFile("migrations/004_cc_tenant_engines.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS tenant_engines") {
+		t.Fatal("migration missing tenant_engines")
+	}
+	if !strings.Contains(s, "gateway_binding") {
+		t.Fatal("migration missing session.gateway_binding")
+	}
+}
+
 func TestMigrationSQL_HasPhaseEAnalytics(t *testing.T) {
 	body, err := os.ReadFile("migrations/003_phase_e_analytics.sql")
 	if err != nil {

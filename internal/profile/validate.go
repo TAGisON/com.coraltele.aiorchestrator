@@ -12,6 +12,10 @@ import (
 type Document struct {
 	ID       string `json:"id"`
 	TenantID string `json:"tenant_id"`
+	Metadata struct {
+		DisplayName string `json:"display_name"`
+		Family      string `json:"family"`
+	} `json:"metadata"`
 	Audio    struct {
 		CanonicalSampleRateHz int `json:"canonical_sample_rate_hz"`
 		FrameMs               int `json:"frame_ms"`
@@ -218,4 +222,9 @@ func SampleRateHz(doc Document) int {
 		return 16000
 	}
 	return doc.Audio.CanonicalSampleRateHz
+}
+
+// Family returns metadata.family (trimmed), empty if unset.
+func Family(doc Document) string {
+	return strings.TrimSpace(doc.Metadata.Family)
 }

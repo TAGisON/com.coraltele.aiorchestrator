@@ -20,6 +20,9 @@ type Repository interface {
 	ListSessions(ctx context.Context, limit int) ([]Session, error)
 	UpdateSessionState(ctx context.Context, id, state string) (Session, error)
 
+	GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error)
+	UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error)
+
 	CreateKBDocument(ctx context.Context, doc KBDocument) error
 	GetKBDocument(ctx context.Context, id string) (KBDocument, error)
 	UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error)
