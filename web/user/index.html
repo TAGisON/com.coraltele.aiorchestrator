@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User · AiOrchestrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="brand">User <span>session</span></div>
+      <nav class="nav">
+        <a href="/">Portal</a>
+        <a href="/admin/">Admin</a>
+        <a href="/supervisor/">Supervisor</a>
+        <a class="active" href="/user/">User</a>
+      </nav>
+    </div>
+    <h1>Start a conversation</h1>
+    <p class="lede">Creates a Talk session pinned to tenant engines. Text turns use inject (same Talk path as STT finals). Live FreeSWITCH audio uses the edge WSS token returned at create — not this browser mic yet.</p>
+    <div id="banner" class="banner" hidden></div>
+
+    <div class="grid side">
+      <section class="panel">
+        <h2>Before you start</h2>
+        <ul class="checklist" id="readyList"></ul>
+        <div class="row" style="margin-top:0.75rem">
+          <button type="button" class="secondary" id="btnReady">Recheck readiness</button>
+          <a class="btn secondary" href="/admin/">Open Admin</a>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Start session</h2>
+        <div class="row">
+          <label>profile
+            <select id="profile"></select>
+          </label>
+          <label>clock
+            <select id="clock">
+              <option value="live">live</option>
+              <option value="playback">playback</option>
+            </select>
+          </label>
+          <button type="button" id="btnStart">Start</button>
+          <button type="button" class="secondary" id="btnStop" disabled>Stop</button>
+        </div>
+        <p class="hint" id="startHint">If Admin has not published profiles or engines, Start will fail with a clear API error.</p>
+        <div id="sessionMeta" class="row"></div>
+        <pre class="log" id="createJson" style="max-height:10rem"></pre>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Talk</h2>
+      <div class="chat" id="chat"></div>
+      <div class="row" style="margin-top:0.75rem">
+        <label style="flex:1">message
+          <input id="msg" style="width:100%;min-width:12rem" placeholder="Type and send a turn…" disabled />
+        </label>
+        <button type="button" id="btnSend" disabled>Send</button>
+        <button type="button" class="secondary" id="btnRefreshTx" disabled>Refresh transcript</button>
+      </div>
+      <pre class="log" id="turnJson" style="margin-top:0.75rem;max-height:10rem"></pre>
+    </section>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

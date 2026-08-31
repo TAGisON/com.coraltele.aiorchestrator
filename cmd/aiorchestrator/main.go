@@ -115,11 +115,9 @@ func main() {
 		applog.Error("register sarvam-tts failed", "err", err)
 		os.Exit(1)
 	}
-	// Lab status: credentials configured only when present in DB (fresh install = false).
+	// Credentials configured only when present in DB (fresh install = false).
 	// Runtime LoadConfig may still fall back to env/secrets.local.json for lab emergency.
-	sarvamConfigured := false
 	if k, err := lookupSarvamKey(ctx, repo, "default"); err == nil && strings.TrimSpace(k) != "" {
-		sarvamConfigured = true
 		applog.Info("sarvam credentials available", "source", "database")
 	} else {
 		applog.Info("sarvam credentials not set — PUT /v1/tenant/credentials/sarvam with api_key")
@@ -138,11 +136,10 @@ func main() {
 	}
 	mgr := session.NewManager(reg)
 	rt := &control.SessionRuntime{Mgr: mgr, Repo: repo}
-	srv := control.NewWithRuntime(repo, reg, rt, cfg, web.LabFS)
-	srv.SetLabExtras(control.LabExtras{
-		StoreBackend:     storeBackend,
-		SarvamConfigured: sarvamConfigured,
-		HTTPAddr:         boot.HTTPAddr,
+	srv := control.NewWithRuntime(repo, reg, rt, cfg, web.UIFS)
+	srv.SetUIExtras(control.UIExtras{
+		StoreBackend: storeBackend,
+		HTTPAddr:     boot.HTTPAddr,
 	})
 	srv.MountEdge(srv.EdgeTokenSecret(), mgr)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
@@ -154,7 +151,13 @@ func main() {
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 
 	go func() {
-		applog.Info("control listening", "addr", addr, "lab_ui", "http://127.0.0.1"+addr+"/lab/", "store", storeBackend)
+		applog.Info("control listening",
+			"addr", addr,
+			"admin", "http://127.0.0.1"+addr+"/admin/",
+			"supervisor", "http://127.0.0.1"+addr+"/supervisor/",
+			"user", "http://127.0.0.1"+addr+"/user/",
+			"store", storeBackend,
+		)
 		kinds := []port.PortKind{
 			port.PortListen, port.PortSpeak, port.PortThink,
 			port.PortTranslate, port.PortKnowledge, port.PortSkill,

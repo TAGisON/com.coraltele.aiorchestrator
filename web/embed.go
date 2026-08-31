@@ -2,5 +2,5 @@ package web
 
 import "embed"
 
-//go:embed lab/*
-var LabFS embed.FS
+//go:embed index.html admin/* supervisor/* user/* shared/*
+var UIFS embed.FS

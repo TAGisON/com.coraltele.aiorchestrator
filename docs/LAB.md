@@ -1,128 +1,59 @@
-# Lab console — Postgres + POC UI
+# Consoles — Admin / Supervisor / User
 
-## Database (telemetry-style)
+Three separate UIs replace the old monolithic lab console.
 
-Shared local Postgres `127.0.0.1:5432`, **new DB name** `aiorchestrator` (same pattern as `telemetry`, `users`, `switch`).
+| Console | URL | Purpose |
+|---|---|---|
+| Portal | http://127.0.0.1:8011/ | Entry + readiness banner |
+| **Admin** | http://127.0.0.1:8011/admin/ | Engines, credentials, settings, publish profiles, readiness |
+| **Supervisor** | http://127.0.0.1:8011/supervisor/ | Session list, transcript, audit, analytics, disposition |
+| **User** | http://127.0.0.1:8011/user/ | Start session, send Talk turns (text inject), stop |
+
+## Fresh install
 
 ```powershell
-.\tools\lab\Init-LabDatabase.ps1 -Recreate   # empty DB; schema applied on boot
-# Boot uses committed conf/aiorchestrator.properties (HTTP :8011, database.url).
-# Nothing is pre-seeded (no engines, no vendor keys, no profiles).
+.\tools\lab\Init-LabDatabase.ps1 -Recreate
 go run ./cmd/aiorchestrator
 ```
 
-Open **http://127.0.0.1:8011/lab/**
+Boot applies **schema only**. Nothing is pre-seeded.
 
-Migrations apply **schema only** on boot when `database.url` is set. Configure engines + credentials via lab **Tenant Engines** / **Settings** (or Control API) before creating sessions.
+1. **Admin** → Save tenant engines (fakes offline, or Sarvam + credential) → Create + publish a profile.
+2. Confirm readiness checklist is green (`GET /v1/platform/status` → `ready_for_sessions: true`).
+3. **User** → Start session → Send turns → Stop.
+4. **Supervisor** → Open session → transcript / audit / analytics; disposition appears after postcall.
+
+## Platform status (abnormal conditions)
+
+`GET /v1/platform/status` returns:
+
+- `status`: `ok` | `degraded` | `not_ready` | `unavailable`
+- `blockers[]` — must clear before sessions (e.g. `tenant_engines_missing`, `no_profiles`, `database_unreachable`)
+- `warnings[]` — startable but risky (e.g. `sarvam_credential_missing`, `store_memory_not_durable`)
+
+UIs surface these as banners and checklists.
+
+## Manual test matrix (edge cases)
+
+| Scenario | Expected |
+|---|---|
+| Fresh DB, open User → Start | Blocked / Start fails with engines or profiles missing |
+| Engines unset, `GET /v1/tenant/engines` | `404` `tenant engines not configured` |
+| Engines set to unknown id | `422` on PUT |
+| Sarvam engines, no credential | Status `degraded` + warning; turns may fail at vendor |
+| No profiles | Status blocker `no_profiles`; User Start fails |
+| Session create before engines | `422` with hint to PUT engines |
+| Inject on missing/stopped session | Error banner on User |
+| Supervisor before any session | Empty list message |
+| Transcript mid-call with no turns yet | Empty transcript panel |
+| Disposition before stop/postcall | `404` / “not written yet” note |
+| Supervisor Force stop | Session terminal; audit `session.terminal` |
+| DB down | Health / platform status unavailable; Admin banner |
+
+## Recordings
+
+Orchestrator stores optional `recording_ref` (external URI) only — not call PCM. Supervisor shows whether a ref was set. Live audio path remains FreeSWITCH edge WSS.
 
 ## Logging
 
-- Rolling **JSON** app log under `logs/aiorchestrator/` (see `conf/logging.xml` + properties `log.*`)
-- Every HTTP request: `method`, `path`, `status`, `duration_ms`
-- Observe path: audit/analytics failures logged fail-open (never break media)
-
-## Lab UI capabilities
-
-| Tab | What you can do |
-|---|---|
-| Overview | Health, store backend (postgres/memory), Sarvam on/off; **CC Quick start** |
-| Tenant Engines | `GET`/`PUT /v1/tenant/engines` — single listen/think/speak ids (not failover lists) |
-| Gateways | All registered gateway ids by port |
-| Profiles | Create/publish; **Contact Agent** presets (Sales / R&D / after-hours) + **legacy** fakes/failover/captions |
-| Sessions | Create/stop; show `gateway_binding`; inject text; PATCH language |
-| Inspect | Session + audit + analytics + **transcript** + **disposition** + SSE; binding/languages summary |
-| Playback | Enqueue playback job |
-| API log | Browser-side request/response trail |
-
-Settings / vendor keys (UI or curl): `GET /v1/tenant/config`, `PUT /v1/tenant/credentials/{gateway_id}`, `PUT /v1/tenant/settings/{key}` — see `CONTROL_API.md`.
-
----
-
-## Contact Agent CC path
-
-Order for proving the vertical in lab (no FreeSWITCH required):
-
-1. **Set tenant engines** — Tenant Engines tab → suggest fakes (`fake-listen` / `fake-think` / `fake-speak`) or Sarvam trio after `PUT /v1/tenant/credentials/sarvam` → Save PUT. Confirm `source` is `store`.
-2. **Publish ≥2 behaviour presets** — Profiles → CC Sales + CC R&D (and/or after-hours). Each has `metadata.family: contact-agent`. **Do not** use legacy sarvam+fake failover for the CC demo.
-3. **Create Talk session** — Sessions → profile_id `cc-sales` (or `cc-rnd`) → Create. Panel shows `gateway_binding` matching tenant engines.
-4. **Multi-turn inject** — inject `hello`, then a second turn; Inspect → Transcript shows ordered user/assistant rows.
-5. **Language lock / PATCH** — first confident Listen lock sets `active_language` (see LANGUAGE_POLICY); operator `PATCH language.primary` via Sessions helper when `mid_call_switch` + `hot_swap_allowed` allow.
-6. **Ladder clip** — inject text matching a clip regex (e.g. `hello` → greeting clip); Analytics `turn_completed` dimensions include `response_tier=clip` (no Think).
-7. **Inspect disposition** — stop session; Disposition panel loads `GET …/disposition` when postcall has written a suggestion.
-
-### Engines vs profiles
-
-| Layer | Owns |
-|---|---|
-| **Tenant engines** | STT / LLM / TTS gateway ids (`SYSTEM_ENGINES.md`) |
-| **CC profiles** | Sales / R&D / after-hours behaviour — persona, voice map, language, ladder clips, skills |
-
-Same tenant engines for every CC profile. Profiles differ by rules/persona/voice/clips — not by vendor failover lists.
-
-### Realtime demo (system-bound)
-
-Contact Agent realtime demo uses **session-pinned `gateway_binding`** from tenant engines. Comma failover (`sarvam-stt, fake-listen`, …) is **legacy / non-CC** only (labeled in the Profiles preset dropdown).
-
-### Language lock
-
-See `docs/product/LANGUAGE_POLICY.md`. Lab:
-
-- Auto-detect → lock on first confident Listen final (or inject path when Actor bound).
-- Ambient re-detect must not flip `active_language`.
-- Operator switch: `PATCH /v1/sessions/{id}/profile-fields` with `{ "language.primary": "hi-IN" }` (Sessions helper).
-
-### Voice / ladder
-
-- Persona `voice` map (or `voice_id`) required for Talk/Speak publish.
-- Ladder: clip → template → LLM; clip match skips Think.
-- Pinned engines: Think total failure → `fallback.think_down` canned clip + escalate skill — **no** mid-session vendor hop (`CONTACT_AGENT.md` §8).
-
-### Quota / rate-limit UX
-
-| Signal | Expected UX |
-|---|---|
-| Think `rate_limit` / vendor total failure with `gateway_binding` pinned | `think_down` clip + escalate; API/audit shows no provider-list walk |
-| Concurrent session create fairness | `429` when enforced (`OPERATIONS.md` §5) |
-
-Lab proof without live Sarvam 429: `go test` path `TestComposer_ThinkDownClipEscalateNoVendorSwitch` (`./internal/runtime/composer`) and inject + Inspect after forcing Think failure in unit tests. Do not invent new vendor SDKs.
-
-### Secrets
-
-Prefer **Postgres** via `PUT /v1/tenant/credentials/sarvam` (masked on GET). Optional lab fallback: `SARVAM_API_KEY` in `.env`. Never commit `.env`, `.agent/secrets.local.json`, or API keys.
-
----
-
-## Smoke checklist (no FreeSWITCH)
-
-1. PUT tenant engines → fakes (or Sarvam single ids).
-2. Create + publish `cc-sales` and `cc-rnd` (Contact Agent presets).
-3. Create session on `cc-sales` → assert `gateway_binding` equals tenant engines.
-4. Inject `hello` → GET transcript (≥1 user + assistant); analytics may show `response_tier=clip`.
-5. Inject a second turn → transcript ordered; multi-turn context.
-6. PATCH `language.primary` → GET session shows `active_language`.
-7. Stop → Inspect audit / analytics / disposition.
-8. Optional: repeat create on `cc-rnd` — same binding, different persona/clips.
-
----
-
-## Scenario checklist (A–D)
-
-| # | Scenario | How to prove |
-|---|---|---|
-| A | Multi-turn context | Lab: two+ injects → `GET …/transcript` ordered turns. Unit: `go test ./internal/control` (`TestInject_ClipTurnAndTranscript`) |
-| B | Language lock | Lab: PATCH language helper + Inspect languages. Unit: `go test ./internal/control` language tests; docs `LANGUAGE_POLICY.md` |
-| C | Quota / rate-limit UX | Documented above; unit: `go test ./internal/runtime/composer -run ThinkDown` (pinned `think_down`, no vendor hop) |
-| D | Clip / ladder | Lab: inject greeting → analytics `response_tier=clip`. Unit: `go test ./internal/runtime/composer -run ClipPath` |
-
-Thin agent scenarios: `tests/agent/scenarios/F-cc-lab-engines.yaml`, `F-cc-behaviour-presets.yaml` wrap the packages above.
-
----
-
-## Sarvam (optional live)
-
-Prefer `PUT /v1/tenant/credentials/sarvam`. Lab fallback: `SARVAM_API_KEY` in `.env`. Gateways register as `sarvam-stt`, `sarvam-llm`, `sarvam-tts` at boot.
-
-- **CC path:** put those **single** ids on Tenant Engines (Suggest Sarvam), then use CC behaviour presets.
-- **Legacy non-CC:** Profiles preset **sarvam + fake failover** still exists for Phase F–style failover demos — not the Contact Agent default.
-
-Real voice E2E WAV / FreeSWITCH path remains a follow-up wave.
+Rolling JSON under `logs/aiorchestrator/` (see `conf/logging.xml` + properties).

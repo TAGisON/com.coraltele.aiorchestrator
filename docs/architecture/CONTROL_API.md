@@ -16,7 +16,11 @@ Base path: `/v1` (versioned so vendors never force a breaking API).
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/v1/health` | Process + PG; optional gateway summary |
+| `GET` | `/v1/platform/status` | Readiness: engines/profiles/DB/gateways + blockers/warnings |
+| `GET` | `/v1/gateways` | Registered gateway ids by port |
+| `GET` | `/v1/sessions` | List recent sessions (supervisor) |
+| `GET` | `/v1/sessions/{id}/audit` | Durable audit events |
+| `GET` | `/v1/sessions/{id}/analytics` | Durable analytics events |
 | `GET` | `/v1/tenant/engines` | Active Listen/Think/Speak gateway ids for tenant |
 | `PUT` | `/v1/tenant/engines` | Upsert tenant engines (validate registry ids) |
 | `GET` | `/v1/tenant/config` | Bundle: engines + credentials (masked) + settings |

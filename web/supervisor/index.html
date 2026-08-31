@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supervisor · AiOrchestrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="brand">Supervisor <span>audit</span></div>
+      <nav class="nav">
+        <a href="/">Portal</a>
+        <a href="/admin/">Admin</a>
+        <a class="active" href="/supervisor/">Supervisor</a>
+        <a href="/user/">User</a>
+      </nav>
+    </div>
+    <h1>Session inspection</h1>
+    <p class="lede">List sessions and open durable transcript, audit trail, analytics, and disposition. Empty states and 404s are expected when nothing has run yet or postcall has not finished.</p>
+    <div id="banner" class="banner" hidden></div>
+
+    <div class="grid side">
+      <section class="panel">
+        <h2>Sessions</h2>
+        <div class="row">
+          <button type="button" id="btnRefresh">Refresh list</button>
+          <label>limit <input id="limit" type="number" value="50" min="1" max="200" style="min-width:5rem" /></label>
+        </div>
+        <div style="overflow:auto;max-height:28rem">
+          <table>
+            <thead>
+              <tr><th>Session</th><th>State</th><th>Profile</th><th>Updated</th></tr>
+            </thead>
+            <tbody id="sessBody"></tbody>
+          </table>
+        </div>
+        <p class="hint" id="sessEmpty" hidden>No sessions yet. Start one from the User console.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Selected session</h2>
+        <div class="row">
+          <label>session_id <input id="sid" style="min-width:18rem" placeholder="select a row or paste id" /></label>
+          <button type="button" id="btnLoad">Inspect</button>
+          <button type="button" class="secondary" id="btnStop">Force stop</button>
+        </div>
+        <div id="metaPills" class="row"></div>
+        <pre class="log" id="sessJson"></pre>
+      </section>
+    </div>
+
+    <div class="grid two" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Transcript</h2>
+        <p class="hint">Durable turns. Empty array means no completed Talk turns yet (or store write failed fail-open).</p>
+        <div class="chat" id="transcriptChat"></div>
+        <pre class="log" id="transcriptJson" style="margin-top:0.75rem;max-height:12rem"></pre>
+      </section>
+      <section class="panel">
+        <h2>Disposition</h2>
+        <p class="hint">404 until postcall worker writes a suggestion after terminal state.</p>
+        <pre class="log" id="dispJson"></pre>
+      </section>
+    </div>
+
+    <div class="grid two" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Audit trail</h2>
+        <pre class="log" id="auditJson"></pre>
+      </section>
+      <section class="panel">
+        <h2>Analytics</h2>
+        <pre class="log" id="analyticsJson"></pre>
+      </section>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

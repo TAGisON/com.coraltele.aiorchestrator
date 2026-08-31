@@ -66,8 +66,8 @@ type Server struct {
 	rt   Runtime
 	cfg  Config
 	mux  *http.ServeMux
-	lab  LabExtras
-	labFS fs.FS
+	ui   UIExtras
+	uiFS fs.FS
 }
 
 func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
@@ -75,8 +75,8 @@ func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
 }
 
 // NewWithRuntime wires an optional runtime manager for session start/stop.
-// labFS is optional embed root containing a "lab/" directory for the POC console.
-func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config, labFS fs.FS) *Server {
+// uiFS is optional embed root with admin/, supervisor/, user/, shared/, and index.html.
+func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config, uiFS fs.FS) *Server {
 	if cfg.OwnerInstance == "" {
 		cfg.OwnerInstance = "local"
 	}
@@ -91,7 +91,7 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 	if cfg.EdgeTokenTTL <= 0 {
 		cfg.EdgeTokenTTL = 5 * time.Minute
 	}
-	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux(), labFS: labFS}
+	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux(), uiFS: uiFS}
 	s.routes()
 	return s
 }
@@ -125,7 +125,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
 	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
-	s.mountLabRoutes(s.labFS)
+	s.mountUIRoutes(s.uiFS)
 }
 
 func (s *Server) requestLogMiddleware(next http.Handler) http.Handler {
@@ -166,8 +166,8 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// Lab POC static UI does not require Bearer.
-		if s.authMiddlewareLabBypass(r.URL.Path) {
+		// Static consoles do not require Bearer.
+		if s.authMiddlewareUIBypass(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -199,7 +199,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":        status,
 		"db":            dbOK,
-		"store_backend": s.lab.StoreBackend,
+		"store_backend": s.ui.StoreBackend,
 	})
 }
 

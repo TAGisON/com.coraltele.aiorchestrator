@@ -25,7 +25,8 @@ Validation pauses after each feature (`next-feature` to continue).
 
 ## Lab
 
-Postgres DB `aiorchestrator` + POC console: `docs/LAB.md` → http://127.0.0.1:8080/lab/
+Postgres DB `aiorchestrator` + consoles: `docs/LAB.md`  
+→ http://127.0.0.1:8011/ (Admin / Supervisor / User)
 
 ## Hard rules
 

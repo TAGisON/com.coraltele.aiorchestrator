@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AiOrchestrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="brand">AiOrchestrator <span>consoles</span></div>
+      <div class="nav">
+        <a href="/v1/health">/v1/health</a>
+        <a href="/v1/platform/status">/v1/platform/status</a>
+      </div>
+    </div>
+    <h1>Choose a console</h1>
+    <p class="lede">Three separate surfaces. Configuration is never pre-seeded — Admin must configure engines, credentials, and profiles before User can start a session. Supervisor inspects durable transcripts and audit trails.</p>
+    <div id="statusBanner" class="banner" hidden></div>
+    <div class="portal">
+      <a class="role" href="/admin/">
+        <h2>Admin</h2>
+        <p>Platform readiness, tenant engines, vendor credentials, settings, and behaviour profiles.</p>
+        <div class="path">/admin/</div>
+      </a>
+      <a class="role" href="/supervisor/">
+        <h2>Supervisor</h2>
+        <p>Session list, live state, transcript, audit events, analytics, and disposition.</p>
+        <div class="path">/supervisor/</div>
+      </a>
+      <a class="role" href="/user/">
+        <h2>User</h2>
+        <p>Start a Talk session, send turns (text), follow replies, stop the session.</p>
+        <div class="path">/user/</div>
+      </a>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script>
+    (async () => {
+      try {
+        const st = await CoralUI.loadPlatformStatus();
+        const el = document.getElementById("statusBanner");
+        if (!st.ready_for_sessions) {
+          CoralUI.showBanner(el, "bad",
+            `<strong>Not ready for sessions.</strong> Blockers: <code>${(st.blockers || []).join(", ") || "unknown"}</code>. Open Admin first.`);
+        } else if ((st.warnings || []).length) {
+          CoralUI.showBanner(el, "",
+            `<strong>Degraded.</strong> Warnings: <code>${st.warnings.join(", ")}</code>`);
+        } else {
+          CoralUI.showBanner(el, "ok", `<strong>Ready.</strong> Engines and profiles are configured.`);
+        }
+      } catch (e) {
+        CoralUI.showBanner(document.getElementById("statusBanner"), "bad", CoralUI.formatApiError(e));
+      }
+    })();
+  </script>
+</body>
+</html>

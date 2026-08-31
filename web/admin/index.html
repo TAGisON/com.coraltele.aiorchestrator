@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · AiOrchestrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="brand">Admin <span>configuration</span></div>
+      <nav class="nav">
+        <a href="/">Portal</a>
+        <a class="active" href="/admin/">Admin</a>
+        <a href="/supervisor/">Supervisor</a>
+        <a href="/user/">User</a>
+      </nav>
+    </div>
+    <h1>Platform configuration</h1>
+    <p class="lede">Nothing is pre-seeded. Configure engines and credentials, publish at least one profile, then verify readiness before Users start sessions.</p>
+    <div id="banner" class="banner" hidden></div>
+
+    <div class="grid side">
+      <section class="panel">
+        <h2>Readiness</h2>
+        <p class="hint">Abnormal conditions surface here (DB down, engines missing, no profiles, unregistered gateway ids, Sarvam key missing).</p>
+        <ul class="checklist" id="readyList"></ul>
+        <div class="row" style="margin-top:0.75rem">
+          <button type="button" class="secondary" id="btnRefreshStatus">Refresh status</button>
+        </div>
+        <pre class="log" id="statusJson" style="margin-top:0.75rem;max-height:14rem"></pre>
+      </section>
+
+      <section class="panel">
+        <h2>Tenant engines</h2>
+        <p class="hint">Required before any session. Suggest buttons fill forms only — Save writes to DB.</p>
+        <div class="row">
+          <label>listen <input id="engListen" list="gwListen" placeholder="not configured" /></label>
+          <label>think <input id="engThink" list="gwThink" placeholder="not configured" /></label>
+          <label>speak <input id="engSpeak" list="gwSpeak" placeholder="not configured" /></label>
+          <datalist id="gwListen"></datalist>
+          <datalist id="gwThink"></datalist>
+          <datalist id="gwSpeak"></datalist>
+        </div>
+        <div class="row">
+          <button type="button" id="btnSaveEngines">Save engines</button>
+          <button type="button" class="secondary" id="btnFakeEngines">Suggest fakes</button>
+          <button type="button" class="secondary" id="btnSarvamEngines">Suggest Sarvam</button>
+          <button type="button" class="secondary" id="btnLoadEngines">Reload</button>
+        </div>
+        <pre class="log" id="enginesJson"></pre>
+      </section>
+    </div>
+
+    <div class="grid two" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Gateway credentials</h2>
+        <p class="hint">Keys are stored in Postgres and never returned raw. Required when engines point at Sarvam.</p>
+        <div class="row">
+          <label>gateway_id <input id="credId" value="sarvam" /></label>
+          <label>api_key <input id="credKey" type="password" autocomplete="off" placeholder="paste once — cleared after save" /></label>
+          <button type="button" id="btnSaveCred">Save credential</button>
+        </div>
+        <pre class="log" id="credJson"></pre>
+      </section>
+
+      <section class="panel">
+        <h2>System settings</h2>
+        <div class="row">
+          <label>key
+            <input id="setKey" list="setKeys" value="coral.base_url" />
+            <datalist id="setKeys">
+              <option value="coral.base_url"></option>
+              <option value="control.auth_token"></option>
+            </datalist>
+          </label>
+          <label>value <input id="setVal" placeholder="https://…" /></label>
+          <button type="button" id="btnSaveSetting">Save setting</button>
+        </div>
+        <pre class="log" id="settingsJson"></pre>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Behaviour profiles</h2>
+      <p class="hint">Publish at least one Contact Agent profile. Users pick a profile id when starting a session.</p>
+      <div class="row">
+        <label>preset
+          <select id="preset">
+            <option value="cc-sales">CC Sales</option>
+            <option value="cc-rnd">CC R&amp;D</option>
+            <option value="cc-after-hours">CC after-hours</option>
+            <option value="fakes">Fakes (offline)</option>
+          </select>
+        </label>
+        <label>profile id <input id="profId" value="cc-sales" /></label>
+        <label>display name <input id="profName" value="CC Sales" /></label>
+        <button type="button" class="secondary" id="btnApplyPreset">Apply preset</button>
+        <button type="button" id="btnPublish">Create + publish</button>
+        <button type="button" class="secondary" id="btnListProfiles">List profiles</button>
+      </div>
+      <textarea id="profDoc" spellcheck="false"></textarea>
+      <pre class="log" id="profilesJson" style="margin-top:0.75rem"></pre>
+    </section>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
