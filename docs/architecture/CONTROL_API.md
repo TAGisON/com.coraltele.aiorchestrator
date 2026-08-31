@@ -52,7 +52,7 @@ WSS edge (not REST): `GET /edge/fs?token=…` — see `EDGE_FS.md`.
 
 ### `GET /v1/tenant/engines`
 
-Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Returns active gateway ids from DB (`tenant_engines`). If no row exists, seeds from boot properties (`engines.listen/think/speak`) into the store.
+Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Returns active gateway ids from DB (`tenant_engines`) only. **No boot/SQL/env seed** — if no row exists → `404` `not_found` with hint to `PUT /v1/tenant/engines`.
 
 ```json
 {
@@ -64,7 +64,7 @@ Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Re
 }
 ```
 
-`source` is `store` | `properties` (properties only if seed upsert fails, e.g. memory race — rare).
+`source` is always `store` when configured. Fresh install has no engines until an operator (or coral-file UI) PUTs them.
 
 ### `PUT /v1/tenant/engines`
 

@@ -24,12 +24,12 @@ import (
 )
 
 func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-worker"}, nil)
 	createProfile(t, srv, "e-lab")
@@ -126,12 +126,12 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 }
 
 func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{}, nil)
 	ts := httptest.NewServer(srv.Handler())
@@ -212,12 +212,12 @@ func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
 }
 
 func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "e-edge"}, nil)
 	createProfile(t, srv, "edge-gone-lab")
@@ -300,6 +300,7 @@ func TestPhaseE_PostcallLeaseDisposition(t *testing.T) {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	srv := control.New(mem, reg, control.Config{OwnerInstance: "test-worker"})
 	createProfile(t, srv, "pc-lab")
 	publishOK(t, srv, "pc-lab", `{

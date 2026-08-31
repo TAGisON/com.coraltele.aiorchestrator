@@ -135,16 +135,16 @@
       <section class="tab" id="tab-engines" hidden>
         <div class="panel">
           <h2>Tenant Engines (system STT / LLM / TTS)</h2>
-          <p class="hint">One id per slot for the tenant. Contact Agent sessions pin these as <code>gateway_binding</code>. Missing row seeds from boot properties into the store (<code>source: store</code>).</p>
+          <p class="hint">One id per slot for the tenant. Fresh install has <strong>no</strong> engines until you Save PUT. Contact Agent sessions pin these as <code>gateway_binding</code>.</p>
           <div class="row">
             <label>listen
-              <input id="engListen" list="gwListenList" value="fake-listen" />
+              <input id="engListen" list="gwListenList" value="" placeholder="not configured" />
             </label>
             <label>think
-              <input id="engThink" list="gwThinkList" value="fake-think" />
+              <input id="engThink" list="gwThinkList" value="" placeholder="not configured" />
             </label>
             <label>speak
-              <input id="engSpeak" list="gwSpeakList" value="fake-speak" />
+              <input id="engSpeak" list="gwSpeakList" value="" placeholder="not configured" />
             </label>
             <datalist id="gwListenList"></datalist>
             <datalist id="gwThinkList"></datalist>

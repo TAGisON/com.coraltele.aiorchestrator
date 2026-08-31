@@ -31,19 +31,13 @@ API: `GET` / `PUT /v1/tenant/engines` (see `CONTROL_API.md`).
 
 ---
 
-## 3. Boot seed (properties → DB)
+## 3. Configuration (Control API only)
 
-When no `tenant_engines` row exists, resolve from committed boot properties (`conf/aiorchestrator.properties`):
+Migrations create the `tenant_engines` table (schema only). They **never** insert a default row.
 
-| Property | Default (lab) |
-|---|---|
-| `engines.listen` | `sarvam-stt` |
-| `engines.think` | `sarvam-llm` |
-| `engines.speak` | `sarvam-tts` |
+Fresh install: `GET /v1/tenant/engines` → `404` until an operator runs `PUT /v1/tenant/engines` (lab Settings / Tenant Engines, or coral-file). No boot-properties or env seed of listen/think/speak ids.
 
-On first resolve with a writable store, the binding is **seeded into Postgres** (`source: store`). Env `SYSTEM_LISTEN` / `SYSTEM_THINK` / `SYSTEM_SPEAK` remains a lab override of those property seeds only (not the primary production path).
-
-Vendor API keys are **not** boot properties — use `PUT /v1/tenant/credentials/{gateway_id}` (see `CONTROL_API.md`).
+Vendor API keys likewise: empty until `PUT /v1/tenant/credentials/{gateway_id}`.
 
 ---
 
@@ -51,7 +45,7 @@ Vendor API keys are **not** boot properties — use `PUT /v1/tenant/credentials/
 
 On `POST /v1/sessions`:
 
-1. Resolve tenant engines (row → else seed from boot properties into store).
+1. Resolve tenant engines from the store only (missing → `422` `tenant engines not configured`).
 2. Capability-check each id against the process gateway registry (port kind + known id).
 3. Persist snapshot on the session as `gateway_binding`: `{ "listen", "think", "speak" }`.
 4. Pass the same binding into runtime start metadata.

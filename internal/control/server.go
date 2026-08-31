@@ -319,6 +319,12 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	tenantID := resolveTenantID(r, req.TenantID)
 	binding, _, err := s.resolveTenantEngines(r.Context(), tenantID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusUnprocessableEntity, CodeBadRequest, "tenant engines not configured", map[string]any{
+			"hint": "PUT /v1/tenant/engines before creating sessions",
+		})
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "resolve tenant engines failed", nil)
 		return

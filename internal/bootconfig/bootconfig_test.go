@@ -16,7 +16,7 @@ func TestDefaultPort8011(t *testing.T) {
 func TestMergeFileAndEnv(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "p.properties")
-	body := "http.addr=:9000\ndatabase.require=true\nengines.listen=fake-listen\n"
+	body := "http.addr=:9000\ndatabase.require=true\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -31,9 +31,6 @@ func TestMergeFileAndEnv(t *testing.T) {
 	}
 	if !cfg.RequireDatabase {
 		t.Fatal("require db")
-	}
-	if cfg.EnginesListen != "fake-listen" {
-		t.Fatalf("listen %q", cfg.EnginesListen)
 	}
 	t.Setenv("HTTP_ADDR", ":8011")
 	cfg2, err := Load(path)

@@ -22,6 +22,7 @@ func TestPatchProfileFields_LanguagePrimary(t *testing.T) {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	ctx := context.Background()
 	seedFakeTenantEngines(t, mem)
 	_ = mem.CreateProfile(ctx, store.Profile{ID: "p-lang"})
@@ -105,6 +106,7 @@ func TestPatchProfileFields_RejectsDisallowedAndNoMidCall(t *testing.T) {
 	reg := router.NewMemRegistry()
 	_ = fake.RegisterAll(reg)
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	ctx := context.Background()
 	seedFakeTenantEngines(t, mem)
 	_ = mem.CreateProfile(ctx, store.Profile{ID: "p2"})
@@ -140,6 +142,7 @@ func TestPatchProfileFields_RejectsDisallowedAndNoMidCall(t *testing.T) {
 
 func TestMemory_SessionLanguages(t *testing.T) {
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	ctx := context.Background()
 	_ = mem.CreateProfile(ctx, store.Profile{ID: "p1"})
 	_, _ = mem.PublishVersion(ctx, "p1", []byte(`{"id":"p1","modes":{"listen":true}}`))

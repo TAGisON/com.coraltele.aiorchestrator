@@ -14,8 +14,15 @@ import (
 
 func seedFakeTenantEngines(t *testing.T, mem *store.Memory) {
 	t.Helper()
+	for _, tid := range []string{"default", "t1"} {
+		seedFakeTenantEnginesFor(t, mem, tid)
+	}
+}
+
+func seedFakeTenantEnginesFor(t *testing.T, mem *store.Memory, tenantID string) {
+	t.Helper()
 	_, err := mem.UpsertTenantEngines(context.Background(), store.TenantEngines{
-		TenantID: "default",
+		TenantID: tenantID,
 		ListenID: "fake-listen",
 		ThinkID:  "fake-think",
 		SpeakID:  "fake-speak",
@@ -25,31 +32,18 @@ func seedFakeTenantEngines(t *testing.T, mem *store.Memory) {
 	}
 }
 
-func TestTenantEngines_GetSeedsFromDefaults(t *testing.T) {
-	control.EngineDefaults = store.GatewayBinding{
-		Listen: "fake-listen", Think: "fake-think", Speak: "fake-speak",
-	}
-	srv, _ := testServer(t)
+func TestTenantEngines_GetNotConfigured_404(t *testing.T) {
+	srv, _ := testServerEmpty(t)
 
 	rr := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/tenant/engines", nil))
-	if rr.Code != http.StatusOK {
+	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
-	}
-	var got map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
-	if got["source"] != "store" {
-		t.Fatalf("source %v", got["source"])
-	}
-	if got["listen"] != "fake-listen" || got["think"] != "fake-think" || got["speak"] != "fake-speak" {
-		t.Fatalf("engines %+v", got)
 	}
 }
 
 func TestTenantEngines_PutUnknown_422(t *testing.T) {
-	srv, _ := testServer(t)
+	srv, _ := testServerEmpty(t)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/v1/tenant/engines", bytes.NewBufferString(`{
   "listen":"not-a-gateway",

@@ -20,12 +20,12 @@ import (
 )
 
 func TestCC5_GetTranscriptOrdered(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "cc5"}, nil)
 	createProfile(t, srv, "cc5-lab")
@@ -90,12 +90,12 @@ func TestCC5_GetTranscriptOrdered(t *testing.T) {
 }
 
 func TestCC5_PostcallDispositionGET(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{OwnerInstance: "cc5-disp"}, nil)
 	createProfile(t, srv, "cc5-disp")

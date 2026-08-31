@@ -16,7 +16,18 @@ import (
 
 func testServer(t *testing.T) (*control.Server, *store.Memory) {
 	t.Helper()
-	setFakeSystemEngines(t)
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
+	srv := control.New(mem, reg, control.Config{})
+	return srv, mem
+}
+
+func testServerEmpty(t *testing.T) (*control.Server, *store.Memory) {
+	t.Helper()
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
@@ -24,15 +35,6 @@ func testServer(t *testing.T) (*control.Server, *store.Memory) {
 	mem := store.NewMemory()
 	srv := control.New(mem, reg, control.Config{})
 	return srv, mem
-}
-
-func setFakeSystemEngines(t *testing.T) {
-	t.Helper()
-	control.EngineDefaults = store.GatewayBinding{
-		Listen: "fake-listen",
-		Think:  "fake-think",
-		Speak:  "fake-speak",
-	}
 }
 
 func TestHealth_OK(t *testing.T) {
@@ -172,12 +174,12 @@ func publishOK(t *testing.T, srv *control.Server, id, body string) {
 }
 
 func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)
 	}
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	rt := &control.SessionRuntime{Mgr: session.NewManager(reg)}
 	srv := control.NewWithRuntime(mem, reg, rt, control.Config{}, nil)
 	createProfile(t, srv, "rt-lab")

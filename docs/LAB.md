@@ -5,17 +5,15 @@
 Shared local Postgres `127.0.0.1:5432`, **new DB name** `aiorchestrator` (same pattern as `telemetry`, `users`, `switch`).
 
 ```powershell
-.\tools\lab\Init-LabDatabase.ps1
-# Boot uses committed conf/aiorchestrator.properties (HTTP :8011, database.url, engines seeds).
-# Optional: copy .env.example .env for lab overrides only.
+.\tools\lab\Init-LabDatabase.ps1 -Recreate   # empty DB; schema applied on boot
+# Boot uses committed conf/aiorchestrator.properties (HTTP :8011, database.url).
+# Nothing is pre-seeded (no engines, no vendor keys, no profiles).
 go run ./cmd/aiorchestrator
 ```
 
 Open **http://127.0.0.1:8011/lab/**
 
-Migrations apply automatically on boot when `database.url` is set (properties or `DATABASE_URL`).
-
-`database.require=true` (properties) / `REQUIRE_DATABASE=1` refuses to start on in-memory (recommended for lab).
+Migrations apply **schema only** on boot when `database.url` is set. Configure engines + credentials via lab **Tenant Engines** / **Settings** (or Control API) before creating sessions.
 
 ## Logging
 

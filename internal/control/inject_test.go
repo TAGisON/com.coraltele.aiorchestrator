@@ -16,7 +16,6 @@ import (
 )
 
 func TestInject_ClipTurnAndTranscript(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		t.Fatal(err)

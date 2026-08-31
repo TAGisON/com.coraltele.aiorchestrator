@@ -45,6 +45,7 @@ func registerPhaseD(t *testing.T, reg *router.MemRegistry, repo store.Repository
 func TestKB_UploadAndRetrieve(t *testing.T) {
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	registerPhaseD(t, reg, mem)
 	srv := control.New(mem, reg, control.Config{})
 
@@ -81,6 +82,7 @@ func TestKB_UploadAndRetrieve(t *testing.T) {
 func TestProfile_AcceptsIngestAndCoralSkills(t *testing.T) {
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	registerPhaseD(t, reg, mem)
 	doc := profile.Document{}
 	doc.Modes.Think = true
@@ -97,9 +99,9 @@ func TestProfile_AcceptsIngestAndCoralSkills(t *testing.T) {
 }
 
 func TestSession_EdgeTokenSigned(t *testing.T) {
-	setFakeSystemEngines(t)
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	registerPhaseD(t, reg, mem)
 	secret := []byte("phase-d-test-secret")
 	srv := control.New(mem, reg, control.Config{EdgeTokenSecret: secret})
@@ -134,6 +136,7 @@ func TestSession_EdgeTokenSigned(t *testing.T) {
 func TestPlaybackJob_FileFeedsBus(t *testing.T) {
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
 	registerPhaseD(t, reg, mem)
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr}, control.Config{}, nil)

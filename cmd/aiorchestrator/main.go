@@ -44,12 +44,6 @@ func main() {
 		"log_dir", logDir,
 	)
 
-	control.EngineDefaults = store.GatewayBinding{
-		Listen: boot.EnginesListen,
-		Think:  boot.EnginesThink,
-		Speak:  boot.EnginesSpeak,
-	}
-
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
 		applog.Error("register fakes failed", "err", err)
@@ -121,10 +115,12 @@ func main() {
 		applog.Error("register sarvam-tts failed", "err", err)
 		os.Exit(1)
 	}
+	// Lab status: credentials configured only when present in DB (fresh install = false).
+	// Runtime LoadConfig may still fall back to env/secrets.local.json for lab emergency.
 	sarvamConfigured := false
-	if cfg, err := sarvam.LoadConfig(); err == nil && cfg.Configured() {
+	if k, err := lookupSarvamKey(ctx, repo, "default"); err == nil && strings.TrimSpace(k) != "" {
 		sarvamConfigured = true
-		applog.Info("sarvam credentials available", "source", "db_or_env")
+		applog.Info("sarvam credentials available", "source", "database")
 	} else {
 		applog.Info("sarvam credentials not set — PUT /v1/tenant/credentials/sarvam with api_key")
 	}

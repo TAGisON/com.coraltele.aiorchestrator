@@ -256,6 +256,10 @@ async function loadEngines() {
     document.getElementById("engTenant").textContent = data.tenant_id || "default";
     document.getElementById("enginesJson").textContent = JSON.stringify(data, null, 2);
   } catch (e) {
+    document.getElementById("engListen").value = "";
+    document.getElementById("engThink").value = "";
+    document.getElementById("engSpeak").value = "";
+    document.getElementById("engSource").textContent = "not configured";
     document.getElementById("enginesJson").textContent = JSON.stringify(e, null, 2);
   }
 }

@@ -15,19 +15,8 @@ import (
 
 const (
 	defaultTenantID    = "default"
-	defaultListenID    = "sarvam-stt"
-	defaultThinkID     = "sarvam-llm"
-	defaultSpeakID     = "sarvam-tts"
 	enginesSourceStore = "store"
-	enginesSourceProps = "properties"
 )
-
-// EngineDefaults are boot-properties seed when no tenant_engines row exists.
-var EngineDefaults = store.GatewayBinding{
-	Listen: defaultListenID,
-	Think:  defaultThinkID,
-	Speak:  defaultSpeakID,
-}
 
 type tenantEnginesResponse struct {
 	TenantID string `json:"tenant_id"`
@@ -46,6 +35,12 @@ type putTenantEnginesReq struct {
 func (s *Server) handleGetTenantEngines(w http.ResponseWriter, r *http.Request) {
 	tenantID := resolveTenantID(r, "")
 	binding, source, err := s.resolveTenantEngines(r.Context(), tenantID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, CodeNotFound, "tenant engines not configured", map[string]any{
+			"hint": "PUT /v1/tenant/engines with listen, think, speak",
+		})
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "resolve tenant engines failed", nil)
 		return
@@ -107,39 +102,13 @@ func resolveTenantID(r *http.Request, bodyTenant string) string {
 	return defaultTenantID
 }
 
-func propertiesGatewayDefaults() store.GatewayBinding {
-	b := EngineDefaults
-	if b.Listen == "" {
-		b.Listen = defaultListenID
-	}
-	if b.Think == "" {
-		b.Think = defaultThinkID
-	}
-	if b.Speak == "" {
-		b.Speak = defaultSpeakID
-	}
-	return b
-}
-
+// resolveTenantEngines returns the stored binding only. No boot/SQL/env seed.
 func (s *Server) resolveTenantEngines(ctx context.Context, tenantID string) (store.GatewayBinding, string, error) {
 	te, err := s.repo.GetTenantEngines(ctx, tenantID)
-	if err == nil {
-		return te.Binding(), enginesSourceStore, nil
-	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if err != nil {
 		return store.GatewayBinding{}, "", err
 	}
-	// Seed from boot properties defaults into DB when possible so UI/Control see store source.
-	def := propertiesGatewayDefaults()
-	if te2, err := s.repo.UpsertTenantEngines(ctx, store.TenantEngines{
-		TenantID: tenantID,
-		ListenID: def.Listen,
-		ThinkID:  def.Think,
-		SpeakID:  def.Speak,
-	}); err == nil {
-		return te2.Binding(), enginesSourceStore, nil
-	}
-	return def, enginesSourceProps, nil
+	return te.Binding(), enginesSourceStore, nil
 }
 
 func validateGatewayBinding(reg port.Registry, b store.GatewayBinding) error {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Config is process bootstrap configuration (not vendor secrets).
+// Config is process bootstrap configuration (not vendor secrets or tenant engines).
 type Config struct {
 	HTTPAddr        string
 	DatabaseURL     string
@@ -23,13 +23,10 @@ type Config struct {
 	OwnerInstance   string
 	EdgeBaseURL     string
 	EdgeTokenSecret string
-	EnginesListen   string
-	EnginesThink    string
-	EnginesSpeak    string
 	PropertiesPath  string
 }
 
-// Default returns lab/server defaults (port 8011).
+// Default returns process defaults (port 8011). No vendor or engine presets.
 func Default() Config {
 	return Config{
 		HTTPAddr:        ":8011",
@@ -44,9 +41,6 @@ func Default() Config {
 		OwnerInstance:   "local",
 		EdgeBaseURL:     "wss://localhost/edge/fs",
 		EdgeTokenSecret: "lab-edge-hmac-change-me",
-		EnginesListen:   "sarvam-stt",
-		EnginesThink:    "sarvam-llm",
-		EnginesSpeak:    "sarvam-tts",
 	}
 }
 
@@ -144,12 +138,6 @@ func mergeFile(cfg *Config, path string) error {
 			cfg.EdgeBaseURL = v
 		case "edge.token_secret":
 			cfg.EdgeTokenSecret = v
-		case "engines.listen":
-			cfg.EnginesListen = v
-		case "engines.think":
-			cfg.EnginesThink = v
-		case "engines.speak":
-			cfg.EnginesSpeak = v
 		}
 	}
 	return sc.Err()
@@ -179,15 +167,6 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("EDGE_TOKEN_SECRET"); v != "" {
 		cfg.EdgeTokenSecret = v
-	}
-	if v := os.Getenv("SYSTEM_LISTEN"); v != "" {
-		cfg.EnginesListen = v
-	}
-	if v := os.Getenv("SYSTEM_THINK"); v != "" {
-		cfg.EnginesThink = v
-	}
-	if v := os.Getenv("SYSTEM_SPEAK"); v != "" {
-		cfg.EnginesSpeak = v
 	}
 }
 
