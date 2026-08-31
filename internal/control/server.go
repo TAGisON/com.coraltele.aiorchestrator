@@ -73,6 +73,8 @@ type Server struct {
 	mux  *http.ServeMux
 	ui   UIExtras
 	uiFS fs.FS
+
+	sandboxes *sandboxRegistry
 }
 
 func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
@@ -96,7 +98,10 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 	if cfg.EdgeTokenTTL <= 0 {
 		cfg.EdgeTokenTTL = 5 * time.Minute
 	}
-	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux(), uiFS: uiFS}
+	s := &Server{
+		repo: repo, reg: reg, rt: rt, cfg: cfg,
+		mux: http.NewServeMux(), uiFS: uiFS, sandboxes: newSandboxRegistry(),
+	}
 	if sr, ok := rt.(*SessionRuntime); ok && sr != nil && sr.OnSessionEnd == nil {
 		sr.OnSessionEnd = s.EndSessionFromDesk
 	}

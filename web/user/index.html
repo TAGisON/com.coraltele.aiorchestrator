@@ -12,7 +12,7 @@
 <body>
   <div class="shell">
     <div class="top">
-      <div class="brand">User <span>session</span></div>
+      <div class="brand">User <span>call</span></div>
       <nav class="nav">
         <a href="/">Portal</a>
         <a href="/admin/">Admin</a>
@@ -20,9 +20,47 @@
         <a class="active" href="/user/">User</a>
       </nav>
     </div>
-    <h1>Start a conversation</h1>
-    <p class="lede">Creates a Talk session pinned to tenant engines. Text turns use inject (same Talk path as STT finals). Live FreeSWITCH audio uses the edge WSS token returned at create — not this browser mic yet.</p>
+    <h1>Start a call</h1>
+    <p class="lede">Two ways to reach the bot. <strong>Text call</strong> drives a published contact desk turn by turn — no mic, no vendor keys, real connectors. <strong>Voice call</strong> attaches your mic and speakers to the session edge (same PCM dialect as FreeSWITCH).</p>
     <div id="banner" class="banner" hidden></div>
+
+    <section class="panel">
+      <h2>Text call — contact desk</h2>
+      <p class="hint">Pick a desk, choose the language you want to open in, then talk. Hindi and English both work, and you can switch mid-call just by typing in the other language (or saying “English mein baat karo”).</p>
+      <div class="row">
+        <label>desk
+          <select id="deskPick"></select>
+        </label>
+        <label>open in
+          <select id="deskLang">
+            <option value="">auto-detect</option>
+            <option value="en-IN">English</option>
+            <option value="hi-IN">हिंदी</option>
+          </select>
+        </label>
+        <label>caller number
+          <input id="deskAni" value="919812345678" />
+        </label>
+        <button type="button" id="btnDeskStart">Start text call</button>
+        <button type="button" class="secondary" id="btnDeskSilence" disabled>Caller went silent</button>
+      </div>
+      <div id="deskMeta" class="row"></div>
+      <div class="chat" id="deskChat"></div>
+      <div class="row" style="margin-top:0.75rem">
+        <label style="flex:1">you say
+          <input id="deskMsg" style="width:100%;min-width:14rem" placeholder="Start a text call first…" disabled />
+        </label>
+        <button type="button" id="btnDeskSend" disabled>Send</button>
+      </div>
+      <div class="row" id="deskQuick"></div>
+      <details>
+        <summary class="hint" style="cursor:pointer">Collected information and handoff pack</summary>
+        <pre class="log" id="deskStateJson" style="margin-top:0.5rem;max-height:16rem"></pre>
+      </details>
+    </section>
+
+    <h2 style="margin:1.5rem 0 0.25rem">Voice call</h2>
+    <p class="hint" style="margin-top:0">Allow the microphone when the browser asks. Requires engines configured and a published profile.</p>
 
     <div class="grid side">
       <section class="panel">
@@ -35,7 +73,7 @@
       </section>
 
       <section class="panel">
-        <h2>Start session</h2>
+        <h2>Call</h2>
         <div class="row">
           <label>profile
             <select id="profile"></select>
@@ -46,29 +84,33 @@
               <option value="playback">playback</option>
             </select>
           </label>
-          <button type="button" id="btnStart">Start</button>
-          <button type="button" class="secondary" id="btnStop" disabled>Stop</button>
+          <button type="button" id="btnStart">Start call</button>
+          <button type="button" class="secondary" id="btnStop" disabled>End call</button>
         </div>
-        <p class="hint" id="startHint">If Admin has not published profiles or engines, Start will fail with a clear API error.</p>
+        <p class="hint" id="startHint">Allow microphone when the browser asks. Call uses ws://…/edge/fs with the session edge token.</p>
         <div id="sessionMeta" class="row"></div>
+        <div id="callStatus" class="row"></div>
         <pre class="log" id="createJson" style="max-height:10rem"></pre>
       </section>
     </div>
 
     <section class="panel" style="margin-top:1rem">
-      <h2>Talk</h2>
+      <h2>Transcript</h2>
       <div class="chat" id="chat"></div>
-      <div class="row" style="margin-top:0.75rem">
-        <label style="flex:1">message
-          <input id="msg" style="width:100%;min-width:12rem" placeholder="Type and send a turn…" disabled />
-        </label>
-        <button type="button" id="btnSend" disabled>Send</button>
-        <button type="button" class="secondary" id="btnRefreshTx" disabled>Refresh transcript</button>
-      </div>
+      <details style="margin-top:0.75rem">
+        <summary class="hint" style="cursor:pointer">Text turn (debug)</summary>
+        <div class="row" style="margin-top:0.75rem">
+          <label style="flex:1">message
+            <input id="msg" style="width:100%;min-width:12rem" placeholder="Type a turn without mic…" disabled />
+          </label>
+          <button type="button" id="btnSend" disabled>Send</button>
+          <button type="button" class="secondary" id="btnRefreshTx" disabled>Refresh transcript</button>
+        </div>
+      </details>
       <pre class="log" id="turnJson" style="margin-top:0.75rem;max-height:10rem"></pre>
     </section>
   </div>
   <script src="/shared/api.js"></script>
-  <script src="./app.js"></script>
+  <script src="/user/app.js"></script>
 </body>
 </html>

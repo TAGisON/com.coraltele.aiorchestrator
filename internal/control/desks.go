@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,7 @@ func (s *Server) mountDeskRoutes() {
 	s.mux.HandleFunc("POST /v1/compliance/erasure", s.handleCreateErasure)
 	s.mux.HandleFunc("POST /v1/compliance/erasure/{id}/complete", s.handleCompleteErasure)
 	s.mux.HandleFunc("GET /v1/compliance/pii-access", s.handleListPIIAccess)
+	s.mountDeskSandboxRoutes()
 }
 
 type createDeskReq struct {
@@ -474,6 +476,11 @@ func (s *Server) handleInstallPreset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "install preset failed: "+err.Error(), nil)
 		return
 	}
+	if name == "coral-tfn" {
+		if err := s.seedCoralProductKB(r.Context(), tenantID); err != nil {
+			applog.Warn("coral product kb seed failed", "err", err)
+		}
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"desk":      deskJSON(rec),
 		"document":  doc,
@@ -481,22 +488,70 @@ func (s *Server) handleInstallPreset(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleDeskCatalog(w http.ResponseWriter, r *http.Request) {
-	skills := make([]map[string]any, 0, len(desk.SkillAuthority))
-	for name, authority := range desk.SkillAuthority {
-		skills = append(skills, map[string]any{"name": name, "authority": authority})
+func (s *Server) seedCoralProductKB(ctx context.Context, tenantID string) error {
+	id, err := newID()
+	if err != nil {
+		return err
 	}
+	doc := store.KBDocument{
+		ID: id, TenantID: tenantID, Collection: "coral-products",
+		URI: "preset://coral-tfn", Status: store.KBIndexing,
+	}
+	if err := s.repo.CreateKBDocument(ctx, doc); err != nil {
+		return err
+	}
+	chunks := chunkText(id, tenantID, "coral-products", doc.URI, desk.CoralProductKnowledge())
+	if err := s.repo.ReplaceKBChunks(ctx, id, chunks); err != nil {
+		_, _ = s.repo.UpdateKBDocumentStatus(ctx, id, store.KBFailed, err.Error())
+		return err
+	}
+	_, err = s.repo.UpdateKBDocumentStatus(ctx, id, store.KBReady, "")
+	return err
+}
+
+func (s *Server) handleDeskCatalog(w http.ResponseWriter, r *http.Request) {
+	skillNames := make([]string, 0, len(desk.SkillAuthority))
+	for name := range desk.SkillAuthority {
+		skillNames = append(skillNames, name)
+	}
+	sort.Strings(skillNames)
+	skills := make([]map[string]any, 0, len(skillNames))
+	for _, name := range skillNames {
+		skills = append(skills, map[string]any{"name": name, "authority": desk.SkillAuthority[name]})
+	}
+
+	productIDs := make([]string, 0, len(desk.ProductVocabulary))
+	for id := range desk.ProductVocabulary {
+		productIDs = append(productIDs, id)
+	}
+	sort.Strings(productIDs)
+	products := make([]map[string]any, 0, len(productIDs))
+	for _, id := range productIDs {
+		products = append(products, map[string]any{
+			"id":    id,
+			"en-IN": desk.DisplayValue(desk.AttrProduct, id, "en-IN"),
+			"hi-IN": desk.DisplayValue(desk.AttrProduct, id, "hi-IN"),
+		})
+	}
+
+	knowledge := make([]string, 0, 2)
+	for _, rec := range s.reg.List(port.PortKnowledge) {
+		knowledge = append(knowledge, string(rec.ID))
+	}
+	sort.Strings(knowledge)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"step_types":   []string{desk.StepSay, desk.StepAsk, desk.StepConfirm, desk.StepChoice, desk.StepAction, desk.StepEnd},
 		"validations":  []string{desk.ValidateFreeText, desk.ValidateEmail, desk.ValidatePhone, desk.ValidateNumber, desk.ValidateChoice, desk.ValidateProduct, desk.ValidateYesNo},
 		"branches":     []string{desk.BranchOK, desk.BranchFail, desk.BranchDuplicate, desk.BranchTimeout, desk.BranchUnavailable},
 		"repairs":      []string{desk.RepairReprompt, desk.RepairNext, desk.RepairClarify, desk.RepairFallback, desk.RepairEnd},
-		"dispositions": desk.Dispositions,
-		"purposes":     desk.Purposes,
-		"products":     desk.ProductVocabulary,
-		"skills":       skills,
-		"languages":    []string{"en-IN", "hi-IN"},
-		"defaults":     desk.DefaultCX(),
+		"dispositions":        desk.Dispositions,
+		"purposes":            desk.Purposes,
+		"products":            products,
+		"skills":              skills,
+		"knowledge_providers": knowledge,
+		"languages":           []string{"en-IN", "hi-IN"},
+		"defaults":            desk.DefaultCX(),
 		"prompt_slots": []string{desk.PromptWelcome, desk.PromptClarify, desk.PromptSilence1, desk.PromptSilence2,
 			desk.PromptSilenceGoodbye, desk.PromptClosing, desk.PromptAnythingElse, desk.PromptSystemDown, desk.PromptHold},
 	})

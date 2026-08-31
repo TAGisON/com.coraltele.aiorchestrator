@@ -78,8 +78,16 @@ func Compile(d Doc) (json.RawMessage, error) {
 	}
 
 	knowledgeProviders := []string{}
-	if len(d.Knowledge) > 0 {
-		knowledgeProviders = append(knowledgeProviders, "ingest-default")
+	seenProvider := map[string]bool{}
+	for _, k := range d.Knowledge {
+		p := strings.TrimSpace(k.Provider)
+		if p == "" {
+			p = DefaultKnowledgeProvider
+		}
+		if !seenProvider[p] {
+			seenProvider[p] = true
+			knowledgeProviders = append(knowledgeProviders, p)
+		}
 	}
 
 	persona := map[string]any{

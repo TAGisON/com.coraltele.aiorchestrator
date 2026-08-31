@@ -54,6 +54,51 @@
       </section>
     </div>
 
+    <section class="panel" style="margin-top:1rem">
+      <h2>Contact attributes</h2>
+      <p class="hint">What the desk collected on this call. Confidential fields (name, email, phone) are masked by default — revealing them writes an entry to the PII access audit that Admin can read.</p>
+      <div class="row">
+        <button type="button" class="secondary" id="btnAttrs">Load masked</button>
+        <label>actor <input id="revealActor" placeholder="your name" style="min-width:9rem" /></label>
+        <label>reason <input id="revealReason" placeholder="why you need it" style="min-width:12rem" /></label>
+        <button type="button" id="btnReveal">Reveal (audited)</button>
+      </div>
+      <div style="overflow:auto;max-height:16rem">
+        <table>
+          <thead><tr><th>Attribute</th><th>Value</th><th>Class</th></tr></thead>
+          <tbody id="attrBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid two" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Handoff pack</h2>
+        <p class="hint">Exactly what the human agent receives on transfer, so the caller never repeats themselves. Live while the call runs; rebuilt from stored attributes afterwards.</p>
+        <div class="row">
+          <button type="button" class="secondary" id="btnHandoff">Load handoff</button>
+          <button type="button" class="secondary" id="btnDeskState">Live desk state</button>
+        </div>
+        <div id="handoffSummary"></div>
+        <pre class="log" id="handoffJson" style="max-height:16rem"></pre>
+      </section>
+
+      <section class="panel">
+        <h2>Connector trail</h2>
+        <p class="hint">Every skill the desk invoked, with the arguments and the backend result. A ticket number only exists here if the backend confirmed it.</p>
+        <div class="row">
+          <button type="button" class="secondary" id="btnSkills">Load invocations</button>
+        </div>
+        <div style="overflow:auto;max-height:10rem">
+          <table>
+            <thead><tr><th>Skill</th><th>Status</th><th>Result</th><th>At</th></tr></thead>
+            <tbody id="skillBody"></tbody>
+          </table>
+        </div>
+        <pre class="log" id="skillJson" style="max-height:12rem"></pre>
+      </section>
+    </div>
+
     <div class="grid two" style="margin-top:1rem">
       <section class="panel">
         <h2>Transcript</h2>
@@ -63,7 +108,14 @@
       </section>
       <section class="panel">
         <h2>Disposition</h2>
-        <p class="hint">404 until postcall worker writes a suggestion after terminal state.</p>
+        <p class="hint">The desk suggests a code; the supervisor decides. Overriding records <code>source=supervisor</code> so reporting can separate machine suggestions from human wrap-up.</p>
+        <div class="row">
+          <label>final code
+            <select id="dispPick"></select>
+          </label>
+          <label>actor <input id="dispActor" placeholder="your name" style="min-width:9rem" /></label>
+          <button type="button" id="btnDisp">Override</button>
+        </div>
         <pre class="log" id="dispJson"></pre>
       </section>
     </div>
@@ -80,6 +132,6 @@
     </div>
   </div>
   <script src="/shared/api.js"></script>
-  <script src="./app.js"></script>
+  <script src="/supervisor/app.js"></script>
 </body>
 </html>

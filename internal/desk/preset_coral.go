@@ -45,8 +45,8 @@ func prompt(id, label, en, hi string) Prompt {
 func coralPrompts() map[string]Prompt {
 	list := []Prompt{
 		prompt(PromptWelcome, "Welcome",
-			"Thank you for calling Coral Telecom Limited. I am Coral Telecom's AI assistant. I can help you with sales enquiries, product information, technical support, or a service complaint. You can speak with me in English or Hindi. How may I help you today?",
-			"Coral Telecom Limited में आपका स्वागत है। मैं Coral Telecom की AI असिस्टेंट हूँ। मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में सहायता कर सकती हूँ। कृपया बताइए, मैं आपकी किस प्रकार सहायता कर सकती हूँ?"),
+			"Thank you for calling Coral Telecom Limited. Welcome to Coral Telecom, your trusted partner for telecom and communication solutions. I am Coral Telecom's AI-powered virtual assistant. I can help you with a sales enquiry, product information, technical support, or a service complaint. You can speak with me in English or Hindi. How may I help you today?",
+			"धन्यवाद, आपने Coral Telecom Limited को कॉल किया है। मैं Coral Telecom की AI-powered virtual assistant हूँ। मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में सहायता कर सकती हूँ। आप मुझसे अंग्रेज़ी या हिंदी में बात कर सकते हैं। कृपया बताइए, मैं आपकी किस प्रकार सहायता कर सकती हूँ?"),
 		prompt(PromptClarify, "Clarify menu",
 			"I can help you with Sales Enquiry, Product Information, Technical Support, or Service Complaint. Please tell me what you need help with.",
 			"मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में मदद कर सकती हूँ। कृपया बताइए आपको किसमें सहायता चाहिए।"),

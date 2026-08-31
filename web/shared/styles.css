@@ -141,3 +141,12 @@ pre.log, .log {
 .portal .role h2 { margin: 0 0 0.4rem; font-size: 1.15rem; }
 .portal .role p { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .portal .role .path { margin-top: 0.85rem; font-family: var(--mono); font-size: 0.78rem; color: var(--accent); }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0 0 0.85rem; }
+.tab {
+  background: transparent; color: var(--muted); border-color: var(--line);
+  padding: 0.35rem 0.7rem; font-size: 0.82rem;
+}
+.tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tab-pane { margin-bottom: 0.5rem; }
+textarea.prompt-box { min-height: 7rem; font-family: var(--sans); font-size: 0.88rem; }

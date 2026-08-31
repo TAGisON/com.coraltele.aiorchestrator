@@ -213,11 +213,16 @@ type SkillBind struct {
 	Config  map[string]string `json:"config,omitempty"`
 }
 
-// KnowledgeAttach binds a KB collection to intents.
+// KnowledgeAttach binds a KB collection to intents. Provider is the registered
+// knowledge gateway that serves it; the GUI picks from the registry.
 type KnowledgeAttach struct {
 	Collection string   `json:"collection"`
 	Intents    []string `json:"intents"`
+	Provider   string   `json:"provider,omitempty"`
 }
+
+// DefaultKnowledgeProvider serves KB collections unless a desk names another.
+const DefaultKnowledgeProvider = "ingest-default"
 
 // RetentionOverride is a desk-level retention policy (§11).
 type RetentionOverride struct {
@@ -323,6 +328,11 @@ func (d *Doc) Normalize() {
 			b.Mode = "stub"
 		}
 		d.Skills[name] = b
+	}
+	for i, k := range d.Knowledge {
+		if strings.TrimSpace(k.Provider) == "" {
+			d.Knowledge[i].Provider = DefaultKnowledgeProvider
+		}
 	}
 	sort.Slice(d.Intents, func(i, j int) bool { return d.Intents[i].ID < d.Intents[j].ID })
 	sort.Slice(d.Matrix, func(i, j int) bool { return d.Matrix[i].Intent < d.Matrix[j].Intent })

@@ -21,7 +21,7 @@
       </nav>
     </div>
     <h1>Platform configuration</h1>
-    <p class="lede">Nothing is pre-seeded. Configure engines and credentials, publish at least one profile, then verify readiness before Users start sessions.</p>
+    <p class="lede">Nothing is pre-seeded. Configure engines and credentials, publish a contact desk (or a raw profile), then verify readiness before Users start sessions.</p>
     <div id="banner" class="banner" hidden></div>
 
     <div class="grid side">
@@ -70,6 +70,11 @@
 
       <section class="panel">
         <h2>System settings</h2>
+        <p class="hint">Optional string keys stored in Postgres. Empty until you save. Common keys:</p>
+        <ul class="hint" style="margin-top:0">
+          <li><code>coral.base_url</code> — base URL for Coral transfer / CRM skill gateways (warm transfer, CRM callbacks). Leave empty if you are not integrating Coral yet.</li>
+          <li><code>control.auth_token</code> — if set, Control API requires <code>Authorization: Bearer …</code>. Leave empty for open local lab.</li>
+        </ul>
         <div class="row">
           <label>key
             <input id="setKey" list="setKeys" value="coral.base_url" />
@@ -78,7 +83,7 @@
               <option value="control.auth_token"></option>
             </datalist>
           </label>
-          <label>value <input id="setVal" placeholder="https://…" /></label>
+          <label>value <input id="setVal" placeholder="optional — e.g. https://coral.example" /></label>
           <button type="button" id="btnSaveSetting">Save setting</button>
         </div>
         <pre class="log" id="settingsJson"></pre>
@@ -86,28 +91,260 @@
     </div>
 
     <section class="panel" style="margin-top:1rem">
-      <h2>Behaviour profiles</h2>
-      <p class="hint">Publish at least one Contact Agent profile. Users pick a profile id when starting a session.</p>
+      <h2>Contact desks</h2>
+      <p class="hint">A desk is the business-facing configuration: prompts in English and Hindi, intents, guided paths, routing matrix and connectors. Publishing a desk compiles and publishes its behaviour profile automatically — you do not author profile JSON for a desk.</p>
       <div class="row">
-        <label>preset
-          <select id="preset">
-            <option value="cc-sales">CC Sales</option>
-            <option value="cc-rnd">CC R&amp;D</option>
-            <option value="cc-after-hours">CC after-hours</option>
-            <option value="fakes">Fakes (offline)</option>
+        <button type="button" id="btnInstallCoral">Install Coral TFN preset</button>
+        <button type="button" class="secondary" id="btnListDesks">Refresh desks</button>
+      </div>
+      <div style="overflow:auto">
+        <table>
+          <thead>
+            <tr><th>Desk</th><th>Direction</th><th>Status</th><th>Version</th><th>Updated</th></tr>
+          </thead>
+          <tbody id="deskBody"></tbody>
+        </table>
+      </div>
+      <p class="hint" id="deskEmpty" hidden>No desks yet. Install the Coral TFN preset to get a complete working desk.</p>
+
+      <div class="grid two" style="margin-top:1rem">
+        <div>
+          <h3 style="font-size:0.95rem;margin:0 0 0.5rem">Publish checklist</h3>
+          <p class="hint">Every blocker must pass before a desk can go live.</p>
+          <div class="row">
+            <label>desk id <input id="deskId" placeholder="select a row" style="min-width:12rem" /></label>
+            <button type="button" class="secondary" id="btnChecklist">Run checklist</button>
+            <button type="button" id="btnPublishDesk">Publish desk</button>
+          </div>
+          <ul class="checklist" id="deskChecklist"></ul>
+        </div>
+        <div>
+          <h3 style="font-size:0.95rem;margin:0 0 0.5rem">Desk summary</h3>
+          <p class="hint">Languages, intents, paths and published versions for the selected desk.</p>
+          <div id="deskSummary" class="row"></div>
+          <pre class="log" id="deskJson" style="max-height:16rem"></pre>
+        </div>
+      </div>
+
+      <div id="deskEditor" hidden style="margin-top:1.25rem">
+        <h3 style="font-size:0.95rem;margin:0 0 0.5rem">Desk configurator</h3>
+        <p class="hint">Edit in English and Hindi. Save draft, then Publish. No JSON required.</p>
+        <div class="tabs" id="deskTabs">
+          <button type="button" class="tab active" data-tab="overview">Overview</button>
+          <button type="button" class="tab" data-tab="prompts">Prompts EN/HI</button>
+          <button type="button" class="tab" data-tab="intents">Intents</button>
+          <button type="button" class="tab" data-tab="matrix">Routing</button>
+          <button type="button" class="tab" data-tab="cx">Call behaviour</button>
+          <button type="button" class="tab" data-tab="sim">Simulator</button>
+        </div>
+        <div class="tab-pane" id="tab-overview">
+          <div class="row">
+            <label>name <input id="edName" style="min-width:16rem" /></label>
+            <label>purpose
+              <select id="edPurpose">
+                <option value="support">support</option>
+                <option value="sales">sales</option>
+                <option value="survey">survey</option>
+                <option value="collections">collections</option>
+                <option value="other">other</option>
+              </select>
+            </label>
+            <label>direction
+              <select id="edDirection">
+                <option value="inbound">inbound</option>
+                <option value="outbound">outbound</option>
+              </select>
+            </label>
+            <label>default language
+              <select id="edDefaultLang">
+                <option value="en-IN">English (en-IN)</option>
+                <option value="hi-IN">हिंदी (hi-IN)</option>
+              </select>
+            </label>
+            <label>voice id <input id="edVoice" placeholder="anushka" /></label>
+          </div>
+        </div>
+        <div class="tab-pane" id="tab-prompts" hidden>
+          <div class="row">
+            <label>prompt
+              <select id="edPromptPick" style="min-width:18rem"></select>
+            </label>
+          </div>
+          <div class="grid two">
+            <label>English
+              <textarea id="edPromptEN" class="prompt-box" spellcheck="true"></textarea>
+            </label>
+            <label>हिंदी
+              <textarea id="edPromptHI" class="prompt-box" spellcheck="true"></textarea>
+            </label>
+          </div>
+        </div>
+        <div class="tab-pane" id="tab-intents" hidden>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>Intent</th><th>English phrases</th><th>हिंदी phrases</th></tr></thead>
+              <tbody id="edIntentBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane" id="tab-matrix" hidden>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>Intent</th><th>Owner</th><th>Queue</th><th>Action</th></tr></thead>
+              <tbody id="edMatrixBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane" id="tab-cx" hidden>
+          <div class="row">
+            <label>barge-in
+              <select id="edBarge"><option value="true">on</option><option value="false">off</option></select>
+            </label>
+            <label>listen while speak
+              <select id="edLWS"><option value="true">on</option><option value="false">off</option></select>
+            </label>
+            <label>silence nudge 1 (ms) <input id="edSil1" type="number" /></label>
+            <label>silence nudge 2 (ms) <input id="edSil2" type="number" /></label>
+            <label>silence hangup (ms) <input id="edSilH" type="number" /></label>
+            <label>ask timeout (ms) <input id="edAskT" type="number" /></label>
+          </div>
+        </div>
+        <div class="tab-pane" id="tab-sim" hidden>
+          <p class="hint">Rehearse a caller without leaving Admin. One utterance per line. Hindi and English both work.</p>
+          <div class="row">
+            <label>open in
+              <select id="edSimLang">
+                <option value="en-IN">English</option>
+                <option value="hi-IN">हिंदी</option>
+              </select>
+            </label>
+            <button type="button" id="btnSimRun">Run simulation</button>
+          </div>
+          <label>caller turns
+            <textarea id="edSimTurns" class="prompt-box" placeholder="I need technical support&#10;IP Phone&#10;cannot make calls&#10;entire system&#10;none&#10;yes"></textarea>
+          </label>
+          <div class="chat" id="edSimChat"></div>
+          <pre class="log" id="edSimJson" style="margin-top:0.5rem;max-height:12rem"></pre>
+        </div>
+        <div class="row" style="margin-top:0.75rem">
+          <button type="button" id="btnSaveDraft">Save draft</button>
+          <span class="hint" id="edDirty" hidden>Unsaved changes</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Connector sandbox</h2>
+      <p class="hint">The desk-skills connectors run in stub mode until a real CRM or ACD is wired. Force a failure here to rehearse the never-invent rules: a failed ticket must never produce a ticket number, and a failed email must never delete a ticket.</p>
+      <div class="row">
+        <label>skill
+          <select id="failSkill">
+            <option value="create_service_complaint">create_service_complaint</option>
+            <option value="send_complaint_email">send_complaint_email</option>
+            <option value="find_open_complaint">find_open_complaint</option>
+            <option value="search_knowledge">search_knowledge</option>
+            <option value="transfer_to_queue">transfer_to_queue</option>
+            <option value="register_sales_enquiry">register_sales_enquiry</option>
           </select>
         </label>
-        <label>profile id <input id="profId" value="cc-sales" /></label>
-        <label>display name <input id="profName" value="CC Sales" /></label>
-        <button type="button" class="secondary" id="btnApplyPreset">Apply preset</button>
+        <label>forced result
+          <select id="failStatus">
+            <option value="">none (healthy)</option>
+            <option value="fail">fail</option>
+            <option value="duplicate">duplicate</option>
+            <option value="timeout">timeout</option>
+            <option value="unavailable">unavailable</option>
+          </select>
+        </label>
+        <button type="button" id="btnSetFailure">Apply</button>
+      </div>
+      <div class="row">
+        <label>agent queue
+          <select id="agentTarget">
+            <option value="sales">sales (Rahul Gupta)</option>
+            <option value="technical_support">technical_support (Arjun Singh Topwal)</option>
+            <option value="service">service (Ritu)</option>
+          </select>
+        </label>
+        <label>availability
+          <select id="agentAvail">
+            <option value="true">available</option>
+            <option value="false">unavailable</option>
+          </select>
+        </label>
+        <button type="button" id="btnSetAgent">Apply</button>
+        <button type="button" class="secondary" id="btnLedger">Refresh ledger</button>
+        <button type="button" class="secondary" id="btnResetLedger">Reset sandbox</button>
+      </div>
+      <div id="ledgerCounts" class="row"></div>
+      <pre class="log" id="ledgerJson" style="max-height:18rem"></pre>
+    </section>
+
+    <div class="grid two" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Tenant properties</h2>
+        <p class="hint">Capacity and retention limits applied per tenant. Retention days drive the purge job; concurrency caps session admission.</p>
+        <div id="propRows"></div>
+        <div class="row">
+          <button type="button" id="btnSaveProps">Save properties</button>
+          <button type="button" class="secondary" id="btnLoadProps">Reload</button>
+        </div>
+        <pre class="log" id="propsJson" style="max-height:12rem"></pre>
+      </section>
+
+      <section class="panel">
+        <h2>Compliance</h2>
+        <p class="hint">Subject erasure requests and the audit of who revealed confidential attributes. Use <code>session:&lt;id&gt;</code> to erase one call.</p>
+        <div class="row">
+          <label>subject_ref <input id="eraseSubject" placeholder="session:… or email:…" style="min-width:14rem" /></label>
+          <label>requested_by <input id="eraseBy" placeholder="dpo" /></label>
+          <button type="button" id="btnErase">Queue erasure</button>
+          <button type="button" class="secondary" id="btnLoadErase">Refresh</button>
+        </div>
+        <div style="overflow:auto;max-height:12rem">
+          <table>
+            <thead><tr><th>Subject</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+            <tbody id="eraseBody"></tbody>
+          </table>
+        </div>
+        <h3 style="font-size:0.9rem;margin:1rem 0 0.35rem">PII access audit</h3>
+        <pre class="log" id="piiJson" style="max-height:10rem"></pre>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Behaviour profiles</h2>
+      <p class="hint">A profile is the session behaviour document (persona, language, clips, skills, voice map). Nothing is pre-seeded in the database — author JSON yourself, then Create + publish. Users pick the profile id when starting a session.</p>
+      <div class="row">
+        <label>profile id <input id="profId" value="" placeholder="my-agent" /></label>
+        <label>display name <input id="profName" value="" placeholder="My agent" /></label>
+        <button type="button" class="secondary" id="btnBlankProfile">Load blank template</button>
         <button type="button" id="btnPublish">Create + publish</button>
         <button type="button" class="secondary" id="btnListProfiles">List profiles</button>
       </div>
-      <textarea id="profDoc" spellcheck="false"></textarea>
+      <textarea id="profDoc" spellcheck="false" placeholder="Profile JSON…"></textarea>
       <pre class="log" id="profilesJson" style="margin-top:0.75rem"></pre>
+    </section>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Knowledge base</h2>
+      <p class="hint">Upload text into a collection for Knowledge / ingest. Status becomes <code>ready</code> when chunks are stored.</p>
+      <div class="row">
+        <label>collection <input id="kbCollection" value="default" /></label>
+        <label>uri (optional) <input id="kbUri" placeholder="file://… or https://…" style="min-width:16rem" /></label>
+        <button type="button" id="btnKbUpload">Upload text</button>
+        <button type="button" class="secondary" id="btnKbGet">Get by id</button>
+      </div>
+      <label>document text
+        <textarea id="kbText" spellcheck="false" placeholder="Paste knowledge text (paragraphs separated by blank lines become chunks)…"></textarea>
+      </label>
+      <div class="row">
+        <label>document id <input id="kbId" placeholder="after upload" style="min-width:18rem" /></label>
+      </div>
+      <pre class="log" id="kbJson"></pre>
     </section>
   </div>
   <script src="/shared/api.js"></script>
-  <script src="./app.js"></script>
+  <script src="/admin/app.js"></script>
 </body>
 </html>

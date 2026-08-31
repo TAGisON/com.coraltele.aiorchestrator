@@ -18,10 +18,11 @@ go run ./cmd/aiorchestrator
 
 Boot applies **schema only**. Nothing is pre-seeded.
 
-1. **Admin** → Save tenant engines (fakes offline, or Sarvam + credential) → Create + publish a profile.
-2. Confirm readiness checklist is green (`GET /v1/platform/status` → `ready_for_sessions: true`).
-3. **User** → Start session → Send turns → Stop.
-4. **Supervisor** → Open session → transcript / audit / analytics; disposition appears after postcall.
+1. **Admin** → Save tenant engines (fakes offline, or Sarvam + credential).
+2. **Admin → Contact desks** → **Install Coral TFN preset** → edit prompts in English/Hindi if needed → **Publish desk**.
+3. Confirm readiness checklist is green (`GET /v1/platform/status` → `ready_for_sessions: true`).
+4. **User → Text call** → pick `coral-tfn`, open in English or हिंदी, start a call. Voice call uses the published `coral-tfn` profile.
+5. **Supervisor** → Open session / inspect attributes, handoff, disposition.
 
 ## Platform status (abnormal conditions)
 

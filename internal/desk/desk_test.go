@@ -49,6 +49,23 @@ func TestPresetCoversScriptRoutingMatrix(t *testing.T) {
 	}
 }
 
+func TestCoralProductKnowledgeIsBilingual(t *testing.T) {
+	text := desk.CoralProductKnowledge()
+	if !strings.Contains(text, "IP Phone") || !strings.Contains(text, "Call Center") {
+		t.Fatal("English product blurbs missing")
+	}
+	hasDevanagari := false
+	for _, r := range text {
+		if r >= 0x0900 && r <= 0x097F {
+			hasDevanagari = true
+			break
+		}
+	}
+	if !hasDevanagari {
+		t.Fatal("Hindi product knowledge must include Devanagari")
+	}
+}
+
 func TestPresetPromptsExistInBothLanguages(t *testing.T) {
 	d := desk.PresetCoralTFN("default")
 	for id := range d.Prompts {
