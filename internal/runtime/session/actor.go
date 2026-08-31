@@ -93,12 +93,18 @@ type Actor struct {
 	Memory      *Memory
 	Attachments []Attachment
 
-	mu        sync.Mutex
-	state     string
-	terminal  string // Completed | Cancelled | Failed when Terminal
-	cancel    context.CancelFunc
-	done      chan struct{}
-	drainOnce sync.Once
+	mu                  sync.Mutex
+	state               string
+	terminal            string // Completed | Cancelled | Failed when Terminal
+	cancel              context.CancelFunc
+	done                chan struct{}
+	drainOnce           sync.Once
+	detectedLanguage    string
+	activeLanguage      string
+	languageLocked      bool
+	flushListenPartials bool
+	// LanguagePersist is optional durability hook (detected, active) after lock/switch.
+	LanguagePersist func(detected, active string)
 
 	feeders []port.Feeder
 	sinks   []port.Sink

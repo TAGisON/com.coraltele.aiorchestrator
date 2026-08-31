@@ -183,6 +183,20 @@ func (m *Memory) UpdateSessionState(ctx context.Context, id, state string) (Sess
 	return s, nil
 }
 
+func (m *Memory) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	s.DetectedLanguage = detected
+	s.ActiveLanguage = active
+	s.UpdatedAt = time.Now().UTC()
+	m.sessions[id] = s
+	return s, nil
+}
+
 func (m *Memory) GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

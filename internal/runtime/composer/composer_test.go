@@ -121,3 +121,60 @@ func TestComposer_NoGatewayImport(t *testing.T) {
 		t.Fatalf("state %s", talk.State())
 	}
 }
+
+func TestComposer_OnListenFinal_LocksAndConsumesLanguage(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 1}
+	th := &fake.Think{}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	actor := &session.Actor{}
+	talk, err := composer.NewTalk(talkProfile(), reg, bus.New(), session.NewMemory(), "live", "sess-lang")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.BindActor(actor)
+	if err := talk.OnListenFinal(context.Background(), port.ListenFinal{
+		Text: "namaste", Language: "hi-IN", Confidence: 0.9,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if actor.ActiveLanguage() != "hi-IN" {
+		t.Fatalf("active=%q", actor.ActiveLanguage())
+	}
+	if spk.LastLanguage != "hi-IN" {
+		t.Fatalf("Speak Language=%q want hi-IN", spk.LastLanguage)
+	}
+	if len(th.LastMessages) == 0 || th.LastMessages[0].Role != "system" {
+		t.Fatalf("want system language instruction, got %+v", th.LastMessages)
+	}
+	if th.LastMessages[0].Content != "Respond in language: hi-IN" {
+		t.Fatalf("system=%q", th.LastMessages[0].Content)
+	}
+	// second final different language — no flip; Speak still hi-IN
+	spk.LastLanguage = ""
+	if err := talk.OnListenFinal(context.Background(), port.ListenFinal{
+		Text: "hello", Language: "en-IN", Confidence: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if actor.ActiveLanguage() != "hi-IN" {
+		t.Fatal("ambient re-detect flipped")
+	}
+	if spk.LastLanguage != "hi-IN" {
+		t.Fatalf("Speak after ambient=%q", spk.LastLanguage)
+	}
+}

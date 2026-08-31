@@ -28,8 +28,10 @@ const (
 	DefaultChatModel = "sarvam-105b-conversations"
 
 	DefaultSTTModel    = "saaras:v3"
-	DefaultSTTLanguage = "en-IN"
+	DefaultSTTLanguage = "en-IN" // TTS / explicit callers only — STT empty/auto uses unknown (LANGUAGE_POLICY)
 	DefaultSTTMode     = "transcribe"
+	// STTLanguageUnknown is Sarvam auto-detect when LanguageHint is empty or "auto".
+	STTLanguageUnknown = "unknown"
 
 	DefaultTTSModel   = "bulbul:v3"
 	DefaultTTSSpeaker = "shubh" // Bulbul v3 default voice per Sarvam docs
@@ -47,6 +49,17 @@ type Config struct {
 // Configured reports whether a non-empty API key is present.
 func (c Config) Configured() bool {
 	return strings.TrimSpace(c.APIKey) != ""
+}
+
+// STTLanguageCode maps Listen LanguageHint to Sarvam language_code / language-code.
+// Empty or case-insensitive "auto" → unknown (auto-detect). Concrete BCP-47 passes through.
+// Does not substitute DefaultSTTLanguage (en-IN).
+func STTLanguageCode(hint string) string {
+	h := strings.TrimSpace(hint)
+	if h == "" || strings.EqualFold(h, "auto") {
+		return STTLanguageUnknown
+	}
+	return h
 }
 
 // LoadConfig reads SARVAM_API_KEY and optional .agent/secrets.local.json overrides.

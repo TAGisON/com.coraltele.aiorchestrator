@@ -104,7 +104,7 @@ Session create resolves tenant engines → capability-checks each gateway → pe
 
 ### `GET /v1/sessions/{id}`
 
-Returns `state` (`Created`|`Attached`|`Running`|`Draining`|`Completed`|`Cancelled`|`Failed`), pinned version, clock, `owner_instance`, `gateway_binding` (when set), error if Failed.
+Returns `state` (`Created`|`Attached`|`Running`|`Draining`|`Completed`|`Cancelled`|`Failed`), pinned version, clock, `owner_instance`, `gateway_binding` (when set), `detected_language`, `active_language` (empty until lock/PATCH — `LANGUAGE_POLICY.md`), error if Failed.
 
 ### `POST /v1/sessions/{id}/inject`
 
@@ -114,11 +114,13 @@ Returns `state` (`Created`|`Attached`|`Running`|`Draining`|`Completed`|`Cancelle
 
 ### `PATCH /v1/sessions/{id}/profile-fields`
 
-Only keys in profile `hot_swap_allowed`:
+Only keys in profile `hot_swap_allowed`. Contact Agent language switch (cc-2):
 
 ```json
 { "language.primary": "hi-IN" }
 ```
+
+Requires `language.mid_call_switch: true`. Sets session `active_language`; next Listen hint uses the new value (`LANGUAGE_POLICY.md`, RUNTIME §9).
 
 ### `POST /v1/sessions/{id}/stop`
 

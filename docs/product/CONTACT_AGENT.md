@@ -41,8 +41,9 @@ At create, a Contact Agent session carries at least:
 - `gateway_binding` from tenant engines (`SYSTEM_ENGINES.md`)
 - Clock (`live` for Talk)
 - Caller / metadata as supplied by Coral
+- `detected_language` / `active_language` (empty until first confident Listen lock or operator PATCH — see `LANGUAGE_POLICY.md`)
 
-Later phases add `detected_language` / `active_language` and voice resolution — not invented here.
+Voice resolution lands in **cc-3**.
 
 ---
 

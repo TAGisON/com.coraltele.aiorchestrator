@@ -64,6 +64,17 @@ func TestMigrationSQL_HasPhaseDKBTables(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasCCLanguagePolicy(t *testing.T) {
+	body, err := os.ReadFile("migrations/005_cc_language_policy.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "detected_language") || !strings.Contains(s, "active_language") {
+		t.Fatal("migration missing session language columns")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

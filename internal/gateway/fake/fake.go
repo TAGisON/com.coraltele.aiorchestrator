@@ -101,6 +101,7 @@ type Speak struct {
 	FrameCount      int           // frames to emit; 0 = 1 (default). >1 for barge-in tests.
 	InterFrameDelay time.Duration // pause between frames (barge-in window)
 	CancelCalls     atomic.Int64  // tiny test hook
+	LastLanguage    string        // last SpeakRequest.Language (cc-2 tests)
 }
 
 func (s *Speak) ID() port.GatewayID { return IDSpeak }
@@ -110,6 +111,7 @@ func (s *Speak) Capabilities() port.Capability {
 }
 
 func (s *Speak) Speak(ctx context.Context, req port.SpeakRequest) (port.SpeakStream, error) {
+	s.LastLanguage = req.Language
 	nFrames := s.FrameCount
 	if nFrames <= 0 {
 		nFrames = 1
@@ -201,7 +203,9 @@ func (s *speakStream) Cancel(ctx context.Context) error {
 
 // --- Think ---
 
-type Think struct{}
+type Think struct {
+	LastMessages []port.ChatMessage // last Complete messages (cc-2 language instruction tests)
+}
 
 func (t *Think) ID() port.GatewayID { return IDThink }
 
@@ -213,6 +217,7 @@ func (t *Think) Complete(ctx context.Context, req port.ThinkRequest) (port.Think
 	if err := ctx.Err(); err != nil {
 		return port.ThinkResult{}, &port.GatewayError{Code: port.CodeCancelled, Message: "cancelled", Cause: err}
 	}
+	t.LastMessages = append([]port.ChatMessage(nil), req.Messages...)
 	out := "ok"
 	if len(req.Messages) > 0 {
 		out = "echo: " + req.Messages[len(req.Messages)-1].Content

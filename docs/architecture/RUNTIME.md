@@ -199,10 +199,12 @@ A gateway must not: choose the next mode, run RAG, own barge-in policy, or read 
 
 | Profile setting | Runtime |
 |---|---|
-| `auto_detect` | First utterance → Listen gateway or detect step → `session.detected_language` |
-| `mid_call_switch` | Control API hot field → restart Listen with new hint → flush partial STT |
+| `auto_detect` | First confident Listen final → lock `session.detected_language` + `active_language` (see `docs/product/LANGUAGE_POLICY.md`); ambient re-detect ignored after lock |
+| `mid_call_switch` | Control API hot field (`PATCH …/profile-fields` `language.primary`) → set `active_language` → restart Listen with new hint → flush partial STT |
 | `one_way` | Translate router on outbound text (captions or pre-Speak) |
 | `two_way` | Dual attachments; parallel Listen/Speak/Translate chains per leg |
+
+Think + Speak consume `active_language` after lock. Contact Agent defaults: `LANGUAGE_POLICY.md`.
 
 ---
 

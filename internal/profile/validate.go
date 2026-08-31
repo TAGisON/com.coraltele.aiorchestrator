@@ -27,8 +27,13 @@ type Document struct {
 		Talk   bool `json:"talk"`
 	} `json:"modes"`
 	Language struct {
-		Behaviour string `json:"behaviour"`
+		Behaviour     string   `json:"behaviour"`
+		Primary       string   `json:"primary"`
+		Allowed       []string `json:"allowed"`
+		AutoDetect    bool     `json:"auto_detect"`
+		MidCallSwitch bool     `json:"mid_call_switch"`
 	} `json:"language"`
+	HotSwapAllowed []string `json:"hot_swap_allowed"`
 	Grounding struct {
 		Required bool `json:"required"`
 	} `json:"grounding"`

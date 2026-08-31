@@ -19,6 +19,7 @@ type Repository interface {
 	GetSession(ctx context.Context, id string) (Session, error)
 	ListSessions(ctx context.Context, limit int) ([]Session, error)
 	UpdateSessionState(ctx context.Context, id, state string) (Session, error)
+	UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error)
 
 	GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error)
 	UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error)

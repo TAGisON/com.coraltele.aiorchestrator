@@ -44,10 +44,10 @@ modes:
 
 language:
   behaviour: none                   # none | captions | one_way | two_way
-  primary: en-IN
+  primary: en-IN                    # omit/empty when auto_detect (CC default)
   allowed: [en-IN, hi-IN]
-  auto_detect: true
-  mid_call_switch: true
+  auto_detect: true                 # Contact Agent default true; no forced primary
+  mid_call_switch: true             # required for PATCH language.primary
 
 grounding:
   type: document_kb                 # none | document_kb | template | graph | playbook
@@ -191,6 +191,7 @@ PSTN paths often use **8 kHz**; wideband and meeting paths use **16 kHz** or hig
 - Gateway ids in routers must exist in the process registry (or tenant gateway table).  
 - Live clock: every selected Listen/Speak provider must advertise `streaming`.
 - **`family: contact-agent`:** do **not** require profile-level `routers.listen|think|speak.providers` when tenant engines are configured (env or `tenant_engines` row). Warn if profile lists conflict with tenant engines.
+- **Contact Agent language:** default `language.auto_detect: true`; do not force `primary` when auto-detect is on (`docs/product/LANGUAGE_POLICY.md`).
 
 ---
 

@@ -38,7 +38,9 @@ func (s *Store) ListSessions(ctx context.Context, limit int) ([]Session, error) 
 	rows, err := s.pool.Query(ctx, `
 SELECT id, COALESCE(tenant_id,''), profile_id, profile_version, clock, state,
        COALESCE(owner_instance,''), canonical_sample_rate_hz, COALESCE(coral_user_id,''),
-       caller, recording_ref, metadata, gateway_binding, created_at, updated_at
+       caller, recording_ref, metadata, gateway_binding,
+       COALESCE(detected_language,''), COALESCE(active_language,''),
+       created_at, updated_at
 FROM session
 ORDER BY created_at DESC
 LIMIT $1
@@ -55,7 +57,9 @@ LIMIT $1
 		if err := rows.Scan(
 			&sess.ID, &sess.TenantID, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State,
 			&sess.OwnerInstance, &sess.CanonicalSampleRateHz, &sess.CoralUserID,
-			&sess.Caller, &rec, &sess.Metadata, &binding, &sess.CreatedAt, &sess.UpdatedAt,
+			&sess.Caller, &rec, &sess.Metadata, &binding,
+			&sess.DetectedLanguage, &sess.ActiveLanguage,
+			&sess.CreatedAt, &sess.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

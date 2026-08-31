@@ -73,6 +73,9 @@ type Talk struct {
 	Session  port.SessionID
 	TenantID string
 	Rate     port.SampleRateHz
+	// Actor is optional session language surface (cc-2). When set, Listen finals lock language
+	// and Speak/Think consume active_language.
+	Actor *session.Actor
 
 	Sink *SinkBuffer
 	Path *thinkpath.Path
@@ -116,6 +119,14 @@ func NewTalk(doc profile.Document, reg port.Registry, b *bus.Bus, mem *session.M
 		state: Listening,
 	}
 	return t, nil
+}
+
+// BindActor wires session language lock + Think/Speak active_language consumption.
+func (t *Talk) BindActor(a *session.Actor) {
+	t.Actor = a
+	if t.Path != nil && a != nil {
+		t.Path.ActiveLanguage = a.ActiveLanguage
+	}
 }
 
 // State returns the current turn state.
@@ -182,6 +193,18 @@ func (t *Talk) EndCapture(ctx context.Context, userText string) error {
 		}
 	}
 	return t.runThinkSpeak(ctx, userText)
+}
+
+// OnListenFinal applies language lock (when Actor bound) then runs a Talk turn.
+func (t *Talk) OnListenFinal(ctx context.Context, final port.ListenFinal) error {
+	if t.Actor != nil {
+		t.Actor.OnListenFinal(final)
+		if t.Path != nil {
+			t.Path.ActiveLanguage = t.Actor.ActiveLanguage
+		}
+	}
+	t.setState(Capturing)
+	return t.runThinkSpeak(ctx, final.Text)
 }
 
 // InjectFinal is a lab helper: treat text as STT final and run a turn from Listening.
@@ -281,11 +304,16 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 		t.setState(Listening)
 		return err
 	}
+	lang := ""
+	if t.Actor != nil {
+		lang = t.Actor.ActiveLanguage()
+	}
 	speakCtx, cancel := context.WithCancel(ctx)
 	stream, err := speakGW.Speak(speakCtx, port.SpeakRequest{
 		SessionID:  t.Session,
 		Text:       text,
 		SampleRate: t.Rate,
+		Language:   lang,
 	})
 	if err != nil {
 		cancel()

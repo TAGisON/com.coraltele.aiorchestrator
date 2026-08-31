@@ -106,7 +106,7 @@ func main() {
 		EdgeTokenSecret: []byte(envOr("EDGE_TOKEN_SECRET", "lab-edge-hmac-change-me")),
 	}
 	mgr := session.NewManager(reg)
-	rt := &control.SessionRuntime{Mgr: mgr}
+	rt := &control.SessionRuntime{Mgr: mgr, Repo: repo}
 	srv := control.NewWithRuntime(repo, reg, rt, cfg, web.LabFS)
 	srv.SetLabExtras(control.LabExtras{
 		StoreBackend:     storeBackend,

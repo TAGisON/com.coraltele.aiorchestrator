@@ -21,10 +21,14 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
-// Runtime is the minimal session-actor surface Control needs (Phase C).
+// Runtime is the minimal session-actor surface Control needs (Phase C + cc-2 language).
 type Runtime interface {
 	StartSession(ctx context.Context, p RuntimeStart) error
 	StopSession(ctx context.Context, sessionID, reason string) (terminalState string, err error)
+	// SwitchLanguage sets session active_language (operator PATCH). Optional until wired.
+	SwitchLanguage(sessionID, primary string) error
+	// Languages returns live actor language state when running.
+	Languages(sessionID string) (detected, active string, ok bool)
 }
 
 // RuntimeStart is create-time actor spawn input.
@@ -102,6 +106,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/profiles/{id}/versions", s.handlePublishProfile)
 	s.mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}", s.handleGetSession)
+	s.mux.HandleFunc("PATCH /v1/sessions/{id}/profile-fields", s.handlePatchProfileFields)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
 	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
@@ -433,6 +438,14 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		"state":                    sess.State,
 		"owner_instance":           sess.OwnerInstance,
 		"canonical_sample_rate_hz": sess.CanonicalSampleRateHz,
+		"detected_language":        sess.DetectedLanguage,
+		"active_language":          sess.ActiveLanguage,
+	}
+	if s.rt != nil {
+		if det, act, ok := s.rt.Languages(sess.ID); ok {
+			out["detected_language"] = det
+			out["active_language"] = act
+		}
 	}
 	if sess.GatewayBinding != nil {
 		out["gateway_binding"] = sess.GatewayBinding

@@ -76,6 +76,8 @@ type Path struct {
 	Session  port.SessionID
 	// ConfirmedSkills lists skill names already confirmed (confirm stub).
 	ConfirmedSkills map[string]bool
+	// ActiveLanguage returns session active_language when locked (cc-2). Nil/empty → no instruction.
+	ActiveLanguage func() string
 }
 
 // Run executes the locked order for one inbound utterance (or playback transcript).
@@ -178,9 +180,16 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 		return res, fmt.Errorf("think gateway not resolved")
 	}
 	skills := skillDescriptors(p.Doc)
+	msgs := p.Mem.Snapshot()
+	if p.ActiveLanguage != nil {
+		if lang := strings.TrimSpace(p.ActiveLanguage()); lang != "" {
+			instr := "Respond in language: " + lang
+			msgs = append([]port.ChatMessage{{Role: "system", Content: instr}}, msgs...)
+		}
+	}
 	tr, err := p.Deps.Think.Complete(ctx, port.ThinkRequest{
 		SessionID:       p.Session,
-		Messages:        p.Mem.Snapshot(),
+		Messages:        msgs,
 		GroundingChunks: chunks,
 		Skills:          skills,
 		Stream:          false,

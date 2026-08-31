@@ -2,6 +2,12 @@
   "id": "job-contact-agent",
   "modes": { "listen": true, "speak": true, "think": true },
   "audio": { "canonical_sample_rate_hz": 16000 },
+  "language": {
+    "behaviour": "none",
+    "auto_detect": true,
+    "mid_call_switch": true
+  },
+  "hot_swap_allowed": ["language.primary"],
   "routers": {
     "listen": { "providers": ["fake-listen"] },
     "speak": { "providers": ["fake-speak"] },

@@ -92,10 +92,7 @@ func (g *Gateway) RecognizeBatch(ctx context.Context, req port.ListenRequest, pc
 	}
 	_ = w.WriteField("model", sarvam.DefaultSTTModel)
 	_ = w.WriteField("mode", sarvam.DefaultSTTMode)
-	lang := req.LanguageHint
-	if lang == "" {
-		lang = sarvam.DefaultSTTLanguage
-	}
+	lang := sarvam.STTLanguageCode(req.LanguageHint)
 	_ = w.WriteField("language_code", lang)
 	_ = w.WriteField("input_audio_codec", "wav")
 	if err := w.Close(); err != nil {
@@ -149,10 +146,7 @@ func (g *Gateway) OpenStream(ctx context.Context, req port.ListenRequest) (port.
 	if rate != 8000 && rate != 16000 {
 		wsRate = 16000
 	}
-	lang := req.LanguageHint
-	if lang == "" {
-		lang = sarvam.DefaultSTTLanguage
-	}
+	lang := sarvam.STTLanguageCode(req.LanguageHint)
 
 	q := url.Values{}
 	q.Set("model", sarvam.DefaultSTTModel)
