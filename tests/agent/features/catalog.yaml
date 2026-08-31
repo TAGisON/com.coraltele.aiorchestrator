@@ -224,6 +224,13 @@ features:
     packages: [./internal/store, ./internal/control]
     evidence: [postcall_job]
 
+  - id: F-validation-v1
+    area: E-observe
+    status: must_test
+    title: Validation V1 Control memory audit harness
+    packages: [./internal/validation]
+    evidence: [audit_event, analytics_event, disposition]
+
   - id: F-sarvam-stt
     area: F-vendor
     status: must_test

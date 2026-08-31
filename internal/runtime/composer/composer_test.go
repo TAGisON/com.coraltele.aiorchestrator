@@ -310,6 +310,68 @@ func TestComposer_ClipPathSkipsLLM(t *testing.T) {
 	}
 }
 
+func TestComposer_AnswerCallSpeaksGreetingNoUserTurn(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 1}
+	th := &fake.Think{}
+	for _, it := range []port.Registration{
+		{ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th},
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc := talkProfile()
+	doc.Rules = []profile.Rule{{
+		ID: "disclosure", Phase: "pre_speak_first", Action: "inject_text",
+		Text: "This call may use AI.",
+	}}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"greeting-en": {Text: "Welcome to Coral.", When: map[string]any{"regex": `(?i)hi`}},
+		},
+	}
+	memStore := store.NewMemory()
+	_ = memStore.CreateSession(context.Background(), store.Session{ID: "sess-answer", TenantID: "t1", ProfileID: "talk", State: store.StateRunning})
+	obs := &observe.Observer{Repo: memStore, Meta: observe.SessionMeta{
+		SessionID: "sess-answer", TenantID: "t1", ProfileID: "talk", ProfileVersion: 1,
+	}}
+	talk, err := composer.NewTalk(doc, reg, bus.New(), session.NewMemory(), "live", "sess-answer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.Obs = obs
+	spoken, err := talk.AnswerCall(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "This call may use AI. Welcome to Coral."
+	if spoken != want {
+		t.Fatalf("spoken=%q want %q", spoken, want)
+	}
+	if spk.LastText != want {
+		t.Fatalf("Speak text=%q", spk.LastText)
+	}
+	if th.CompleteCalls.Load() != 0 {
+		t.Fatal("Think must not run on answer")
+	}
+	turns, err := memStore.ListTranscriptTurns(context.Background(), "sess-answer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 || turns[0].Role != store.RoleAssistant {
+		t.Fatalf("want single assistant turn, got %#v", turns)
+	}
+	// idempotent
+	again, err := talk.AnswerCall(context.Background())
+	if err != nil || again != "" {
+		t.Fatalf("second AnswerCall spoken=%q err=%v", again, err)
+	}
+}
+
 func TestComposer_ThinkDownClipEscalateNoVendorSwitch(t *testing.T) {
 	reg := router.NewMemRegistry()
 	spk := &fake.Speak{FrameCount: 1}

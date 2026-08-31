@@ -1,26 +1,22 @@
-﻿# superseded: use per-feature phases F-*
-id: validation-v1
-name: Product validation wave â€” Control + files + audit (no FS)
-pipeline: product-validation
-platform_first: post Aâ€“F validation
+﻿id: validation-v1
+name: Product validation wave — Control + memory + audit (no FS)
+pipeline: validation-v1
+platform_first: post A–F validation
 exit_criteria:
-  - tests/agent/FEATURES.md + features/catalog.yaml list every product feature to test
-  - Every catalog must_test feature has scenarios/F-*.yaml with what/how/steps
-  - Fixtures for job families under fixtures/profiles/ without secrets
-  - Run-FeatureScenarios.ps1 (or equivalent) records pass/fail/skip for all must_test ids
-  - go test ./... green; audit-report covers E-observe evidence
-  - deferred (FS, TTS-Engine, interpret) and optional_live explicitly skipped with reason
-  - test-reviewer confirms no silent drops from FEATURES.md; summarizer closes wave
+  - .agent/work/validation-v1/scenarios.md lists Tier A (V1-A01..A08) + audit assertion table
+  - go test ./internal/validation -count=1 green (Tier A); Tier B skip without key
+  - audit-report.md has zero blocking gaps vs assertion table
+  - summary.md records V1 pass/fail; residual risks named
+  - FreeSWITCH / Postgres durable audit deferred (Tier C)
 out_of_scope:
-  - FreeSWITCH / call-server E2E (deferred until human provides endpoint)
-  - Product feature coding outside validation assets (use coral-phase for that)
-  - Committing API keys
+  - FreeSWITCH / call-server E2E
+  - Product feature coding outside validation assets (use coral-phase)
+  - Committing API keys or .agent/secrets.local.json
 docs:
-  - tests/agent/FEATURES.md
-  - tests/agent/features/catalog.yaml
-  - tests/agent/MANIFEST.yaml
-  - tests/agent/README.md
-  - docs/architecture/CONTROL_API.md
   - docs/VALIDATION_PIPELINE.md
-depends_on: coral-phase Aâ€“F complete (or equivalent surface)
-
+  - docs/architecture/CONTROL_API.md
+  - docs/architecture/ANALYTICS_AND_POSTCALL.md
+  - docs/architecture/OPERATIONS.md
+  - tests/agent/MANIFEST.yaml
+  - tests/agent/FEATURES.md
+depends_on: coral-phase A–F complete (or equivalent surface)

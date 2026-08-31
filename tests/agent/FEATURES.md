@@ -84,6 +84,7 @@ Testers (scenario-planner → … → test-summarizer) **must** cover every feat
 | `F-audit-append` | Audit append-only | Session/turn terminal writes audit_event rows | store_e + control phase_e | audit kinds present | must_test |
 | `F-analytics-events` | Analytics event catalog | session_started/completed/failed, turn, hop_latency, etc. as implemented | store_e + phase_e | analytics_event rows | must_test |
 | `F-postcall-enqueue` | Postcall on terminal | postcall_job enqueued on session terminal / playback complete | store_e + phase_e | postcall_job row | must_test |
+| `F-validation-v1` | Validation V1 umbrella harness | Tier A V1-A01..A08 Control+memory+audit+SSE+edge-gone+disposition | `go test ./internal/validation` | audit + analytics + disposition | must_test |
 
 ---
 

@@ -92,6 +92,7 @@ type Talk struct {
 	thinkCancel  context.CancelFunc
 	lastBargeIn  bool
 	cancelCount  int
+	answered     bool
 }
 
 // NewTalk builds a composer. VAD may be nil (defaults to energy VAD when clock enables it).
@@ -213,6 +214,69 @@ func (t *Talk) OnListenFinal(ctx context.Context, final port.ListenFinal) error 
 func (t *Talk) InjectFinal(ctx context.Context, userText string) error {
 	t.setState(Capturing)
 	return t.runThinkSpeak(ctx, userText)
+}
+
+// AnswerCall speaks the opening (pre_speak_first inject_text + greeting clip) without Think or a user turn.
+// Idempotent: a second call returns ("", nil).
+func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
+	t.mu.Lock()
+	if t.answered {
+		t.mu.Unlock()
+		return "", nil
+	}
+	t.answered = true
+	t.mu.Unlock()
+
+	var parts []string
+	for _, rule := range t.Doc.Rules {
+		if rule.Phase == "pre_speak_first" && rule.Action == "inject_text" {
+			if s := strings.TrimSpace(rule.Text); s != "" {
+				parts = append(parts, s)
+			}
+		}
+	}
+	if g := openingGreeting(t.Doc); g != "" {
+		parts = append(parts, g)
+	}
+	spoken = strings.TrimSpace(strings.Join(parts, " "))
+	if spoken == "" {
+		return "", nil
+	}
+	if t.Mem != nil {
+		t.Mem.Append("assistant", spoken)
+	}
+	if err := t.speak(ctx, spoken); err != nil {
+		return spoken, err
+	}
+	if t.Obs != nil {
+		t.Obs.AppendAssistantOnly(ctx, spoken)
+	}
+	if t.Bus != nil {
+		t.Bus.PublishEvent(bus.Event{Kind: "turn.completed", Data: map[string]any{
+			"outcome":       "answer",
+			"response_tier": "clip",
+		}})
+	}
+	return spoken, nil
+}
+
+func openingGreeting(doc profile.Document) string {
+	if doc.Response == nil || doc.Response.Clips == nil {
+		return ""
+	}
+	if u, ok := doc.Response.Clips["greeting-en"]; ok {
+		if s := strings.TrimSpace(u.Text); s != "" {
+			return s
+		}
+	}
+	for id, u := range doc.Response.Clips {
+		if strings.HasPrefix(strings.ToLower(id), "greeting") {
+			if s := strings.TrimSpace(u.Text); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {

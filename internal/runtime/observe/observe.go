@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
@@ -169,6 +170,26 @@ func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, respo
 		if _, err := o.Repo.AppendTranscriptTurn(ctx, row); err != nil {
 			applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", row.Role, "err", err)
 		}
+	}
+}
+
+// AppendAssistantOnly writes a single assistant transcript turn (call answer / opening).
+func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string) {
+	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
+		return
+	}
+	if strings.TrimSpace(responseText) == "" {
+		return
+	}
+	turnID := newTurnID()
+	_, err := o.Repo.AppendTranscriptTurn(ctx, store.TranscriptTurn{
+		SessionID: o.Meta.SessionID,
+		Role:      store.RoleAssistant,
+		Text:      responseText,
+		TurnID:    turnID,
+	})
+	if err != nil {
+		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleAssistant, "err", err)
 	}
 }
 

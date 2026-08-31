@@ -20,7 +20,8 @@ limits:
 
 # Role/skill/artifact maps live in .agent/pipelines/<name>.json
 # - coral-phase: planner → coder → reviewer → summarizer
-# - product-validation: scenario-planner → … → test-summarizer
+# - product-validation: scenario-planner → … → test-summarizer (per-feature pause)
+# - validation-v1: same roles; single wave phase validation-v1 (Control+memory Tier A)
 
 docs:
   platform_first: docs/architecture/PLATFORM_FIRST.md

@@ -64,6 +64,26 @@ On summarizer **pass**: trail is copied into the evidence worktree and committed
 
 ---
 
+## Validation V1 wave (Control + memory umbrella)
+
+Single-phase pipeline for lab product+audit proof (no FS):
+
+```powershell
+.\tools\agent-runner\agent.ps1 start -Pipeline validation-v1 -From validation-v1
+```
+
+| Piece | Path |
+|---|---|
+| Phase | `.agent/phases/validation-v1.yaml` |
+| Pipeline | `.agent/pipelines/validation-v1.json` |
+| Scenarios | `.agent/work/validation-v1/scenarios.md` |
+| Harness | `go test ./internal/validation` / `scripts/validation/Run-ValidationV1.ps1` |
+| Feature id | `F-validation-v1` in `tests/agent/` |
+
+Ops detail: `docs/architecture/OPERATIONS.md` §11.
+
+---
+
 ## Adding FS later
 
 1. Human provides call-server endpoint  

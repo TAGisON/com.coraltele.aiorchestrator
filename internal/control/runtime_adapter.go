@@ -91,6 +91,22 @@ func (r *SessionRuntime) InjectText(ctx context.Context, sessionID, text string)
 	return talk.InjectFinal(ctx, text)
 }
 
+// AnswerCall speaks the profile opening without Think / user text.
+func (r *SessionRuntime) AnswerCall(ctx context.Context, sessionID string) (string, error) {
+	if r == nil || r.Mgr == nil {
+		return "", fmt.Errorf("runtime not configured")
+	}
+	a, ok := r.Mgr.Get(sessionID)
+	if !ok {
+		return "", fmt.Errorf("session actor not running")
+	}
+	talk, err := r.talkFor(a)
+	if err != nil {
+		return "", err
+	}
+	return talk.AnswerCall(ctx)
+}
+
 func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -34,6 +34,7 @@ Base path: `/v1` (versioned so vendors never force a breaking API).
 | `GET` | `/v1/sessions/{id}` | Status including `gateway_binding` |
 | `POST` | `/v1/sessions/{id}/attachments` | Bind feeder/sink metadata (non-FS) |
 | `POST` | `/v1/sessions/{id}/inject` | Text in (Speak / push) |
+| `POST` | `/v1/sessions/{id}/answer` | Call answered — speak profile opening (no user turn) |
 | `PATCH` | `/v1/sessions/{id}/profile-fields` | Hot-swap allowed fields only |
 | `POST` | `/v1/sessions/{id}/stop` | Drain → terminal |
 | `GET` | `/v1/sessions/{id}/events` | SSE event stream |

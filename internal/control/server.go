@@ -31,6 +31,8 @@ type Runtime interface {
 	Languages(sessionID string) (detected, active string, ok bool)
 	// InjectText runs a lab Talk turn from text (CONTROL_API POST …/inject).
 	InjectText(ctx context.Context, sessionID, text string) error
+	// AnswerCall speaks the profile opening (call answered) without a user turn.
+	AnswerCall(ctx context.Context, sessionID string) (spoken string, err error)
 }
 
 // RuntimeStart is create-time actor spawn input.
@@ -117,6 +119,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/sessions/{id}", s.handleGetSession)
 	s.mux.HandleFunc("PATCH /v1/sessions/{id}/profile-fields", s.handlePatchProfileFields)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/inject", s.handleInject)
+	s.mux.HandleFunc("POST /v1/sessions/{id}/answer", s.handleAnswer)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/transcript", s.handleGetTranscript)

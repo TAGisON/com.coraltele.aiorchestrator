@@ -102,3 +102,75 @@ func TestInject_ClipTurnAndTranscript(t *testing.T) {
 		t.Fatalf("assistant turn %#v", tr.Turns[1])
 	}
 }
+
+func TestAnswer_GreetingBeforeInject(t *testing.T) {
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	if err := coraltransfer.Register(reg, nil); err != nil {
+		t.Fatal(err)
+	}
+	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
+	mgr := session.NewManager(reg)
+	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr, Repo: mem}, control.Config{OwnerInstance: "ans"}, nil)
+
+	createProfile(t, srv, "cc-answer")
+	publishOK(t, srv, "cc-answer", `{
+  "id":"cc-answer",
+  "metadata":{"family":"contact-agent","display_name":"CC Answer"},
+  "modes":{"listen":true,"speak":true,"think":true,"talk":true},
+  "audio":{"canonical_sample_rate_hz":16000},
+  "language":{"behaviour":"none","auto_detect":true,"mid_call_switch":true},
+  "hot_swap_allowed":["language.primary"],
+  "persona":{"name":"Assist","voice":{"fake-speak":"lab-voice"}},
+  "response":{
+    "ladder":["clip","llm"],
+    "clips":{
+      "greeting-en":{"text":"Namaste — Coral Assist.","when":{"regex":"(?i)hi"}}
+    }
+  },
+  "fallback":{"think_down":{"speak_canned":"greeting-en"}}
+}`)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
+  "profile_id":"cc-answer","profile_version":"latest","clock":"live"
+}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &created)
+	sid := created["session_id"].(string)
+
+	rr = httptest.NewRecorder()
+	ans := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+sid+"/answer", bytes.NewBufferString(`{}`))
+	ans.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(rr, ans)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("answer %d %s", rr.Code, rr.Body.String())
+	}
+	var body map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &body)
+	if body["spoken"] != "Namaste — Coral Assist." {
+		t.Fatalf("spoken %#v", body["spoken"])
+	}
+
+	rr = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/sessions/"+sid+"/transcript", nil))
+	var tr struct {
+		Turns []struct {
+			Role string `json:"role"`
+			Text string `json:"text"`
+		} `json:"turns"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &tr)
+	if len(tr.Turns) != 1 || tr.Turns[0].Role != "assistant" {
+		t.Fatalf("want opening assistant only, got %#v", tr.Turns)
+	}
+}
+

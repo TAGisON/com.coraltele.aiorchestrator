@@ -1,0 +1,23 @@
+id: F-validation-v1
+feature_id: F-validation-v1
+title: Validation V1 Control+memory+audit harness
+area: E-observe
+status: must_test
+tags: [validation, audit, analytics, postcall, control]
+requires: []
+packages: [./internal/validation]
+fixtures: {}
+what: |
+  Tier A scenarios V1-A01..A08: health, profile lifecycle, session lifecycle,
+  audit/analytics after stop, SSE catalog, edge-gone terminal, postcall disposition.
+  Tier B skips without SARVAM_API_KEY.
+how: |
+  go test ./internal/validation -count=1
+  # or: scripts/validation/Run-ValidationV1.ps1
+steps:
+  - action: go_test
+    packages: [./internal/validation]
+expect:
+  go_test: pass
+evidence:
+  kinds: [audit_event, analytics_event, disposition]

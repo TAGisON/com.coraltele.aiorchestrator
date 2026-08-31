@@ -165,3 +165,51 @@ go test -tags=sarvam_live ./internal/gateway/sarvamstt -count=1 -v
 ```
 
 Never commit `.agent/secrets.local.json` or print API keys in logs/artifacts.
+
+---
+
+## 11. Product Validation V1 (Control + memory + audit)
+
+Validation V1 proves the A–F product surface **without FreeSWITCH**: Control API, fakes, audit/analytics, postcall disposition. It is a **parallel track** to `coral-phase` product coding.
+
+### How to run Tier A (always)
+
+```powershell
+cd C:\Users\user\Documents\GitHub\com.coraltele.aiorchestrator
+go test ./internal/validation -count=1
+# or:
+.\scripts\validation\Run-ValidationV1.ps1
+```
+
+Scenarios and assertion table: `.agent/work/validation-v1/scenarios.md` (`V1-A01`…`V1-A08`).
+
+Agent pipeline (quiet dispatch):
+
+```powershell
+$env:AGENT_NO_MAIL = "1"
+.\tools\agent-runner\agent.ps1 start -Pipeline validation-v1 -From validation-v1
+.\tools\agent-runner\agent.ps1 monitor-start
+.\tools\agent-runner\agent.ps1 assign-role
+```
+
+Roles use existing `coral-validation-*` skills (aliases: `coral-validation-planner` / `runner` / `auditor` / `summarizer`). Artifacts land in `.agent/work/validation-v1/`.
+
+Per-feature deep wave remains `product-validation` (`docs/VALIDATION_PIPELINE.md`).
+
+### Tier B — Sarvam live (key required)
+
+1. Put a rotated key in `.agent/secrets.local.json` as `SARVAM_API_KEY`, or export `$env:SARVAM_API_KEY`.  
+2. Prefer Admin `PUT /v1/tenant/credentials/sarvam` for long-lived lab.  
+3. Re-run `go test ./internal/validation -count=1` — Tier B subtests run when a key is found; otherwise they **skip**.  
+4. Optional package live tests (same as §10):
+
+```powershell
+$env:SARVAM_API_KEY = "<from secrets.local.json>"
+go test -tags=sarvam_live ./internal/gateway/sarvamstt -count=1 -v
+```
+
+Never commit secrets. Tier B soft-skip without a key does **not** fail Validation V1.
+
+### Tier C — later (not V1)
+
+Postgres durable audit under `DATABASE_URL`, FreeSWITCH / `mod_audio_stream` round-trip, multi-tenant auth limits — flip when human provides deploy topology / call-server endpoint (`F-edge-fs-live`).
