@@ -10,33 +10,38 @@ import (
 
 // Memory is an in-process Repository for tests without Postgres.
 type Memory struct {
-	mu           sync.Mutex
-	profiles     map[string]Profile
-	versions     map[string][]ProfileVersion
-	sessions     map[string]Session
-	engines      map[string]TenantEngines
-	kbDocs       map[string]KBDocument
-	kbChunks     map[string][]KBChunk // document_id → chunks
-	playJobs     map[string]PlaybackJob
-	auditSeq     int64
-	audits       []AuditEvent
-	analyticsSeq int64
-	analytics    []AnalyticsEvent
-	postJobs     map[string]PostcallJob
-	healthy      bool
+	mu            sync.Mutex
+	profiles      map[string]Profile
+	versions      map[string][]ProfileVersion
+	sessions      map[string]Session
+	engines       map[string]TenantEngines
+	kbDocs        map[string]KBDocument
+	kbChunks      map[string][]KBChunk // document_id → chunks
+	playJobs      map[string]PlaybackJob
+	auditSeq      int64
+	audits        []AuditEvent
+	analyticsSeq  int64
+	analytics     []AnalyticsEvent
+	postJobs      map[string]PostcallJob
+	transcriptSeq int64
+	transcripts   map[string][]TranscriptTurn // session_id → ordered turns
+	dispositions  map[string]SessionDisposition
+	healthy       bool
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		profiles: make(map[string]Profile),
-		versions: make(map[string][]ProfileVersion),
-		sessions: make(map[string]Session),
-		engines:  make(map[string]TenantEngines),
-		kbDocs:   make(map[string]KBDocument),
-		kbChunks: make(map[string][]KBChunk),
-		playJobs: make(map[string]PlaybackJob),
-		postJobs: make(map[string]PostcallJob),
-		healthy:  true,
+		profiles:     make(map[string]Profile),
+		versions:     make(map[string][]ProfileVersion),
+		sessions:     make(map[string]Session),
+		engines:      make(map[string]TenantEngines),
+		kbDocs:       make(map[string]KBDocument),
+		kbChunks:     make(map[string][]KBChunk),
+		playJobs:     make(map[string]PlaybackJob),
+		postJobs:     make(map[string]PostcallJob),
+		transcripts:  make(map[string][]TranscriptTurn),
+		dispositions: make(map[string]SessionDisposition),
+		healthy:      true,
 	}
 }
 
@@ -442,4 +447,50 @@ func (m *Memory) LeaseNextPostcallJob(ctx context.Context, owner string) (Postca
 		}
 	}
 	return PostcallJob{}, ErrNotFound
+}
+
+func (m *Memory) AppendTranscriptTurn(ctx context.Context, turn TranscriptTurn) (TranscriptTurn, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	list := m.transcripts[turn.SessionID]
+	turn.Seq = len(list) + 1
+	m.transcriptSeq++
+	turn.ID = m.transcriptSeq
+	turn.CreatedAt = time.Now().UTC()
+	m.transcripts[turn.SessionID] = append(list, turn)
+	return turn, nil
+}
+
+func (m *Memory) ListTranscriptTurns(ctx context.Context, sessionID string) ([]TranscriptTurn, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	list := m.transcripts[sessionID]
+	out := make([]TranscriptTurn, len(list))
+	copy(out, list)
+	return out, nil
+}
+
+func (m *Memory) UpsertSessionDisposition(ctx context.Context, d SessionDisposition) (SessionDisposition, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if d.Source == "" {
+		d.Source = "postcall_worker"
+	}
+	prev, ok := m.dispositions[d.SessionID]
+	if ok && d.Final == "" && prev.Final != "" {
+		d.Final = prev.Final
+	}
+	d.UpdatedAt = time.Now().UTC()
+	m.dispositions[d.SessionID] = d
+	return d, nil
+}
+
+func (m *Memory) GetSessionDisposition(ctx context.Context, sessionID string) (SessionDisposition, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d, ok := m.dispositions[sessionID]
+	if !ok {
+		return SessionDisposition{}, ErrNotFound
+	}
+	return d, nil
 }

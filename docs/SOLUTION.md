@@ -506,7 +506,9 @@ PostgreSQL (illustrative entities — not a migration SOW):
 | `gateway_registration` | Optional DB view of enabled gateways per tenant (or config file + vault) |
 | `kb_document` / `kb_chunk` | Ingest store |
 | `session` | id, tenant, profile_version, clock, state, owner_instance, canonical_sample_rate_hz, coral_user optional, caller metadata, recording_ref |
-| `audit_event` | Append-only; turn-correlated |
+| `audit_event` | Append-only; turn-correlated (`turn_id` on turn.completed) |
+| `transcript_turn` | Ordered durable transcript rows keyed by session_id (`seq`, shared `turn_id` per Talk cycle) |
+| `session_disposition` | AI disposition suggestion (+ optional final) per session; written by postcall |
 | `playback_job` | file_uri, profile_version, state, lease_owner, leased_until |
 | `postcall_job` | session_id, profile_version, state, lease (disposition/summary pipeline) |
 | `analytics_event` | Append-only metrics per session/turn (see ANALYTICS_AND_POSTCALL.md) |

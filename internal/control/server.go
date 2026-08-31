@@ -109,6 +109,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/sessions/{id}/profile-fields", s.handlePatchProfileFields)
 	s.mux.HandleFunc("POST /v1/sessions/{id}/stop", s.handleStopSession)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
+	s.mux.HandleFunc("GET /v1/sessions/{id}/transcript", s.handleGetTranscript)
+	s.mux.HandleFunc("GET /v1/sessions/{id}/disposition", s.handleGetDisposition)
 	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)

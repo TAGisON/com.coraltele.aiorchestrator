@@ -127,16 +127,27 @@ func (w *PostcallWorker) runJob(ctx context.Context, job store.PostcallJob) {
 		}
 	}
 
+	tplID := dispositionTemplateID(doc)
+	turns, _ := w.Repo.ListTranscriptTurns(ctx, sess.ID)
+	_, _ = w.Repo.UpsertSessionDisposition(ctx, store.SessionDisposition{
+		SessionID:  sess.ID,
+		Suggestion: suggestion,
+		TemplateID: tplID,
+		Source:     "postcall_worker",
+	})
+
 	obs.Audit(ctx, store.AuditDisposition, map[string]any{
-		"suggestion":     suggestion,
-		"template_id":    dispositionTemplateID(doc),
-		"recording_ref":  sess.RecordingRef,
-		"source":         "postcall_worker",
+		"suggestion":            suggestion,
+		"template_id":           tplID,
+		"recording_ref":         sess.RecordingRef,
+		"source":                "postcall_worker",
+		"transcript_turn_count": len(turns),
+		"transcript_link":       "/v1/sessions/" + sess.ID + "/transcript",
 	})
 	obs.Metric(ctx, "disposition_suggestion", 1, map[string]any{"suggestion": suggestion})
 
-	// Optional coral-crm push when create_ticket / disposition skill allowed.
-	w.maybePushCRM(ctx, doc, sess, suggestion)
+	// Optional coral-crm push: prefer push_disposition when allowed, else create_ticket.
+	w.maybePushCRM(ctx, doc, sess, suggestion, tplID)
 
 	job.State = store.JobCompleted
 	job.ErrorMessage = ""
@@ -164,9 +175,12 @@ func (w *PostcallWorker) runDisposition(ctx context.Context, doc profile.Documen
 		return "", errors.New("think type assert failed")
 	}
 	tpl := dispositionTemplateID(doc)
-	excerpt := "session " + sess.ID
-	if sess.RecordingRef != "" {
-		excerpt += " recording_ref=" + sess.RecordingRef
+	excerpt := transcriptExcerpt(ctx, w.Repo, sess.ID)
+	if excerpt == "" {
+		excerpt = "session " + sess.ID
+		if sess.RecordingRef != "" {
+			excerpt += " recording_ref=" + sess.RecordingRef
+		}
 	}
 	prompt := "Disposition template " + tpl + ". Classify as resolved, unresolved, or escalated. Transcript excerpt: " + excerpt
 	tr, err := th.Complete(ctx, port.ThinkRequest{
@@ -180,6 +194,33 @@ func (w *PostcallWorker) runDisposition(ctx context.Context, doc profile.Documen
 		return "", err
 	}
 	return parseDisposition(tr.Text), nil
+}
+
+const (
+	dispositionExcerptMaxTurns = 20
+	dispositionExcerptMaxChars = 4000
+)
+
+func transcriptExcerpt(ctx context.Context, repo store.Repository, sessionID string) string {
+	if repo == nil {
+		return ""
+	}
+	turns, err := repo.ListTranscriptTurns(ctx, sessionID)
+	if err != nil || len(turns) == 0 {
+		return ""
+	}
+	if len(turns) > dispositionExcerptMaxTurns {
+		turns = turns[len(turns)-dispositionExcerptMaxTurns:]
+	}
+	var b strings.Builder
+	for _, t := range turns {
+		line := t.Role + ": " + t.Text + "\n"
+		if b.Len()+len(line) > dispositionExcerptMaxChars {
+			break
+		}
+		b.WriteString(line)
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func parseDisposition(text string) string {
@@ -196,19 +237,56 @@ func parseDisposition(text string) string {
 	}
 }
 
-func (w *PostcallWorker) maybePushCRM(ctx context.Context, doc profile.Document, sess store.Session, suggestion string) {
-	def, ok := doc.Skills.Definitions["create_ticket"]
-	if !ok || def.Gateway == "" {
+func (w *PostcallWorker) maybePushCRM(ctx context.Context, doc profile.Document, sess store.Session, suggestion, templateID string) {
+	if w.tryPushDisposition(ctx, doc, sess, suggestion, templateID) {
 		return
 	}
-	allowed := false
+	w.tryPushCreateTicket(ctx, doc, sess, suggestion)
+}
+
+func skillAllowed(doc profile.Document, name string) bool {
 	for _, a := range doc.Skills.Allowed {
-		if a == "create_ticket" {
-			allowed = true
-			break
+		if a == name {
+			return true
 		}
 	}
-	if !allowed {
+	return false
+}
+
+func (w *PostcallWorker) tryPushDisposition(ctx context.Context, doc profile.Document, sess store.Session, suggestion, templateID string) bool {
+	def, ok := doc.Skills.Definitions["push_disposition"]
+	if !ok || def.Gateway == "" || !skillAllowed(doc, "push_disposition") {
+		return false
+	}
+	rec, err := router.Select(w.Reg, []port.GatewayID{port.GatewayID(def.Gateway)}, port.PortSkill, router.SelectOptions{})
+	if err != nil {
+		return false
+	}
+	sk, ok := rec.Instance.(port.Skill)
+	if !ok {
+		return false
+	}
+	excerpt := transcriptExcerpt(ctx, w.Repo, sess.ID)
+	args, _ := json.Marshal(map[string]any{
+		"action":             "push_disposition",
+		"session_id":         sess.ID,
+		"suggestion":         suggestion,
+		"template_id":        templateID,
+		"transcript_excerpt": excerpt,
+		"recording_ref":      sess.RecordingRef,
+	})
+	_, _ = sk.Execute(ctx, port.SkillRequest{
+		SessionID: port.SessionID(sess.ID),
+		Name:      "push_disposition",
+		Args:      args,
+		TenantID:  sess.TenantID,
+	})
+	return true
+}
+
+func (w *PostcallWorker) tryPushCreateTicket(ctx context.Context, doc profile.Document, sess store.Session, suggestion string) {
+	def, ok := doc.Skills.Definitions["create_ticket"]
+	if !ok || def.Gateway == "" || !skillAllowed(doc, "create_ticket") {
 		return
 	}
 	rec, err := router.Select(w.Reg, []port.GatewayID{port.GatewayID(def.Gateway)}, port.PortSkill, router.SelectOptions{})

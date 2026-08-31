@@ -110,6 +110,31 @@ Runtime validates args against schema, runs Skill router, injects result into me
 
 Coral agent desktop **screen-pop** consumes this event (existing CRM/ACD integration). Orchestrator session moves to **Draining** after successful handoff skill; FS transfer is triggered by Coral/FS, not by orchestrator SIP.
 
+### resolve_customer (coral-crm stub)
+
+Lookup / resolve caller identity against Coral CRM (stub only — no live CRM writeback in V1).
+
+| Field (args) | Content |
+|---|---|
+| `caller` | ANI / channel id (optional if `customer_ref` set) |
+| `customer_ref` | Opaque customer reference |
+
+Stub result when BaseURL empty: `{ "ok": true, "stub": true, "customer_id": "…" }`.
+
+### push_disposition (coral-crm stub)
+
+Optional postcall skill to push AI disposition suggestion to Coral CRM/CDR. Prefer this over piggybacking `create_ticket` when both are allowed.
+
+| Field (args) | Content |
+|---|---|
+| `session_id` | Orchestrator session id |
+| `suggestion` | `resolved` \| `unresolved` \| `escalated` |
+| `template_id` | Profile `templates.disposition.id` |
+| `transcript_excerpt` | Optional last-N turns excerpt |
+| `recording_ref` | Optional FS/CDR recording URI |
+
+Postcall worker: if `push_disposition` ∈ `skills.allowed` + definitions → Execute; else fall back to existing optional `create_ticket` push. Full production Coral writeback remains out of scope until estate endpoint is configured.
+
 ---
 
 ## 3. Playbooks and intents

@@ -13,7 +13,7 @@ import (
 
 const ID port.GatewayID = "coral-crm"
 
-// Gateway is a minimal act/inform CRM stub (create_ticket / status).
+// Gateway is a minimal act/inform CRM stub (create_ticket / resolve_customer / push_disposition / status).
 type Gateway struct {
 	BaseURL    string
 	HTTPClient *http.Client
@@ -37,6 +37,9 @@ func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.Skil
 			action = v
 		}
 	}
+	if g.BaseURL == "" {
+		return stubResult(action, args)
+	}
 	payload := map[string]any{
 		"session_id": string(req.SessionID),
 		"tenant_id":  req.TenantID,
@@ -44,10 +47,6 @@ func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.Skil
 		"args":       args,
 	}
 	body, _ := json.Marshal(payload)
-	if g.BaseURL == "" {
-		out, _ := json.Marshal(map[string]any{"ok": true, "stub": true, "action": action})
-		return port.SkillResult{OK: true, Output: out}, nil
-	}
 	client := g.HTTPClient
 	if client == nil {
 		client = http.DefaultClient
@@ -65,6 +64,28 @@ func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.Skil
 	ok := resp.StatusCode >= 200 && resp.StatusCode < 300
 	out, _ := json.Marshal(map[string]any{"ok": ok, "status": resp.StatusCode, "action": action})
 	return port.SkillResult{OK: ok, Output: out}, nil
+}
+
+func stubResult(action string, args map[string]any) (port.SkillResult, error) {
+	switch action {
+	case "resolve_customer":
+		customerID := "stub-customer"
+		if args != nil {
+			if v, ok := args["customer_ref"].(string); ok && v != "" {
+				customerID = "stub-" + v
+			} else if v, ok := args["caller"].(string); ok && v != "" {
+				customerID = "stub-" + v
+			}
+		}
+		out, _ := json.Marshal(map[string]any{"ok": true, "stub": true, "customer_id": customerID})
+		return port.SkillResult{OK: true, Output: out}, nil
+	case "push_disposition":
+		out, _ := json.Marshal(map[string]any{"ok": true, "stub": true, "action": "push_disposition"})
+		return port.SkillResult{OK: true, Output: out}, nil
+	default:
+		out, _ := json.Marshal(map[string]any{"ok": true, "stub": true, "action": action})
+		return port.SkillResult{OK: true, Output: out}, nil
+	}
 }
 
 // Register adds coral-crm to the registry.

@@ -28,7 +28,7 @@ It is a **profile family** (`metadata.family: contact-agent`), not a separate pr
 | Language | Auto-detect then lock; operator/user switch only | cc-2 → `LANGUAGE_POLICY.md` |
 | Voice | Persona voice required for Talk/Speak; bound to Speak gateway | cc-3 |
 | Response ladder | clip → template → LLM; vendor fail → clip + escalate | cc-4 |
-| Transcript / disposition | Durable transcript APIs + disposition path | cc-5 |
+| Transcript / disposition | Durable transcript APIs + disposition path | cc-5 (done: `GET …/transcript`, `GET …/disposition`, postcall upsert) |
 | Lab validation | Lab surfaces for engines / language / ladder | cc-6 |
 
 ---
@@ -55,7 +55,7 @@ One Coral **tenant** may publish many Contact Agent profiles. All inherit the **
 ## 5. CRM / Coral boundary
 
 - Coral owns identity, ACD/transfer, agent desktop disposition override.
-- Orchestrator owns session runtime, transcript buffer, AI disposition **suggestion**, audit/analytics.
+- Orchestrator owns session runtime, **durable** transcript (`transcript_turn` + `GET /v1/sessions/{id}/transcript`), AI disposition **suggestion** (`session_disposition` + `GET /v1/sessions/{id}/disposition`), audit/analytics.
 - Skills call **their** CRM/ticket HTTP APIs; we do not become a second CRM.
 
 ---

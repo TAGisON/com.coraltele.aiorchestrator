@@ -75,6 +75,20 @@ func TestMigrationSQL_HasCCLanguagePolicy(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasCCTranscriptDisposition(t *testing.T) {
+	body, err := os.ReadFile("migrations/006_cc_transcript_disposition.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS transcript_turn") {
+		t.Fatal("migration missing transcript_turn")
+	}
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS session_disposition") {
+		t.Fatal("migration missing session_disposition")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

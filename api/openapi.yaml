@@ -203,6 +203,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/sessions/{id}/transcript:
+    get:
+      summary: Ordered durable transcript turns
+      description: |
+        Returns turns appended on Talk completion (user then assistant share turn_id).
+        404 if session missing. Empty turns[] when no turns yet.
+      operationId: getSessionTranscript
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/sessions/{id}/disposition:
+    get:
+      summary: AI disposition suggestion for session
+      description: |
+        Written by postcall worker after terminal. Tags resolved|unresolved|escalated.
+        404 if session missing or disposition row not written yet.
+      operationId: getSessionDisposition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DispositionResponse"
+        "404":
+          description: Session or disposition not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /v1/jobs/playback:
     post:
       summary: Enqueue file playback job
@@ -414,3 +466,44 @@ components:
           type: string
         canonical_sample_rate_hz:
           type: integer
+    TranscriptResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        turns:
+          type: array
+          items:
+            type: object
+            properties:
+              seq:
+                type: integer
+              turn_id:
+                type: string
+              role:
+                type: string
+                enum: [user, assistant, system]
+              text:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+    DispositionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        suggestion:
+          type: string
+          enum: [resolved, unresolved, escalated]
+        template_id:
+          type: string
+        source:
+          type: string
+          example: postcall_worker
+        final:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time

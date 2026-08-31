@@ -56,16 +56,17 @@ Session Terminal
   → enqueue postcall_job (same PG worker pool as playback, or inline if < SLA)
   → optional Listen batch on recording URI (if not already transcribed)
   → Think + disposition template (if profile.analytics / templates.disposition)
+  → upsert session_disposition (durable suggestion; GET /v1/sessions/{id}/disposition)
   → write audit + analytics_event
-  → Skill: push disposition to Coral CRM/CDR
+  → Skill: push_disposition (preferred) or create_ticket fallback to Coral CRM/CDR
   → emit recording_ref + transcript link correlation
 ```
 
 | Output | Destination |
 |---|---|
-| Transcript | Audit + optional Coral CDR field |
+| Transcript | Durable `transcript_turn` + `GET /v1/sessions/{id}/transcript`; audit correlation via `turn_id` |
 | AI summary | Screen-pop already sent on warm transfer; post-call updates CRM |
-| Disposition tags | `resolved` \| `unresolved` \| `escalated` + agent override via Coral UI |
+| Disposition tags | Stored suggestion `resolved` \| `unresolved` \| `escalated` + agent override via Coral UI (`final` may stay null until CRM confirms) |
 | Recording link | `recording_ref` from FS metadata passed at session create |
 
 **Agent override:** Coral agent desktop owns manual disposition; orchestrator stores AI suggestion + final outcome when CRM skill callbacks or webhook confirms.

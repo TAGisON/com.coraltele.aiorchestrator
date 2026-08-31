@@ -44,4 +44,9 @@ type Repository interface {
 	GetPostcallJob(ctx context.Context, id string) (PostcallJob, error)
 	UpdatePostcallJob(ctx context.Context, job PostcallJob) error
 	LeaseNextPostcallJob(ctx context.Context, owner string) (PostcallJob, error)
+
+	AppendTranscriptTurn(ctx context.Context, turn TranscriptTurn) (TranscriptTurn, error)
+	ListTranscriptTurns(ctx context.Context, sessionID string) ([]TranscriptTurn, error)
+	UpsertSessionDisposition(ctx context.Context, d SessionDisposition) (SessionDisposition, error)
+	GetSessionDisposition(ctx context.Context, sessionID string) (SessionDisposition, error)
 }

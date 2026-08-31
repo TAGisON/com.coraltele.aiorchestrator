@@ -4,6 +4,8 @@ package observe
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"time"
 
@@ -82,28 +84,37 @@ func (o *Observer) Metric(ctx context.Context, metric string, value float64, dim
 
 // TurnCompleted is the durable Talk turn completion hook (once per think+speak cycle).
 type TurnCompleted struct {
-	UserText       string
-	ResponseText   string
-	BargeIn        bool
-	SkillName      string
-	SkillOK        bool
-	KnowledgeHit   bool
-	GroundingReq   bool
-	ListenGateway  string
-	ThinkGateway   string
-	SpeakGateway   string
-	VoiceID        string
-	ResponseTier  string // clip | template | llm | refuse | escalate
-	Outcome        string
-	LatencyMs      int64
+	UserText      string
+	ResponseText  string
+	BargeIn       bool
+	SkillName     string
+	SkillOK       bool
+	KnowledgeHit  bool
+	GroundingReq  bool
+	ListenGateway string
+	ThinkGateway  string
+	SpeakGateway  string
+	VoiceID       string
+	ResponseTier string // clip | template | llm | refuse | escalate
+	Outcome       string
+	LatencyMs     int64
+	TurnID        string // optional; generated when empty
 }
 
 // OnTurnCompleted writes turn.completed audit + turn_completed analytics (and related metrics).
+// Also appends durable transcript turns (user then assistant) with shared turn_id (fail-open).
 func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	if o == nil {
 		return
 	}
+	turnID := t.TurnID
+	if turnID == "" {
+		turnID = newTurnID()
+	}
+	o.appendTranscript(ctx, turnID, t.UserText, t.ResponseText)
+
 	payload := map[string]any{
+		"turn_id":            turnID,
 		"user_text_redacted": truncate(t.UserText, 256),
 		"response_redacted":  truncate(t.ResponseText, 256),
 		"barge_in":           t.BargeIn,
@@ -145,6 +156,28 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	if t.LatencyMs > 0 {
 		o.Metric(ctx, store.MetricHopLatencyMs, float64(t.LatencyMs), map[string]any{"hop": "turn"})
 	}
+}
+
+func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, responseText string) {
+	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
+		return
+	}
+	for _, row := range []store.TranscriptTurn{
+		{SessionID: o.Meta.SessionID, Role: store.RoleUser, Text: userText, TurnID: turnID},
+		{SessionID: o.Meta.SessionID, Role: store.RoleAssistant, Text: responseText, TurnID: turnID},
+	} {
+		if _, err := o.Repo.AppendTranscriptTurn(ctx, row); err != nil {
+			applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", row.Role, "err", err)
+		}
+	}
+}
+
+func newTurnID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return hex.EncodeToString([]byte(time.Now().UTC().Format("20060102150405.000000000")))
+	}
+	return hex.EncodeToString(b[:])
 }
 
 // OnBargeIn records barge_in audit + analytics.

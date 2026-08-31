@@ -26,6 +26,8 @@ Base path: `/v1` (versioned so vendors never force a breaking API).
 | `PATCH` | `/v1/sessions/{id}/profile-fields` | Hot-swap allowed fields only |
 | `POST` | `/v1/sessions/{id}/stop` | Drain → terminal |
 | `GET` | `/v1/sessions/{id}/events` | SSE event stream |
+| `GET` | `/v1/sessions/{id}/transcript` | Ordered durable transcript turns |
+| `GET` | `/v1/sessions/{id}/disposition` | AI disposition suggestion (postcall write) |
 | `POST` | `/v1/jobs/playback` | Enqueue playback |
 | `GET` | `/v1/jobs/{id}` | Job state |
 | `GET` | `/v1/profiles` | List (tenant-scoped) |
@@ -121,6 +123,43 @@ Only keys in profile `hot_swap_allowed`. Contact Agent language switch (cc-2):
 ```
 
 Requires `language.mid_call_switch: true`. Sets session `active_language`; next Listen hint uses the new value (`LANGUAGE_POLICY.md`, RUNTIME §9).
+
+### `GET /v1/sessions/{id}/transcript`
+
+Returns durable ordered turns for the session (cc-5). Appended on Talk turn complete (user then assistant rows share one `turn_id` per cycle; `seq` is monotonic per session). Live PCM is never stored here.
+
+404 `not_found` if session missing. Empty `turns` array when session exists but no turns yet.
+
+```json
+{
+  "session_id": "…",
+  "turns": [
+    {"seq": 1, "turn_id": "…", "role": "user", "text": "…", "created_at": "…"},
+    {"seq": 2, "turn_id": "…", "role": "assistant", "text": "…", "created_at": "…"}
+  ]
+}
+```
+
+`role` is closed: `user` | `assistant` | `system`.
+
+### `GET /v1/sessions/{id}/disposition`
+
+Returns the AI disposition suggestion written by the postcall worker after session terminal (or playback complete). Tags: `resolved` | `unresolved` | `escalated`. Always upserts a row when postcall completes successfully (default `unresolved` when no `templates.disposition`).
+
+404 `not_found` if session missing **or** no disposition row yet (postcall not done). Agent override (`final`) may stay null in V1 — Coral owns override UI.
+
+```json
+{
+  "session_id": "…",
+  "suggestion": "resolved",
+  "template_id": "cc-disposition-v1",
+  "source": "postcall_worker",
+  "final": null,
+  "updated_at": "…"
+}
+```
+
+**Write path:** postcall worker `UpsertSessionDisposition` after Think/`templates.disposition` (or default), then audit `disposition.suggestion`. Optional skill `push_disposition` (else legacy `create_ticket` push) when allowed in profile.
 
 ### `POST /v1/sessions/{id}/stop`
 
