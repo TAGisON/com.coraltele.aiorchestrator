@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ops-facing logging layout (Coral style). Go process applies equivalent rolling via applog + properties. -->
+<Configuration status="error">
+    <Properties>
+        <Property name="APP_NAME">aiorchestrator</Property>
+        <Property name="LOG_BASE">/var/log/coralswitch/softswitch</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5p %c.%M:%L - %m%n</Property>
+    </Properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_ERR">
+            <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+        <RollingFile name="AppLog"
+            fileName="${LOG_BASE}/${APP_NAME}/app.log"
+            filePattern="${LOG_BASE}/${APP_NAME}/app.%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies><SizeBasedTriggeringPolicy size="10MB"/></Policies>
+            <DefaultRolloverStrategy max="5"/>
+        </RollingFile>
+        <RollingFile name="LibLog"
+            fileName="${LOG_BASE}/${APP_NAME}/lib.log"
+            filePattern="${LOG_BASE}/${APP_NAME}/lib.%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies><SizeBasedTriggeringPolicy size="10MB"/></Policies>
+            <DefaultRolloverStrategy max="5"/>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="AppLog"/>
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

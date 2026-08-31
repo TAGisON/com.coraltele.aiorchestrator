@@ -131,11 +131,11 @@ Lab realtime Talk can use Sarvam Listen / Think / Speak with fakes as ordered fa
 
 ### Secrets
 
-1. Copy `.agent/secrets.example.json` → `.agent/secrets.local.json` (gitignored).  
-2. Set `sarvam.api_key`, or export `SARVAM_API_KEY` (env wins over file for the key).  
+1. Preferred: `PUT /v1/tenant/credentials/sarvam` with `{ "api_key": "…" }` (Postgres; masked on GET / config).  
+2. Lab fallback only: copy `.agent/secrets.example.json` → `.agent/secrets.local.json`, or export `SARVAM_API_KEY`.  
 3. Optional URL overrides: `stt_rest_url`, `stt_ws_url`, `chat_url`, `tts_url` (defaults match public Sarvam hosts in the example file).
 
-`cmd/aiorchestrator` registers `sarvam-stt`, `sarvam-llm`, and `sarvam-tts` only when a key is present. Without a key, CI / lab still run on fakes only.
+`cmd/aiorchestrator` always registers `sarvam-stt`, `sarvam-llm`, and `sarvam-tts`; calls fail until a key is present in DB (or lab env). Boot properties in `conf/aiorchestrator.properties` hold listen address (**`:8011`**), database DSN, and engine seeds — not vendor keys.
 
 ### Profile provider lists (example)
 

@@ -19,6 +19,13 @@ Base path: `/v1` (versioned so vendors never force a breaking API).
 | `GET` | `/v1/health` | Process + PG; optional gateway summary |
 | `GET` | `/v1/tenant/engines` | Active Listen/Think/Speak gateway ids for tenant |
 | `PUT` | `/v1/tenant/engines` | Upsert tenant engines (validate registry ids) |
+| `GET` | `/v1/tenant/config` | Bundle: engines + credentials (masked) + settings |
+| `GET` | `/v1/tenant/credentials` | List gateway credentials (keys masked) |
+| `GET` | `/v1/tenant/credentials/{gateway_id}` | One credential (masked) |
+| `PUT` | `/v1/tenant/credentials/{gateway_id}` | Upsert API key (+ optional extra JSON) |
+| `GET` | `/v1/tenant/settings` | List string settings |
+| `GET` | `/v1/tenant/settings/{key}` | Get setting |
+| `PUT` | `/v1/tenant/settings/{key}` | Upsert setting (`coral.base_url`, `control.auth_token`, …) |
 | `POST` | `/v1/sessions` | Create session; pin profile + `gateway_binding`; optional edge token |
 | `GET` | `/v1/sessions/{id}` | Status including `gateway_binding` |
 | `POST` | `/v1/sessions/{id}/attachments` | Bind feeder/sink metadata (non-FS) |
@@ -45,7 +52,7 @@ WSS edge (not REST): `GET /edge/fs?token=…` — see `EDGE_FS.md`.
 
 ### `GET /v1/tenant/engines`
 
-Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Returns active gateway ids (DB row, else env `SYSTEM_LISTEN` / `SYSTEM_THINK` / `SYSTEM_SPEAK` with lab defaults `sarvam-stt` / `sarvam-llm` / `sarvam-tts`).
+Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Returns active gateway ids from DB (`tenant_engines`). If no row exists, seeds from boot properties (`engines.listen/think/speak`) into the store.
 
 ```json
 {
@@ -53,11 +60,11 @@ Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Re
   "listen": "sarvam-stt",
   "think": "sarvam-llm",
   "speak": "sarvam-tts",
-  "source": "env"
+  "source": "store"
 }
 ```
 
-`source` is `store` | `env`.
+`source` is `store` | `properties` (properties only if seed upsert fails, e.g. memory race — rare).
 
 ### `PUT /v1/tenant/engines`
 
@@ -70,6 +77,39 @@ Resolves tenant from auth or `X-Tenant-ID` (lab default tenant id `default`). Re
 ```
 
 Validates each id against the process gateway registry (correct port). Unknown or wrong-port id → `422` + `bad_request` (or `profile_invalid` if treated as config invalid). Returns the stored binding with `source: "store"`.
+
+### `GET /v1/tenant/config`
+
+Single payload for admin / coral-file settings screens: engines + masked credentials + string settings.
+
+```json
+{
+  "tenant_id": "default",
+  "engines": { "tenant_id": "default", "listen": "sarvam-stt", "think": "sarvam-llm", "speak": "sarvam-tts", "source": "store" },
+  "credentials": [
+    { "tenant_id": "default", "gateway_id": "sarvam", "api_key_set": true, "api_key_preview": "****abcd", "updated_at": "…" }
+  ],
+  "settings": [
+    { "tenant_id": "default", "key": "coral.base_url", "value": "https://…", "updated_at": "…" }
+  ]
+}
+```
+
+Raw API keys are never returned.
+
+### `PUT /v1/tenant/credentials/{gateway_id}`
+
+Upsert vendor secret used at runtime (e.g. `sarvam`, or per-adapter ids). Body:
+
+```json
+{ "api_key": "…", "extra": {} }
+```
+
+Response is masked (`api_key_set`, `api_key_preview`). Lab UI / coral-file call this instead of editing `.env`.
+
+### `PUT /v1/tenant/settings/{key}`
+
+Upsert string setting (`coral.base_url`, `control.auth_token`, …). Body: `{ "value": "…" }`.
 
 ### `POST /v1/sessions`
 

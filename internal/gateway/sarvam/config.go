@@ -62,15 +62,23 @@ func STTLanguageCode(hint string) string {
 	return h
 }
 
-// LoadConfig reads SARVAM_API_KEY and optional .agent/secrets.local.json overrides.
-// Missing file / missing key is not an error — Configured() is false.
+// LoadConfig reads API key from KeyProvider (DB), then env, then secrets.local.json.
+// Missing key is not an error — Configured() is false.
 func LoadConfig() (Config, error) {
 	cfg := Config{
-		APIKey:     strings.TrimSpace(os.Getenv("SARVAM_API_KEY")),
+		APIKey:     "",
 		STTRestURL: DefaultSTTRestURL,
 		STTWSURL:   DefaultSTTWSURL,
 		ChatURL:    DefaultChatURL,
 		TTSURL:     DefaultTTSURL,
+	}
+	if keyProvider != nil {
+		if k, err := keyProvider(context.Background()); err == nil {
+			cfg.APIKey = strings.TrimSpace(k)
+		}
+	}
+	if cfg.APIKey == "" {
+		cfg.APIKey = strings.TrimSpace(os.Getenv("SARVAM_API_KEY"))
 	}
 	path := secretsPath()
 	data, err := os.ReadFile(path)
@@ -111,6 +119,16 @@ func LoadConfig() (Config, error) {
 		cfg.TTSURL = v
 	}
 	return cfg, nil
+}
+
+// KeyProvider supplies the Sarvam API key at call time (typically from DB).
+type KeyProvider func(ctx context.Context) (string, error)
+
+var keyProvider KeyProvider
+
+// SetKeyProvider installs a runtime key source (DB). Nil clears.
+func SetKeyProvider(p KeyProvider) {
+	keyProvider = p
 }
 
 func secretsPath() string {

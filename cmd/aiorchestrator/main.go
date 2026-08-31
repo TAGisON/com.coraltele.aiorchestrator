@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/bootconfig"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/control"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coralcrm"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coraltransfer"
@@ -26,7 +30,25 @@ import (
 )
 
 func main() {
-	applog.Configure(os.Getenv("LOG_LEVEL"), os.Getenv("LOG_FORMAT"))
+	boot, err := bootconfig.Load("")
+	if err != nil {
+		applog.Configure("info", "json", "")
+		applog.Error("boot properties failed", "err", err)
+		os.Exit(1)
+	}
+	logDir := filepath.Join(boot.LogBase)
+	applog.ConfigureRolling(boot.LogLevel, boot.LogFormat, logDir, boot.LogMaxSizeMB, boot.LogMaxBackups)
+	applog.Info("boot config loaded",
+		"properties", boot.PropertiesPath,
+		"http_addr", boot.HTTPAddr,
+		"log_dir", logDir,
+	)
+
+	control.EngineDefaults = store.GatewayBinding{
+		Listen: boot.EnginesListen,
+		Think:  boot.EnginesThink,
+		Speak:  boot.EnginesSpeak,
+	}
 
 	reg := router.NewMemRegistry()
 	if err := fake.RegisterAll(reg); err != nil {
@@ -35,18 +57,18 @@ func main() {
 	}
 
 	ctx := context.Background()
-	databaseURL := envOr("DATABASE_URL", "")
-	requireDB := envOr("REQUIRE_DATABASE", "0") == "1" || envOr("REQUIRE_DATABASE", "") == "true"
+	databaseURL := strings.TrimSpace(boot.DatabaseURL)
+	requireDB := boot.RequireDatabase
 
 	var repo store.Repository
 	var closer func()
 	storeBackend := "memory"
 	if databaseURL == "" {
 		if requireDB {
-			applog.Error("DATABASE_URL required (REQUIRE_DATABASE=1)")
+			applog.Error("database.url required (database.require=true)")
 			os.Exit(1)
 		}
-		applog.Warn("DATABASE_URL unset: using in-memory store (lab only)")
+		applog.Warn("database.url unset: using in-memory store (lab only)")
 		repo = store.NewMemory()
 		closer = func() {}
 	} else {
@@ -62,48 +84,61 @@ func main() {
 	}
 	defer closer()
 
+	// Runtime Sarvam key from DB (tenant default); env/secrets remain lab fallback inside LoadConfig.
+	sarvam.SetKeyProvider(func(ctx context.Context) (string, error) {
+		return lookupSarvamKey(ctx, repo, "default")
+	})
+
 	ing := ingest.New(repo)
 	if err := ingest.Register(reg, ing); err != nil {
 		applog.Error("register ingest failed", "err", err)
 		os.Exit(1)
 	}
-	if err := coraltransfer.Register(reg, &coraltransfer.Gateway{BaseURL: os.Getenv("CORAL_BASE_URL")}); err != nil {
+
+	coralBase := os.Getenv("CORAL_BASE_URL")
+	if st, err := repo.GetSystemSetting(ctx, "default", "coral.base_url"); err == nil {
+		coralBase = st.Value
+	}
+	if err := coraltransfer.Register(reg, &coraltransfer.Gateway{BaseURL: coralBase}); err != nil {
 		applog.Error("register coral-transfer failed", "err", err)
 		os.Exit(1)
 	}
-	if err := coralcrm.Register(reg, &coralcrm.Gateway{BaseURL: os.Getenv("CORAL_BASE_URL")}); err != nil {
+	if err := coralcrm.Register(reg, &coralcrm.Gateway{BaseURL: coralBase}); err != nil {
 		applog.Error("register coral-crm failed", "err", err)
 		os.Exit(1)
 	}
 
-	sarvamConfigured := false
-	if sarvamCfg, err := sarvam.LoadConfig(); err != nil {
-		applog.Error("sarvam config failed", "err", err)
+	// Always register Sarvam adapters; they error until DB (or lab env) has a key.
+	if err := sarvamstt.Register(reg, nil); err != nil {
+		applog.Error("register sarvam-stt failed", "err", err)
 		os.Exit(1)
-	} else if sarvamCfg.Configured() {
-		if err := sarvamstt.Register(reg, sarvamstt.New(sarvamCfg)); err != nil {
-			applog.Error("register sarvam-stt failed", "err", err)
-			os.Exit(1)
-		}
-		if err := sarvamllm.Register(reg, sarvamllm.New(sarvamCfg)); err != nil {
-			applog.Error("register sarvam-llm failed", "err", err)
-			os.Exit(1)
-		}
-		if err := sarvamtts.Register(reg, sarvamtts.New(sarvamCfg)); err != nil {
-			applog.Error("register sarvam-tts failed", "err", err)
-			os.Exit(1)
-		}
+	}
+	if err := sarvamllm.Register(reg, nil); err != nil {
+		applog.Error("register sarvam-llm failed", "err", err)
+		os.Exit(1)
+	}
+	if err := sarvamtts.Register(reg, nil); err != nil {
+		applog.Error("register sarvam-tts failed", "err", err)
+		os.Exit(1)
+	}
+	sarvamConfigured := false
+	if cfg, err := sarvam.LoadConfig(); err == nil && cfg.Configured() {
 		sarvamConfigured = true
-		applog.Info("sarvam gateways registered", "ids", "sarvam-stt,sarvam-llm,sarvam-tts")
+		applog.Info("sarvam credentials available", "source", "db_or_env")
 	} else {
-		applog.Info("sarvam not configured (set SARVAM_API_KEY to enable)")
+		applog.Info("sarvam credentials not set — PUT /v1/tenant/credentials/sarvam with api_key")
+	}
+
+	authToken := os.Getenv("CONTROL_AUTH_TOKEN")
+	if st, err := repo.GetSystemSetting(ctx, "default", "control.auth_token"); err == nil && st.Value != "" {
+		authToken = st.Value
 	}
 
 	cfg := control.Config{
-		AuthToken:       os.Getenv("CONTROL_AUTH_TOKEN"),
-		OwnerInstance:   envOr("OWNER_INSTANCE", "local"),
-		EdgeBaseURL:     envOr("EDGE_BASE_URL", "wss://localhost/edge/fs"),
-		EdgeTokenSecret: []byte(envOr("EDGE_TOKEN_SECRET", "lab-edge-hmac-change-me")),
+		AuthToken:       authToken,
+		OwnerInstance:   boot.OwnerInstance,
+		EdgeBaseURL:     boot.EdgeBaseURL,
+		EdgeTokenSecret: []byte(boot.EdgeTokenSecret),
 	}
 	mgr := session.NewManager(reg)
 	rt := &control.SessionRuntime{Mgr: mgr, Repo: repo}
@@ -111,7 +146,7 @@ func main() {
 	srv.SetLabExtras(control.LabExtras{
 		StoreBackend:     storeBackend,
 		SarvamConfigured: sarvamConfigured,
-		HTTPAddr:         envOr("HTTP_ADDR", ":8080"),
+		HTTPAddr:         boot.HTTPAddr,
 	})
 	srv.MountEdge(srv.EdgeTokenSecret(), mgr)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
@@ -119,7 +154,7 @@ func main() {
 	_ = srv.StartPlaybackWorker(workerCtx, mgr)
 	_ = srv.StartPostcallWorker(workerCtx)
 
-	addr := envOr("HTTP_ADDR", ":8080")
+	addr := boot.HTTPAddr
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 
 	go func() {
@@ -147,9 +182,16 @@ func main() {
 	_ = httpSrv.Shutdown(shutdownCtx)
 }
 
-func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+func lookupSarvamKey(ctx context.Context, repo store.Repository, tenantID string) (string, error) {
+	ids := []string{"sarvam", "sarvam-stt", "sarvam-llm", "sarvam-tts"}
+	for _, id := range ids {
+		c, err := repo.GetGatewayCredential(ctx, tenantID, id)
+		if err == nil && strings.TrimSpace(c.APIKey) != "" {
+			return c.APIKey, nil
+		}
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return "", err
+		}
 	}
-	return def
+	return "", nil
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
@@ -15,16 +14,20 @@ import (
 )
 
 const (
-	defaultTenantID   = "default"
-	defaultListenID   = "sarvam-stt"
-	defaultThinkID    = "sarvam-llm"
-	defaultSpeakID    = "sarvam-tts"
-	envSystemListen   = "SYSTEM_LISTEN"
-	envSystemThink    = "SYSTEM_THINK"
-	envSystemSpeak    = "SYSTEM_SPEAK"
+	defaultTenantID    = "default"
+	defaultListenID    = "sarvam-stt"
+	defaultThinkID     = "sarvam-llm"
+	defaultSpeakID     = "sarvam-tts"
 	enginesSourceStore = "store"
-	enginesSourceEnv   = "env"
+	enginesSourceProps = "properties"
 )
+
+// EngineDefaults are boot-properties seed when no tenant_engines row exists.
+var EngineDefaults = store.GatewayBinding{
+	Listen: defaultListenID,
+	Think:  defaultThinkID,
+	Speak:  defaultSpeakID,
+}
 
 type tenantEnginesResponse struct {
 	TenantID string `json:"tenant_id"`
@@ -104,20 +107,18 @@ func resolveTenantID(r *http.Request, bodyTenant string) string {
 	return defaultTenantID
 }
 
-func envGatewayDefaults() store.GatewayBinding {
-	listen := strings.TrimSpace(os.Getenv(envSystemListen))
-	if listen == "" {
-		listen = defaultListenID
+func propertiesGatewayDefaults() store.GatewayBinding {
+	b := EngineDefaults
+	if b.Listen == "" {
+		b.Listen = defaultListenID
 	}
-	think := strings.TrimSpace(os.Getenv(envSystemThink))
-	if think == "" {
-		think = defaultThinkID
+	if b.Think == "" {
+		b.Think = defaultThinkID
 	}
-	speak := strings.TrimSpace(os.Getenv(envSystemSpeak))
-	if speak == "" {
-		speak = defaultSpeakID
+	if b.Speak == "" {
+		b.Speak = defaultSpeakID
 	}
-	return store.GatewayBinding{Listen: listen, Think: think, Speak: speak}
+	return b
 }
 
 func (s *Server) resolveTenantEngines(ctx context.Context, tenantID string) (store.GatewayBinding, string, error) {
@@ -128,7 +129,17 @@ func (s *Server) resolveTenantEngines(ctx context.Context, tenantID string) (sto
 	if !errors.Is(err, store.ErrNotFound) {
 		return store.GatewayBinding{}, "", err
 	}
-	return envGatewayDefaults(), enginesSourceEnv, nil
+	// Seed from boot properties defaults into DB when possible so UI/Control see store source.
+	def := propertiesGatewayDefaults()
+	if te2, err := s.repo.UpsertTenantEngines(ctx, store.TenantEngines{
+		TenantID: tenantID,
+		ListenID: def.Listen,
+		ThinkID:  def.Think,
+		SpeakID:  def.Speak,
+	}); err == nil {
+		return te2.Binding(), enginesSourceStore, nil
+	}
+	return def, enginesSourceProps, nil
 }
 
 func validateGatewayBinding(reg port.Registry, b store.GatewayBinding) error {

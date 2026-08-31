@@ -15,6 +15,8 @@ type Memory struct {
 	versions      map[string][]ProfileVersion
 	sessions      map[string]Session
 	engines       map[string]TenantEngines
+	creds         map[string]GatewayCredential // tenantID\x00gatewayID
+	settings      map[string]SystemSetting     // tenantID\x00key
 	kbDocs        map[string]KBDocument
 	kbChunks      map[string][]KBChunk // document_id → chunks
 	playJobs      map[string]PlaybackJob
@@ -35,6 +37,8 @@ func NewMemory() *Memory {
 		versions:     make(map[string][]ProfileVersion),
 		sessions:     make(map[string]Session),
 		engines:      make(map[string]TenantEngines),
+		creds:        make(map[string]GatewayCredential),
+		settings:     make(map[string]SystemSetting),
 		kbDocs:       make(map[string]KBDocument),
 		kbChunks:     make(map[string][]KBChunk),
 		playJobs:     make(map[string]PlaybackJob),
@@ -218,6 +222,72 @@ func (m *Memory) UpsertTenantEngines(ctx context.Context, te TenantEngines) (Ten
 	te.UpdatedAt = time.Now().UTC()
 	m.engines[te.TenantID] = te
 	return te, nil
+}
+
+func credKey(tenantID, gatewayID string) string { return tenantID + "\x00" + gatewayID }
+func settingKey(tenantID, key string) string    { return tenantID + "\x00" + key }
+
+func (m *Memory) GetGatewayCredential(ctx context.Context, tenantID, gatewayID string) (GatewayCredential, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.creds[credKey(tenantID, gatewayID)]
+	if !ok {
+		return GatewayCredential{}, ErrNotFound
+	}
+	return c, nil
+}
+
+func (m *Memory) UpsertGatewayCredential(ctx context.Context, c GatewayCredential) (GatewayCredential, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(c.Extra) == 0 {
+		c.Extra = json.RawMessage(`{}`)
+	}
+	c.UpdatedAt = time.Now().UTC()
+	m.creds[credKey(c.TenantID, c.GatewayID)] = c
+	return c, nil
+}
+
+func (m *Memory) ListGatewayCredentials(ctx context.Context, tenantID string) ([]GatewayCredential, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []GatewayCredential
+	for _, c := range m.creds {
+		if c.TenantID == tenantID {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) GetSystemSetting(ctx context.Context, tenantID, key string) (SystemSetting, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.settings[settingKey(tenantID, key)]
+	if !ok {
+		return SystemSetting{}, ErrNotFound
+	}
+	return st, nil
+}
+
+func (m *Memory) UpsertSystemSetting(ctx context.Context, st SystemSetting) (SystemSetting, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st.UpdatedAt = time.Now().UTC()
+	m.settings[settingKey(st.TenantID, st.Key)] = st
+	return st, nil
+}
+
+func (m *Memory) ListSystemSettings(ctx context.Context, tenantID string) ([]SystemSetting, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []SystemSetting
+	for _, st := range m.settings {
+		if st.TenantID == tenantID {
+			out = append(out, st)
+		}
+	}
+	return out, nil
 }
 
 func (m *Memory) CreateKBDocument(ctx context.Context, doc KBDocument) error {

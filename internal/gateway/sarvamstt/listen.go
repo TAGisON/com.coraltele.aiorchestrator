@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -65,7 +64,14 @@ func (g *Gateway) client() *http.Client {
 	return sarvam.DefaultHTTPClient()
 }
 
+func (g *Gateway) refreshCfg() {
+	if cfg, err := sarvam.LoadConfig(); err == nil {
+		g.Cfg = cfg
+	}
+}
+
 func (g *Gateway) RecognizeBatch(ctx context.Context, req port.ListenRequest, pcm []byte) (port.ListenFinal, error) {
+	g.refreshCfg()
 	if !g.Cfg.Configured() {
 		return port.ListenFinal{}, &port.GatewayError{Code: port.CodeAuth, Message: "sarvam api key missing"}
 	}
@@ -135,6 +141,7 @@ func (g *Gateway) RecognizeBatch(ctx context.Context, req port.ListenRequest, pc
 }
 
 func (g *Gateway) OpenStream(ctx context.Context, req port.ListenRequest) (port.ListenStream, error) {
+	g.refreshCfg()
 	if !g.Cfg.Configured() {
 		return nil, &port.GatewayError{Code: port.CodeAuth, Message: "sarvam api key missing"}
 	}
@@ -345,7 +352,7 @@ func binaryPutUint32(b []byte, v uint32) {
 	b[3] = byte(v >> 24)
 }
 
-// Register adds sarvam-stt when configured. Probe is unhealthy without a key.
+// Register adds sarvam-stt. API key may be supplied later via DB credentials.
 func Register(reg port.Registry, g *Gateway) error {
 	if g == nil {
 		cfg, err := sarvam.LoadConfig()
@@ -354,15 +361,13 @@ func Register(reg port.Registry, g *Gateway) error {
 		}
 		g = New(cfg)
 	}
-	if !g.Cfg.Configured() {
-		return fmt.Errorf("sarvam-stt: api key not configured")
-	}
 	return reg.Register(port.Registration{
 		ID:           ID,
 		Port:         port.PortListen,
 		Capabilities: g.Capabilities(),
 		Instance:     g,
 		Probe: func(ctx context.Context) port.Health {
+			g.refreshCfg()
 			if !g.Cfg.Configured() {
 				return port.Health{Healthy: false, LastError: "api key missing"}
 			}

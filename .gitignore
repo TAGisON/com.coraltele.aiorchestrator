@@ -54,3 +54,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Built binaries
+*.exe
+/aiorchestrator
+/aiorchestrator.exe

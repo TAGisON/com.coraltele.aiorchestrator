@@ -6,20 +6,20 @@ Shared local Postgres `127.0.0.1:5432`, **new DB name** `aiorchestrator` (same p
 
 ```powershell
 .\tools\lab\Init-LabDatabase.ps1
-copy .env.example .env
-# edit .env if needed — set SARVAM_API_KEY when testing real vendors
+# Boot uses committed conf/aiorchestrator.properties (HTTP :8011, database.url, engines seeds).
+# Optional: copy .env.example .env for lab overrides only.
 go run ./cmd/aiorchestrator
 ```
 
-Open **http://127.0.0.1:8080/lab/**
+Open **http://127.0.0.1:8011/lab/**
 
-Migrations apply automatically on boot when `DATABASE_URL` is set.
+Migrations apply automatically on boot when `database.url` is set (properties or `DATABASE_URL`).
 
-`REQUIRE_DATABASE=1` refuses to start on in-memory (recommended for lab).
+`database.require=true` (properties) / `REQUIRE_DATABASE=1` refuses to start on in-memory (recommended for lab).
 
 ## Logging
 
-- Process logs: structured **JSON** on stdout (`LOG_FORMAT=json`, `LOG_LEVEL=info|debug|warn|error`)
+- Rolling **JSON** app log under `logs/aiorchestrator/` (see `conf/logging.xml` + properties `log.*`)
 - Every HTTP request: `method`, `path`, `status`, `duration_ms`
 - Observe path: audit/analytics failures logged fail-open (never break media)
 
@@ -36,13 +36,15 @@ Migrations apply automatically on boot when `DATABASE_URL` is set.
 | Playback | Enqueue playback job |
 | API log | Browser-side request/response trail |
 
+Settings / vendor keys (UI or curl): `GET /v1/tenant/config`, `PUT /v1/tenant/credentials/{gateway_id}`, `PUT /v1/tenant/settings/{key}` — see `CONTROL_API.md`.
+
 ---
 
 ## Contact Agent CC path
 
 Order for proving the vertical in lab (no FreeSWITCH required):
 
-1. **Set tenant engines** — Tenant Engines tab → suggest fakes (`fake-listen` / `fake-think` / `fake-speak`) or Sarvam trio when `SARVAM_API_KEY` is set → Save PUT. Confirm `source` is `store` (or note env fallback in GET).
+1. **Set tenant engines** — Tenant Engines tab → suggest fakes (`fake-listen` / `fake-think` / `fake-speak`) or Sarvam trio after `PUT /v1/tenant/credentials/sarvam` → Save PUT. Confirm `source` is `store`.
 2. **Publish ≥2 behaviour presets** — Profiles → CC Sales + CC R&D (and/or after-hours). Each has `metadata.family: contact-agent`. **Do not** use legacy sarvam+fake failover for the CC demo.
 3. **Create Talk session** — Sessions → profile_id `cc-sales` (or `cc-rnd`) → Create. Panel shows `gateway_binding` matching tenant engines.
 4. **Multi-turn inject** — inject `hello`, then a second turn; Inspect → Transcript shows ordered user/assistant rows.
@@ -88,7 +90,7 @@ Lab proof without live Sarvam 429: `go test` path `TestComposer_ThinkDownClipEsc
 
 ### Secrets
 
-`SARVAM_API_KEY` and other credentials live in `.env` / environment only. Never commit `.env`, `.agent/secrets.local.json`, or API keys.
+Prefer **Postgres** via `PUT /v1/tenant/credentials/sarvam` (masked on GET). Optional lab fallback: `SARVAM_API_KEY` in `.env`. Never commit `.env`, `.agent/secrets.local.json`, or API keys.
 
 ---
 
@@ -118,9 +120,9 @@ Thin agent scenarios: `tests/agent/scenarios/F-cc-lab-engines.yaml`, `F-cc-behav
 
 ---
 
-## Sarvam (legacy / optional live)
+## Sarvam (optional live)
 
-Set `SARVAM_API_KEY` in `.env` / environment. Gateways register as `sarvam-stt`, `sarvam-llm`, `sarvam-tts`.
+Prefer `PUT /v1/tenant/credentials/sarvam`. Lab fallback: `SARVAM_API_KEY` in `.env`. Gateways register as `sarvam-stt`, `sarvam-llm`, `sarvam-tts` at boot.
 
 - **CC path:** put those **single** ids on Tenant Engines (Suggest Sarvam), then use CC behaviour presets.
 - **Legacy non-CC:** Profiles preset **sarvam + fake failover** still exists for Phase F–style failover demos — not the Contact Agent default.

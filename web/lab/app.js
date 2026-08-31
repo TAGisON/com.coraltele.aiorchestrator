@@ -192,6 +192,7 @@ document.querySelectorAll("nav button").forEach((btn) => {
     document.querySelectorAll(".tab").forEach((t) => { t.hidden = true; });
     document.getElementById("tab-" + btn.dataset.tab).hidden = false;
     if (btn.dataset.tab === "engines") loadEngines().catch(() => {});
+    if (btn.dataset.tab === "settings") loadTenantConfig().catch(() => {});
   });
 });
 
@@ -281,6 +282,41 @@ function suggestSarvamEngines() {
   document.getElementById("engListen").value = "sarvam-stt";
   document.getElementById("engThink").value = "sarvam-llm";
   document.getElementById("engSpeak").value = "sarvam-tts";
+}
+
+async function loadTenantConfig() {
+  try {
+    const data = await api("GET", "/v1/tenant/config");
+    document.getElementById("settingsJson").textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById("settingsJson").textContent = JSON.stringify(e, null, 2);
+  }
+}
+
+async function saveCredential() {
+  const gatewayId = document.getElementById("credGateway").value.trim();
+  const apiKey = document.getElementById("credApiKey").value;
+  if (!gatewayId || !apiKey) {
+    alert("gateway_id and api_key required");
+    return;
+  }
+  const data = await api("PUT", "/v1/tenant/credentials/" + encodeURIComponent(gatewayId), { api_key: apiKey });
+  document.getElementById("credApiKey").value = "";
+  document.getElementById("settingsJson").textContent = JSON.stringify(data, null, 2);
+  await loadTenantConfig().catch(() => {});
+  await refreshOverview().catch(() => {});
+}
+
+async function saveSetting() {
+  const key = document.getElementById("setKey").value.trim();
+  const value = document.getElementById("setValue").value;
+  if (!key) {
+    alert("key required");
+    return;
+  }
+  const data = await api("PUT", "/v1/tenant/settings/" + encodeURIComponent(key), { value });
+  document.getElementById("settingsJson").textContent = JSON.stringify(data, null, 2);
+  await loadTenantConfig().catch(() => {});
 }
 
 function applyPreset() {

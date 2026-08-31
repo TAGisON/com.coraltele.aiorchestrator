@@ -31,17 +31,19 @@ API: `GET` / `PUT /v1/tenant/engines` (see `CONTROL_API.md`).
 
 ---
 
-## 3. Env fallback (single-tenant lab)
+## 3. Boot seed (properties → DB)
 
-When no tenant-engines row exists, resolve from process env:
+When no `tenant_engines` row exists, resolve from committed boot properties (`conf/aiorchestrator.properties`):
 
-| Env | Default (lab) |
+| Property | Default (lab) |
 |---|---|
-| `SYSTEM_LISTEN` | `sarvam-stt` |
-| `SYSTEM_THINK` | `sarvam-llm` |
-| `SYSTEM_SPEAK` | `sarvam-tts` |
+| `engines.listen` | `sarvam-stt` |
+| `engines.think` | `sarvam-llm` |
+| `engines.speak` | `sarvam-tts` |
 
-Missing env → use the lab default above. Multi-tenant production should persist rows; env is the lab / bootstrap path only.
+On first resolve with a writable store, the binding is **seeded into Postgres** (`source: store`). Env `SYSTEM_LISTEN` / `SYSTEM_THINK` / `SYSTEM_SPEAK` remains a lab override of those property seeds only (not the primary production path).
+
+Vendor API keys are **not** boot properties — use `PUT /v1/tenant/credentials/{gateway_id}` (see `CONTROL_API.md`).
 
 ---
 
@@ -49,7 +51,7 @@ Missing env → use the lab default above. Multi-tenant production should persis
 
 On `POST /v1/sessions`:
 
-1. Resolve tenant engines (row → else env fallback).
+1. Resolve tenant engines (row → else seed from boot properties into store).
 2. Capability-check each id against the process gateway registry (port kind + known id).
 3. Persist snapshot on the session as `gateway_binding`: `{ "listen", "think", "speak" }`.
 4. Pass the same binding into runtime start metadata.
@@ -76,4 +78,4 @@ If a Contact Agent profile still lists providers that **differ** from tenant eng
 - Profile-level vendor override UI  
 - Mid-session failover walk  
 - Per-call engine override  
-- coral-file admin panel (lab panel in later CC phase)
+- Full coral-file admin panel (lab uses Control APIs above)

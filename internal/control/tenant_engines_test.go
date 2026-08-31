@@ -25,10 +25,10 @@ func seedFakeTenantEngines(t *testing.T, mem *store.Memory) {
 	}
 }
 
-func TestTenantEngines_GetEnvFallback(t *testing.T) {
-	t.Setenv("SYSTEM_LISTEN", "fake-listen")
-	t.Setenv("SYSTEM_THINK", "fake-think")
-	t.Setenv("SYSTEM_SPEAK", "fake-speak")
+func TestTenantEngines_GetSeedsFromDefaults(t *testing.T) {
+	control.EngineDefaults = store.GatewayBinding{
+		Listen: "fake-listen", Think: "fake-think", Speak: "fake-speak",
+	}
 	srv, _ := testServer(t)
 
 	rr := httptest.NewRecorder()
@@ -40,7 +40,7 @@ func TestTenantEngines_GetEnvFallback(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got["source"] != "env" {
+	if got["source"] != "store" {
 		t.Fatalf("source %v", got["source"])
 	}
 	if got["listen"] != "fake-listen" || got["think"] != "fake-think" || got["speak"] != "fake-speak" {

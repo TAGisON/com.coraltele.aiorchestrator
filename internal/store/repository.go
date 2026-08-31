@@ -24,6 +24,13 @@ type Repository interface {
 	GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error)
 	UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error)
 
+	GetGatewayCredential(ctx context.Context, tenantID, gatewayID string) (GatewayCredential, error)
+	UpsertGatewayCredential(ctx context.Context, c GatewayCredential) (GatewayCredential, error)
+	ListGatewayCredentials(ctx context.Context, tenantID string) ([]GatewayCredential, error)
+	GetSystemSetting(ctx context.Context, tenantID, key string) (SystemSetting, error)
+	UpsertSystemSetting(ctx context.Context, st SystemSetting) (SystemSetting, error)
+	ListSystemSettings(ctx context.Context, tenantID string) ([]SystemSetting, error)
+
 	CreateKBDocument(ctx context.Context, doc KBDocument) error
 	GetKBDocument(ctx context.Context, id string) (KBDocument, error)
 	UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error)

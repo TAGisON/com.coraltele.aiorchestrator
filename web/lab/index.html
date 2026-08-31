@@ -101,6 +101,7 @@
     <nav id="nav">
       <button data-tab="overview" class="active">Overview</button>
       <button data-tab="engines">Tenant Engines</button>
+      <button data-tab="settings">Settings</button>
       <button data-tab="gateways">Gateways</button>
       <button data-tab="profiles">Profiles</button>
       <button data-tab="sessions">Sessions</button>
@@ -120,7 +121,8 @@
         <div class="panel">
           <h2>Quick start — Contact Agent CC</h2>
           <ol style="color:var(--muted); font-size:0.9rem; line-height:1.5;">
-            <li>Confirm store is <strong>postgres</strong> (DATABASE_URL).</li>
+            <li>Confirm store is <strong>postgres</strong> (boot <code>database.url</code>).</li>
+            <li>Optional: <strong>Settings</strong> — save Sarvam API key to DB (not only .env).</li>
             <li>Open <strong>Tenant Engines</strong> — PUT single listen/think/speak ids (fakes offline, or Sarvam when keyed). Never comma failover lists.</li>
             <li>Publish ≥2 <strong>Contact Agent</strong> behaviour presets (Sales + R&amp;D / after-hours) — not the legacy failover presets.</li>
             <li>Create a Talk session; confirm <code>gateway_binding</code> matches tenant engines.</li>
@@ -133,7 +135,7 @@
       <section class="tab" id="tab-engines" hidden>
         <div class="panel">
           <h2>Tenant Engines (system STT / LLM / TTS)</h2>
-          <p class="hint">One id per slot for the tenant. Contact Agent sessions pin these as <code>gateway_binding</code>. Source is store row or env fallback (<code>SYSTEM_LISTEN</code> / <code>SYSTEM_THINK</code> / <code>SYSTEM_SPEAK</code>).</p>
+          <p class="hint">One id per slot for the tenant. Contact Agent sessions pin these as <code>gateway_binding</code>. Missing row seeds from boot properties into the store (<code>source: store</code>).</p>
           <div class="row">
             <label>listen
               <input id="engListen" list="gwListenList" value="fake-listen" />
@@ -156,6 +158,40 @@
           </div>
           <p class="hint">Current source: <strong id="engSource">…</strong> · tenant: <strong id="engTenant">default</strong></p>
           <pre class="log" id="enginesJson"></pre>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-settings" hidden>
+        <div class="panel">
+          <h2>Gateway credentials (DB)</h2>
+          <p class="hint">Runtime vendor keys — stored in Postgres, never returned raw. Prefer this over <code>.env</code> for Sarvam.</p>
+          <div class="row">
+            <label>gateway_id
+              <input id="credGateway" value="sarvam" />
+            </label>
+            <label>api_key
+              <input id="credApiKey" type="password" placeholder="paste key — not shown after save" autocomplete="off" />
+            </label>
+            <button class="action" onclick="saveCredential()">Save credential</button>
+            <button class="action secondary" onclick="loadTenantConfig()">Refresh config</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>System settings (DB)</h2>
+          <div class="row">
+            <label>key
+              <input id="setKey" list="knownSettings" value="coral.base_url" />
+              <datalist id="knownSettings">
+                <option value="coral.base_url"></option>
+                <option value="control.auth_token"></option>
+              </datalist>
+            </label>
+            <label>value
+              <input id="setValue" placeholder="https://…" />
+            </label>
+            <button class="action" onclick="saveSetting()">Save setting</button>
+          </div>
+          <pre class="log" id="settingsJson"></pre>
         </div>
       </section>
 

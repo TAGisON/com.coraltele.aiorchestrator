@@ -89,6 +89,20 @@ func TestMigrationSQL_HasCCTranscriptDisposition(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasGatewayCredentials(t *testing.T) {
+	body, err := os.ReadFile("migrations/007_gateway_credentials.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS gateway_credentials") {
+		t.Fatal("migration missing gateway_credentials")
+	}
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS system_settings") {
+		t.Fatal("migration missing system_settings")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

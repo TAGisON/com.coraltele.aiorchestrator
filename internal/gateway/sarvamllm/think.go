@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -52,7 +51,14 @@ func (g *Gateway) model() string {
 	return DefaultModel
 }
 
+func (g *Gateway) refreshCfg() {
+	if cfg, err := sarvam.LoadConfig(); err == nil {
+		g.Cfg = cfg
+	}
+}
+
 func (g *Gateway) Complete(ctx context.Context, req port.ThinkRequest) (port.ThinkResult, error) {
+	g.refreshCfg()
 	if !g.Cfg.Configured() {
 		return port.ThinkResult{}, &port.GatewayError{Code: port.CodeAuth, Message: "sarvam api key missing"}
 	}
@@ -188,7 +194,7 @@ func (t *thinkStream) Cancel(ctx context.Context) error {
 	return nil
 }
 
-// Register adds sarvam-llm when configured.
+// Register adds sarvam-llm. API key may be supplied later via DB credentials.
 func Register(reg port.Registry, g *Gateway) error {
 	if g == nil {
 		cfg, err := sarvam.LoadConfig()
@@ -197,15 +203,13 @@ func Register(reg port.Registry, g *Gateway) error {
 		}
 		g = New(cfg)
 	}
-	if !g.Cfg.Configured() {
-		return fmt.Errorf("sarvam-llm: api key not configured")
-	}
 	return reg.Register(port.Registration{
 		ID:           ID,
 		Port:         port.PortThink,
 		Capabilities: g.Capabilities(),
 		Instance:     g,
 		Probe: func(ctx context.Context) port.Health {
+			g.refreshCfg()
 			if !g.Cfg.Configured() {
 				return port.Health{Healthy: false, LastError: "api key missing"}
 			}

@@ -28,9 +28,11 @@ func testServer(t *testing.T) (*control.Server, *store.Memory) {
 
 func setFakeSystemEngines(t *testing.T) {
 	t.Helper()
-	t.Setenv("SYSTEM_LISTEN", "fake-listen")
-	t.Setenv("SYSTEM_THINK", "fake-think")
-	t.Setenv("SYSTEM_SPEAK", "fake-speak")
+	control.EngineDefaults = store.GatewayBinding{
+		Listen: "fake-listen",
+		Think:  "fake-think",
+		Speak:  "fake-speak",
+	}
 }
 
 func TestHealth_OK(t *testing.T) {
