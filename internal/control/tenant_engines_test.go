@@ -109,7 +109,8 @@ func TestSession_CreatePersistsGatewayBinding(t *testing.T) {
   "id":"cc-lab",
   "metadata":{"family":"contact-agent"},
   "modes":{"listen":true,"speak":true,"think":true,"talk":true},
-  "audio":{"canonical_sample_rate_hz":16000}
+  "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}}
 }`)
 
 	rr := httptest.NewRecorder()

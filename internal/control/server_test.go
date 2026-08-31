@@ -89,6 +89,7 @@ func TestSession_CreateGetStop(t *testing.T) {
   "id":"contact-lab",
   "modes":{"listen":true,"speak":true,"think":true},
   "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},
@@ -182,6 +183,7 @@ func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
   "id":"rt-lab",
   "modes":{"listen":true,"speak":true,"think":true},
   "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},

@@ -94,3 +94,33 @@ func TestSSMLUnsupported(t *testing.T) {
 		t.Fatalf("want unsupported got %v", err)
 	}
 }
+
+func TestSpeakVoiceIDOverridesDefaultSpeaker(t *testing.T) {
+	pcm := make([]byte, 16000*2/25)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req["speaker"] != "anushka" {
+			t.Errorf("speaker=%v want anushka (from VoiceID)", req["speaker"])
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"audios": []string{base64.StdEncoding.EncodeToString(pcm)},
+		})
+	}))
+	defer srv.Close()
+
+	g := &sarvamtts.Gateway{
+		Cfg:        sarvam.Config{APIKey: "test-key", TTSURL: srv.URL},
+		HTTPClient: srv.Client(),
+		Speaker:    sarvam.DefaultTTSSpeaker, // would be shubh without VoiceID
+	}
+	ss, err := g.Speak(context.Background(), port.SpeakRequest{
+		SessionID: "s1", Text: "hello", SampleRate: 16000, Language: "hi-IN",
+		VoiceID: "Anushka",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-ss.Frames()
+	<-ss.Done()
+}

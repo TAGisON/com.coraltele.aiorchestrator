@@ -65,7 +65,12 @@ persona:
   name: Priya
   instructions: |
     You are a first-line support agent for Acme. Be concise. Never invent policy.
-  voice_id: tts-engine:priya-hi-en  # gateway-specific voice ref
+  # Preferred: map keyed by Speak gateway id (system-bound session gateway_binding.speak)
+  voice:
+    sarvam-tts: shubh
+    fake-speak: lab-voice
+  # Optional scalar alias when map miss/absent (also accept persona.voice as a string)
+  # voice_id: shubh
 
 routers:
   listen:
@@ -192,6 +197,7 @@ PSTN paths often use **8 kHz**; wideband and meeting paths use **16 kHz** or hig
 - Live clock: every selected Listen/Speak provider must advertise `streaming`.
 - **`family: contact-agent`:** do **not** require profile-level `routers.listen|think|speak.providers` when tenant engines are configured (env or `tenant_engines` row). Warn if profile lists conflict with tenant engines.
 - **Contact Agent language:** default `language.auto_detect: true`; do not force `primary` when auto-detect is on (`docs/product/LANGUAGE_POLICY.md`).
+- **Talk / Speak voice:** if `modes.talk` or `modes.speak` is true, require non-empty `persona.voice_id` **or** non-empty `persona.voice` map (at least one gateway→speaker entry). Listen-only / captions-style profiles may omit persona voice. Publish returns `422` + `profile_invalid` when missing. Do **not** require a map key for every possible Speak gateway at publish (tenant Speak may be unknown). Runtime resolution: `persona.voice[gateway_binding.speak]` then scalar `voice_id` (see `CONTACT_AGENT.md`).
 
 ---
 

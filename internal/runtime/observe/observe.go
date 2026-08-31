@@ -92,6 +92,7 @@ type TurnCompleted struct {
 	ListenGateway  string
 	ThinkGateway   string
 	SpeakGateway   string
+	VoiceID        string
 	Outcome        string
 	LatencyMs      int64
 }
@@ -111,6 +112,9 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 			"think":  t.ThinkGateway,
 			"speak":  t.SpeakGateway,
 		},
+	}
+	if t.VoiceID != "" {
+		payload["voice_id"] = t.VoiceID
 	}
 	if t.SkillName != "" {
 		payload["skill_name"] = t.SkillName

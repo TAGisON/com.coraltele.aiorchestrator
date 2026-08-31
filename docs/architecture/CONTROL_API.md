@@ -184,7 +184,10 @@ Event names (locked): `caption`, `session.state`, `skill.completed`, `turn.compl
 ## 4. Profile publish
 
 `POST /v1/profiles/{id}/versions` body = profile document from `PROFILE_SCHEMA.md`.  
-Server validates gateway ids against registry; returns `422` + `profile_invalid` if not.
+Server validates gateway ids against registry; returns `422` + `profile_invalid` if not.  
+Talk/Speak profiles missing `persona.voice` / `persona.voice_id` also return `422` + `profile_invalid` (cc-3).
+
+**Deferred (coral-file follow-up):** `GET /v1/gateways/{id}/voices` catalog for voice pickers — not in this control surface yet.
 
 ---
 

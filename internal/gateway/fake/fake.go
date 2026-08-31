@@ -102,6 +102,7 @@ type Speak struct {
 	InterFrameDelay time.Duration // pause between frames (barge-in window)
 	CancelCalls     atomic.Int64  // tiny test hook
 	LastLanguage    string        // last SpeakRequest.Language (cc-2 tests)
+	LastVoiceID     string        // last SpeakRequest.VoiceID (cc-3 tests)
 }
 
 func (s *Speak) ID() port.GatewayID { return IDSpeak }
@@ -112,6 +113,7 @@ func (s *Speak) Capabilities() port.Capability {
 
 func (s *Speak) Speak(ctx context.Context, req port.SpeakRequest) (port.SpeakStream, error) {
 	s.LastLanguage = req.Language
+	s.LastVoiceID = req.VoiceID
 	nFrames := s.FrameCount
 	if nFrames <= 0 {
 		nFrames = 1

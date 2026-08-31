@@ -37,6 +37,7 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
   "id":"e-lab",
   "modes":{"listen":true,"speak":true,"think":true,"talk":true},
   "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},
@@ -141,6 +142,7 @@ func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
   "id":"sse-lab",
   "modes":{"listen":true,"speak":true,"think":true},
   "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},
@@ -223,6 +225,7 @@ func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
   "id":"edge-gone-lab",
   "modes":{"listen":true,"speak":true,"think":true},
   "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},

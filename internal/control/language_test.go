@@ -31,6 +31,7 @@ func TestPatchProfileFields_LanguagePrimary(t *testing.T) {
   "audio":{"canonical_sample_rate_hz":16000},
   "language":{"auto_detect":true,"mid_call_switch":true},
   "hot_swap_allowed":["language.primary"],
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
   "routers":{
     "listen":{"providers":["fake-listen"]},
     "speak":{"providers":["fake-speak"]},

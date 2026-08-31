@@ -26,6 +26,8 @@ type Document struct {
 		Think  bool `json:"think"`
 		Talk   bool `json:"talk"`
 	} `json:"modes"`
+	// Persona holds voice/tone/instructions (PROFILE_SCHEMA). Voice required when Talk/Speak.
+	Persona  Persona `json:"persona"`
 	Language struct {
 		Behaviour     string   `json:"behaviour"`
 		Primary       string   `json:"primary"`
@@ -68,6 +70,94 @@ type Document struct {
 	Analytics struct {
 		Emit []string `json:"emit"`
 	} `json:"analytics"`
+}
+
+// Persona is the profile persona subsection (voice, tone, instructions).
+type Persona struct {
+	Name         string            `json:"name,omitempty"`
+	Instructions string            `json:"instructions,omitempty"`
+	VoiceID      string            `json:"voice_id,omitempty"`
+	Voice        map[string]string `json:"-"` // gateway_id → speaker/voice ref
+}
+
+// UnmarshalJSON accepts persona.voice as a map or as a string alias for voice_id.
+func (p *Persona) UnmarshalJSON(b []byte) error {
+	type alias struct {
+		Name         string          `json:"name"`
+		Instructions string          `json:"instructions"`
+		VoiceID      string          `json:"voice_id"`
+		Voice        json.RawMessage `json:"voice"`
+	}
+	var a alias
+	if err := json.Unmarshal(b, &a); err != nil {
+		return err
+	}
+	p.Name = a.Name
+	p.Instructions = a.Instructions
+	p.VoiceID = strings.TrimSpace(a.VoiceID)
+	p.Voice = nil
+	if len(a.Voice) == 0 || string(a.Voice) == "null" {
+		return nil
+	}
+	var scalar string
+	if err := json.Unmarshal(a.Voice, &scalar); err == nil {
+		scalar = strings.TrimSpace(scalar)
+		if scalar != "" && p.VoiceID == "" {
+			p.VoiceID = scalar
+		}
+		return nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal(a.Voice, &m); err != nil {
+		return fmt.Errorf("persona.voice: want string or object: %w", err)
+	}
+	p.Voice = m
+	return nil
+}
+
+// MarshalJSON emits voice_id and optional voice map.
+func (p Persona) MarshalJSON() ([]byte, error) {
+	out := map[string]any{}
+	if p.Name != "" {
+		out["name"] = p.Name
+	}
+	if p.Instructions != "" {
+		out["instructions"] = p.Instructions
+	}
+	if p.VoiceID != "" {
+		out["voice_id"] = p.VoiceID
+	}
+	if len(p.Voice) > 0 {
+		out["voice"] = p.Voice
+	}
+	return json.Marshal(out)
+}
+
+// HasPersonaVoice reports whether persona has a usable voice_id or non-empty voice map entry.
+func HasPersonaVoice(doc Document) bool {
+	if strings.TrimSpace(doc.Persona.VoiceID) != "" {
+		return true
+	}
+	for _, v := range doc.Persona.Voice {
+		if strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveVoiceID returns the Speak VoiceID for a bound speak gateway id.
+// Precedence: persona.voice[speakGatewayID], then persona.voice_id (incl. string voice alias).
+func ResolveVoiceID(doc Document, speakGatewayID string) string {
+	speakGatewayID = strings.TrimSpace(speakGatewayID)
+	if speakGatewayID != "" && doc.Persona.Voice != nil {
+		if v, ok := doc.Persona.Voice[speakGatewayID]; ok {
+			if t := strings.TrimSpace(v); t != "" {
+				return t
+			}
+		}
+	}
+	return strings.TrimSpace(doc.Persona.VoiceID)
 }
 
 type RouterProviders struct {
@@ -132,6 +222,12 @@ func Parse(raw json.RawMessage) (Document, error) {
 func Validate(doc Document, reg port.Registry) error {
 	if !doc.Modes.Listen && !doc.Modes.Speak && !doc.Modes.Think && !doc.Modes.Talk {
 		return &ValidationError{Message: "at least one mode must be on", Details: map[string]any{"field": "modes"}}
+	}
+	if (doc.Modes.Talk || doc.Modes.Speak) && !HasPersonaVoice(doc) {
+		return &ValidationError{
+			Message: "persona.voice or persona.voice_id required when talk or speak mode is on",
+			Details: map[string]any{"field": "persona.voice"},
+		}
 	}
 	if doc.Audio.CanonicalSampleRateHz != 0 {
 		r := doc.Audio.CanonicalSampleRateHz

@@ -8,6 +8,12 @@
     "mid_call_switch": true
   },
   "hot_swap_allowed": ["language.primary"],
+  "persona": {
+    "voice": {
+      "fake-speak": "lab-voice",
+      "sarvam-tts": "shubh"
+    }
+  },
   "routers": {
     "listen": { "providers": ["fake-listen"] },
     "speak": { "providers": ["fake-speak"] },

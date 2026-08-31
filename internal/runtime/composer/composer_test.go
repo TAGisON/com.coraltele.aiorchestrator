@@ -13,6 +13,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
 func talkProfile() profile.Document {
@@ -23,6 +24,7 @@ func talkProfile() profile.Document {
 	doc.Modes.Speak = true
 	doc.Modes.Think = true
 	doc.Audio.CanonicalSampleRateHz = 16000
+	doc.Persona.Voice = map[string]string{"fake-speak": "lab-voice"}
 	doc.Routers.Listen.Providers = []string{"fake-listen"}
 	doc.Routers.Speak.Providers = []string{"fake-speak"}
 	doc.Routers.Think.Providers = []string{"fake-think"}
@@ -176,5 +178,72 @@ func TestComposer_OnListenFinal_LocksAndConsumesLanguage(t *testing.T) {
 	}
 	if spk.LastLanguage != "hi-IN" {
 		t.Fatalf("Speak after ambient=%q", spk.LastLanguage)
+	}
+}
+
+func TestComposer_VoiceIDFromPersonaMapAndBoundSpeak(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 1}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDThink, Port: port.PortThink, Capabilities: (&fake.Think{}).Capabilities(), Instance: &fake.Think{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	doc := talkProfile()
+	doc.Persona.Voice = map[string]string{"fake-speak": "bound-speaker"}
+	doc.Persona.VoiceID = "scalar-fallback"
+	// Conflicting profile list would pick a different order without binding preference.
+	doc.Routers.Speak.Providers = []string{"fake-speak"}
+
+	actor := &session.Actor{
+		GatewayBinding: &store.GatewayBinding{
+			Listen: "fake-listen", Think: "fake-think", Speak: "fake-speak",
+		},
+	}
+	actor.OnListenFinal(port.ListenFinal{Text: "hi", Language: "en-IN", Confidence: 1})
+
+	talk, err := composer.NewTalk(doc, reg, bus.New(), session.NewMemory(), "live", "sess-voice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.BindActor(actor)
+	if err := talk.InjectFinal(context.Background(), "hello"); err != nil {
+		t.Fatal(err)
+	}
+	if spk.LastVoiceID != "bound-speaker" {
+		t.Fatalf("VoiceID=%q want bound-speaker", spk.LastVoiceID)
+	}
+	if spk.LastLanguage != "en-IN" {
+		t.Fatalf("Language=%q want en-IN", spk.LastLanguage)
+	}
+
+	// Map miss → scalar voice_id
+	spk.LastVoiceID = ""
+	doc2 := talkProfile()
+	doc2.Persona.Voice = map[string]string{"sarvam-tts": "anushka"}
+	doc2.Persona.VoiceID = "scalar-only"
+	talk2, err := composer.NewTalk(doc2, reg, bus.New(), session.NewMemory(), "live", "sess-voice-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk2.BindActor(&session.Actor{
+		GatewayBinding: &store.GatewayBinding{Speak: "fake-speak"},
+	})
+	if err := talk2.InjectFinal(context.Background(), "ping"); err != nil {
+		t.Fatal(err)
+	}
+	if spk.LastVoiceID != "scalar-only" {
+		t.Fatalf("VoiceID=%q want scalar-only", spk.LastVoiceID)
 	}
 }

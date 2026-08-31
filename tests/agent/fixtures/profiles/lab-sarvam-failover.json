@@ -2,6 +2,12 @@
   "id": "lab-sarvam-failover",
   "modes": { "listen": true, "speak": true, "think": true },
   "audio": { "canonical_sample_rate_hz": 16000 },
+  "persona": {
+    "voice": {
+      "sarvam-tts": "shubh",
+      "fake-speak": "lab-voice"
+    }
+  },
   "routers": {
     "listen": { "providers": ["sarvam-stt", "fake-listen"] },
     "speak": { "providers": ["sarvam-tts", "fake-speak"] },

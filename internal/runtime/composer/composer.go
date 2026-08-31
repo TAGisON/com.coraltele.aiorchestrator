@@ -5,6 +5,7 @@ package composer
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -256,16 +257,23 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 }
 
 func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thinkpath.Result, barge bool, outcome string, started time.Time) {
-	listenGW, thinkGW, speakGW := "", "", ""
-	if len(t.Doc.Routers.Listen.Providers) > 0 {
+	listenGW, thinkGW := "", ""
+	if t.Actor != nil && t.Actor.GatewayBinding != nil {
+		if s := strings.TrimSpace(t.Actor.GatewayBinding.Listen); s != "" {
+			listenGW = s
+		}
+		if s := strings.TrimSpace(t.Actor.GatewayBinding.Think); s != "" {
+			thinkGW = s
+		}
+	}
+	if listenGW == "" && len(t.Doc.Routers.Listen.Providers) > 0 {
 		listenGW = t.Doc.Routers.Listen.Providers[0]
 	}
-	if len(t.Doc.Routers.Think.Providers) > 0 {
+	if thinkGW == "" && len(t.Doc.Routers.Think.Providers) > 0 {
 		thinkGW = t.Doc.Routers.Think.Providers[0]
 	}
-	if len(t.Doc.Routers.Speak.Providers) > 0 {
-		speakGW = t.Doc.Routers.Speak.Providers[0]
-	}
+	speakGW := t.speakGatewayID()
+	voiceID := profile.ResolveVoiceID(t.Doc, speakGW)
 	if t.Obs != nil {
 		t.Obs.OnTurnCompleted(ctx, observe.TurnCompleted{
 			UserText:      userText,
@@ -278,6 +286,7 @@ func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thin
 			ListenGateway: listenGW,
 			ThinkGateway:  thinkGW,
 			SpeakGateway:  speakGW,
+			VoiceID:       voiceID,
 			Outcome:       outcome,
 			LatencyMs:     time.Since(started).Milliseconds(),
 		})
@@ -299,7 +308,7 @@ func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thin
 }
 
 func (t *Talk) speak(ctx context.Context, text string) error {
-	speakGW, err := t.selectSpeak()
+	speakGW, speakID, err := t.selectSpeak()
 	if err != nil {
 		t.setState(Listening)
 		return err
@@ -308,12 +317,14 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 	if t.Actor != nil {
 		lang = t.Actor.ActiveLanguage()
 	}
+	voiceID := profile.ResolveVoiceID(t.Doc, speakID)
 	speakCtx, cancel := context.WithCancel(ctx)
 	stream, err := speakGW.Speak(speakCtx, port.SpeakRequest{
 		SessionID:  t.Session,
 		Text:       text,
 		SampleRate: t.Rate,
 		Language:   lang,
+		VoiceID:    voiceID,
 	})
 	if err != nil {
 		cancel()
@@ -405,23 +416,44 @@ func (t *Talk) bargeIn() {
 	}
 }
 
-func (t *Talk) selectSpeak() (port.Speak, error) {
-	ids := make([]port.GatewayID, 0, len(t.Doc.Routers.Speak.Providers))
-	for _, p := range t.Doc.Routers.Speak.Providers {
-		ids = append(ids, port.GatewayID(p))
+// speakGatewayID is the Speak id used for persona.voice map keys and audit.
+// Prefer session gateway_binding.speak when pinned (CC); else first profile speak provider.
+func (t *Talk) speakGatewayID() string {
+	if t.Actor != nil && t.Actor.GatewayBinding != nil {
+		if s := strings.TrimSpace(t.Actor.GatewayBinding.Speak); s != "" {
+			return s
+		}
+	}
+	if len(t.Doc.Routers.Speak.Providers) > 0 {
+		return t.Doc.Routers.Speak.Providers[0]
+	}
+	return ""
+}
+
+func (t *Talk) selectSpeak() (port.Speak, string, error) {
+	var ids []port.GatewayID
+	if t.Actor != nil && t.Actor.GatewayBinding != nil {
+		if s := strings.TrimSpace(t.Actor.GatewayBinding.Speak); s != "" {
+			ids = []port.GatewayID{port.GatewayID(s)}
+		}
 	}
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("no speak providers")
+		for _, p := range t.Doc.Routers.Speak.Providers {
+			ids = append(ids, port.GatewayID(p))
+		}
+	}
+	if len(ids) == 0 {
+		return nil, "", fmt.Errorf("no speak providers")
 	}
 	rec, err := router.Select(t.Reg, ids, port.PortSpeak, router.SelectOptions{Clock: t.Clock})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	sp, ok := rec.Instance.(port.Speak)
 	if !ok {
-		return nil, fmt.Errorf("speak instance type assert failed")
+		return nil, "", fmt.Errorf("speak instance type assert failed")
 	}
-	return sp, nil
+	return sp, string(rec.ID), nil
 }
 
 // SpeakAndWaitForBarge starts Speaking and returns once barge-in occurs or speak completes.
