@@ -16,6 +16,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/control"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coralcrm"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coraltransfer"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/deskskills"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/fake"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/ingest"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvam"
@@ -99,6 +100,10 @@ func main() {
 	}
 	if err := coralcrm.Register(reg, &coralcrm.Gateway{BaseURL: coralBase}); err != nil {
 		applog.Error("register coral-crm failed", "err", err)
+		os.Exit(1)
+	}
+	if _, err := deskskills.Register(reg, nil); err != nil {
+		applog.Error("register desk-skills failed", "err", err)
 		os.Exit(1)
 	}
 

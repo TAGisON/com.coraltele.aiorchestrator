@@ -80,6 +80,44 @@ func TestThinkPath_KnowledgeMiss_GroundingRequired(t *testing.T) {
 	}
 }
 
+func TestThinkPath_ClipWinsOverGroundingEscalate(t *testing.T) {
+	reg := baseReg(t)
+	var doc profile.Document
+	doc.Modes.Think = true
+	doc.Grounding.Required = true
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	doc.Routers.Knowledge.Providers = []string{"fake-knowledge"}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"greeting-en": {
+				Text: "Welcome to Coral.",
+				When: map[string]any{"regex": `(?i)\b(hi|hello|hey)\b`},
+			},
+		},
+	}
+	doc.Rules = []profile.Rule{{
+		ID: "escalate-no-grounding", Phase: "pre_think",
+		When:   map[string]any{"grounding_required": true, "knowledge_hit": false},
+		Action: "escalate", Message: "no kb — escalate",
+	}}
+	deps, err := thinkpath.Resolve(reg, doc, "live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &thinkpath.Path{Doc: doc, Mem: session.NewMemory(), Deps: deps, Reg: reg, Session: "s-clip-g"}
+	res, err := p.Run(context.Background(), "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ResponseTier != thinkpath.TierClip || res.ResponseText != "Welcome to Coral." {
+		t.Fatalf("want greeting clip, got %+v", res)
+	}
+	if res.Action == "escalate" {
+		t.Fatal("grounding escalate must not beat greeting clip")
+	}
+}
+
 func TestThinkPath_KnowledgeHit_Think_Playbook(t *testing.T) {
 	reg := router.NewMemRegistry()
 	know := &fake.Knowledge{Snippets: map[string][]port.KnowledgeSnippet{

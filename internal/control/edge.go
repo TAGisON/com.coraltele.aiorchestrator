@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/modaudiostream"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
@@ -11,10 +12,16 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
+// LiveTalkStarter starts Listen→Talk when an edge attaches (browser or FreeSWITCH).
+type LiveTalkStarter interface {
+	StartLiveTalk(ctx context.Context, sessionID string) error
+}
+
 // EdgeBinder binds FS WSS connections to session actors.
 type EdgeBinder struct {
 	Repo store.Repository
 	Mgr  *session.Manager
+	Live LiveTalkStarter
 	// OnTerminal runs after durable Cancelled from feeder-gone (same hook as stop API).
 	OnTerminal func(ctx context.Context, sess store.Session, terminal string)
 }
@@ -58,12 +65,22 @@ func (b *EdgeBinder) AttachConn(sessionID string, conn *modaudiostream.Conn) err
 	if b.Repo != nil {
 		_, _ = b.Repo.UpdateSessionState(ctx, sessionID, store.StateAttached)
 	}
+	if b.Live != nil {
+		if err := b.Live.StartLiveTalk(ctx, sessionID); err != nil {
+			// Keep edge attached so Speak can still reach the sink; Listen may recover on retry.
+			applog.Warn("start live talk", "session", sessionID, "err", err)
+		}
+	}
 	return nil
 }
 
 // NewEdgeBinder returns an EdgeBinder that routes feeder-gone Terminal through onSessionTerminal.
 func (s *Server) NewEdgeBinder(mgr *session.Manager) *EdgeBinder {
-	return &EdgeBinder{Repo: s.repo, Mgr: mgr, OnTerminal: s.onSessionTerminal}
+	b := &EdgeBinder{Repo: s.repo, Mgr: mgr, OnTerminal: s.onSessionTerminal}
+	if live, ok := s.rt.(LiveTalkStarter); ok {
+		b.Live = live
+	}
+	return b
 }
 
 // MountEdge registers GET /edge/fs on the control mux (Bearer auth skipped for /edge/).

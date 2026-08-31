@@ -74,6 +74,9 @@ type Document struct {
 	Analytics struct {
 		Emit []string `json:"emit"`
 	} `json:"analytics"`
+	// XDesk carries the compiled Contact Desk document for desk-driven profiles.
+	// Pinned with the profile version so the runtime needs no second lookup.
+	XDesk json.RawMessage `json:"x_desk,omitempty"`
 }
 
 // ResponseConfig is response.ladder + clips + turn templates (distinct from post-call templates.*).

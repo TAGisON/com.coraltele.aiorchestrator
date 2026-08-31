@@ -56,4 +56,30 @@ type Repository interface {
 	ListTranscriptTurns(ctx context.Context, sessionID string) ([]TranscriptTurn, error)
 	UpsertSessionDisposition(ctx context.Context, d SessionDisposition) (SessionDisposition, error)
 	GetSessionDisposition(ctx context.Context, sessionID string) (SessionDisposition, error)
+
+	// Contact Desk vertical (CONTACT_DESK_POC_SOLUTION.md §4.4).
+	UpsertDesk(ctx context.Context, d Desk) (Desk, error)
+	GetDesk(ctx context.Context, id string) (Desk, error)
+	ListDesks(ctx context.Context, tenantID string) ([]Desk, error)
+	SaveDeskDraft(ctx context.Context, deskID string, doc json.RawMessage) (DeskDraft, error)
+	GetDeskDraft(ctx context.Context, deskID string) (DeskDraft, error)
+	PublishDeskVersion(ctx context.Context, v DeskVersion) (DeskVersion, error)
+	GetDeskVersion(ctx context.Context, deskID string, version int) (DeskVersion, error)
+	ListDeskVersions(ctx context.Context, deskID string) ([]DeskVersion, error)
+
+	UpsertSessionAttributes(ctx context.Context, sessionID string, attrs []SessionAttribute) error
+	ListSessionAttributes(ctx context.Context, sessionID string) ([]SessionAttribute, error)
+	AppendSkillInvocation(ctx context.Context, inv SkillInvocation) (SkillInvocation, error)
+	ListSkillInvocations(ctx context.Context, sessionID string) ([]SkillInvocation, error)
+
+	AppendPIIAccess(ctx context.Context, ev PIIAccess) (PIIAccess, error)
+	ListPIIAccess(ctx context.Context, sessionID string, limit int) ([]PIIAccess, error)
+	CreateErasureRequest(ctx context.Context, r ErasureRequest) (ErasureRequest, error)
+	ListErasureRequests(ctx context.Context, tenantID string) ([]ErasureRequest, error)
+	CompleteErasureRequest(ctx context.Context, id string) (ErasureRequest, error)
+	UpsertConsent(ctx context.Context, c ConsentRecord) (ConsentRecord, error)
+	GetConsent(ctx context.Context, tenantID, phone string) (ConsentRecord, error)
+
+	CountActiveSessions(ctx context.Context, tenantID string) (int, error)
+	PurgeSessionData(ctx context.Context, sessionID string) error
 }

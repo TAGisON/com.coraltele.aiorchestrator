@@ -36,6 +36,28 @@ type Result struct {
 	SkillOK       bool
 	PlaybookState string
 	BlockedThink  bool
+	// DeskEnd is set when a Contact Desk guided path finished the call.
+	DeskEnd     bool
+	Disposition string
+	DeskStepID  string
+}
+
+// Controller is an optional deterministic dialog owner (Contact Desk guided paths).
+// When it handles a turn, rules / ladder / Think are skipped for that turn.
+type Controller interface {
+	Turn(ctx context.Context, userText string) (ControllerResult, bool)
+	Welcome() (string, bool)
+}
+
+// ControllerResult is one controller-decided turn.
+type ControllerResult struct {
+	Text        string
+	Tier        string
+	SkillName   string
+	SkillOK     bool
+	End         bool
+	Disposition string
+	StepID      string
 }
 
 // Deps are resolved gateway instances (from registry Select).
@@ -92,6 +114,8 @@ type Path struct {
 	// PinnedEngines is true when session gateway_binding is set (CC) — no mid-session vendor hop;
 	// Think total failure uses profile.fallback.think_down.
 	PinnedEngines bool
+	// Desk owns the turn when the pinned profile carries a Contact Desk document.
+	Desk Controller
 }
 
 // Run executes the locked order for one inbound utterance (or playback transcript).
@@ -104,6 +128,27 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 	p.Mem.Append("user", userText)
 	// 2. redact stub (no-op)
 	redacted := userText
+
+	// 2b. Contact Desk guided path owns the turn when configured.
+	if p.Desk != nil {
+		if dr, handled := p.Desk.Turn(ctx, redacted); handled {
+			res.Action = "allow"
+			res.ResponseTier = dr.Tier
+			if res.ResponseTier == "" {
+				res.ResponseTier = TierClip
+			}
+			res.ResponseText = dr.Text
+			res.SkillName = dr.SkillName
+			res.SkillOK = dr.SkillOK
+			res.DeskEnd = dr.End
+			res.Disposition = dr.Disposition
+			res.DeskStepID = dr.StepID
+			if dr.Text != "" {
+				p.Mem.Append("assistant", dr.Text)
+			}
+			return res, nil
+		}
+	}
 
 	// 3. playbook step (if profile has playbook)
 	if p.Doc.Playbook != nil && len(p.Doc.Playbook.States) > 0 {
@@ -138,60 +183,38 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 		Slots:             p.Mem.GetSlots(),
 	}
 
-	// 5. rules pre_think
-	if rule, ok := firstMatch(p.Doc.Rules, "pre_think", facts); ok {
-		res.RuleID = rule.ID
-		res.Action = rule.Action
-		switch rule.Action {
-		case "refuse":
-			res.ResponseTier = TierRefuse
-			res.ResponseText = rule.Message
-			if res.ResponseText == "" {
-				res.ResponseText = "I cannot help with that."
-			}
-			p.Mem.Append("assistant", res.ResponseText)
-			return res, nil
-		case "block_think":
-			res.BlockedThink = true
-			res.ResponseTier = TierRefuse
-			res.ResponseText = rule.Message
-			if res.ResponseText == "" {
-				res.ResponseText = "Thinking blocked by policy."
-			}
-			p.Mem.Append("assistant", res.ResponseText)
-			return res, nil
-		case "escalate":
-			res.ResponseTier = TierEscalate
-			res.ResponseText = rule.Message
-			if res.ResponseText == "" {
-				res.ResponseText = "Escalating to a human."
-			}
-			if rule.Skill != "" {
-				ok, err := p.executeSkill(ctx, rule.Skill, nil)
-				if err != nil {
-					return res, err
-				}
-				res.SkillName = rule.Skill
-				res.SkillOK = ok
-			}
-			p.Mem.Append("assistant", res.ResponseText)
-			return res, nil
-		case "inject_text":
-			if rule.Text != "" {
-				redacted = rule.Text + "\n" + redacted
-			}
-		case "allow":
-			// continue
+	// 5. rules pre_think — text/intent predicates only.
+	// Grounding-only rules (grounding_required / knowledge_hit) wait until after the clip ladder
+	// so greetings and intent clips still fire when the KB misses.
+	if rule, ok := firstMatchFiltered(p.Doc.Rules, "pre_think", facts, false); ok {
+		applied, newText, err := p.applyPreThinkRule(ctx, &res, rule, redacted)
+		if err != nil {
+			return res, err
 		}
+		if applied {
+			return res, nil
+		}
+		redacted = newText
 	}
 
-	// 5b. response ladder (clip → template) before free LLM
+	// 5b. response ladder (clip → template) before free LLM / grounding escalate
 	if text, tier, ok := matchLadderCanned(p.Doc.Response, redacted); ok {
 		res.Action = "allow"
 		res.ResponseTier = tier
 		res.ResponseText = text
 		p.Mem.Append("assistant", text)
 		return res, nil
+	}
+
+	// 5c. grounding-only pre_think (e.g. escalate-no-grounding) after clips miss
+	if rule, ok := firstMatchFiltered(p.Doc.Rules, "pre_think", facts, true); ok {
+		applied, _, err := p.applyPreThinkRule(ctx, &res, rule, redacted)
+		if err != nil {
+			return res, err
+		}
+		if applied {
+			return res, nil
+		}
 	}
 
 	if p.Doc.Grounding.Required && !hit {
@@ -446,6 +469,86 @@ func firstMatch(rules []profile.Rule, phase string, f evalFacts) (profile.Rule, 
 		}
 	}
 	return profile.Rule{}, false
+}
+
+// firstMatchFiltered walks rules for phase.
+// groundingOnly=false skips grounding-only when-clauses; groundingOnly=true matches only those.
+func firstMatchFiltered(rules []profile.Rule, phase string, f evalFacts, groundingOnly bool) (profile.Rule, bool) {
+	for _, r := range rules {
+		if r.Phase != phase {
+			continue
+		}
+		if isGroundingOnlyWhen(r.When) != groundingOnly {
+			continue
+		}
+		if matchWhen(r.When, f) {
+			return r, true
+		}
+	}
+	return profile.Rule{}, false
+}
+
+func isGroundingOnlyWhen(when map[string]any) bool {
+	if len(when) == 0 {
+		return false
+	}
+	for k := range when {
+		if k != "grounding_required" && k != "knowledge_hit" {
+			return false
+		}
+	}
+	return true
+}
+
+// applyPreThinkRule applies a matched pre_think rule.
+// Returns applied=true when the turn should end; otherwise continues with possibly rewritten user text.
+func (p *Path) applyPreThinkRule(ctx context.Context, res *Result, rule profile.Rule, redacted string) (applied bool, newText string, err error) {
+	res.RuleID = rule.ID
+	res.Action = rule.Action
+	switch rule.Action {
+	case "refuse":
+		res.ResponseTier = TierRefuse
+		res.ResponseText = rule.Message
+		if res.ResponseText == "" {
+			res.ResponseText = "I cannot help with that."
+		}
+		p.Mem.Append("assistant", res.ResponseText)
+		return true, redacted, nil
+	case "block_think":
+		res.BlockedThink = true
+		res.ResponseTier = TierRefuse
+		res.ResponseText = rule.Message
+		if res.ResponseText == "" {
+			res.ResponseText = "Thinking blocked by policy."
+		}
+		p.Mem.Append("assistant", res.ResponseText)
+		return true, redacted, nil
+	case "escalate":
+		res.ResponseTier = TierEscalate
+		res.ResponseText = rule.Message
+		if res.ResponseText == "" {
+			res.ResponseText = "Escalating to a human."
+		}
+		if rule.Skill != "" {
+			ok, err := p.executeSkill(ctx, rule.Skill, nil)
+			if err != nil {
+				return false, redacted, err
+			}
+			res.SkillName = rule.Skill
+			res.SkillOK = ok
+		}
+		p.Mem.Append("assistant", res.ResponseText)
+		return true, redacted, nil
+	case "inject_text":
+		if rule.Text != "" {
+			redacted = rule.Text + "\n" + redacted
+		}
+		return false, redacted, nil
+	case "allow":
+		return false, redacted, nil
+	default:
+		return false, redacted, nil
+	}
 }
 
 func matchWhen(when map[string]any, f evalFacts) bool {

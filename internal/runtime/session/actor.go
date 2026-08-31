@@ -108,6 +108,7 @@ type Actor struct {
 
 	feeders []port.Feeder
 	sinks   []port.Sink
+	pcmTap  func(port.PCMFrame) // optional live Listen tap (edge uplink); set by control.StartLiveTalk
 }
 
 // State returns the current lifecycle state.
@@ -220,6 +221,19 @@ func (a *Actor) FeedPCM(frame port.PCMFrame) {
 		frame.SampleRate = a.SampleRate
 	}
 	a.Bus.PublishAudio(frame)
+	a.mu.Lock()
+	tap := a.pcmTap
+	a.mu.Unlock()
+	if tap != nil {
+		tap(frame)
+	}
+}
+
+// SetPCMTap registers a live uplink consumer (Listen). Nil clears.
+func (a *Actor) SetPCMTap(tap func(port.PCMFrame)) {
+	a.mu.Lock()
+	a.pcmTap = tap
+	a.mu.Unlock()
 }
 
 // FeedPlaybackBlob feeds a finite PCM blob at playback pace (may be faster than realtime).

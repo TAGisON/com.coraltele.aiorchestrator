@@ -28,6 +28,7 @@ type Memory struct {
 	transcriptSeq int64
 	transcripts   map[string][]TranscriptTurn // session_id → ordered turns
 	dispositions  map[string]SessionDisposition
+	desk          *deskMemory
 	healthy       bool
 }
 

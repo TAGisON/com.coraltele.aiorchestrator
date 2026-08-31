@@ -3,7 +3,7 @@
 **Status:** LOCKED (product vertical for `contact-agent-cc` pipeline)  
 **Date:** 31 August 2026  
 **Parents:** `PRODUCT_DECISIONS.md`  
-**Related:** `SYSTEM_ENGINES.md`, `LANGUAGE_POLICY.md`
+**Related:** `SYSTEM_ENGINES.md`, `LANGUAGE_POLICY.md`, `CONTACT_DESK_POC_SOLUTION.md` (Contact Desk industrial architecture — Desk ≡ this profile family)
 
 ---
 

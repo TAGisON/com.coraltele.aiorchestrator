@@ -1,13 +1,16 @@
 package control
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -94,6 +97,9 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 		cfg.EdgeTokenTTL = 5 * time.Minute
 	}
 	s := &Server{repo: repo, reg: reg, rt: rt, cfg: cfg, mux: http.NewServeMux(), uiFS: uiFS}
+	if sr, ok := rt.(*SessionRuntime); ok && sr != nil && sr.OnSessionEnd == nil {
+		sr.OnSessionEnd = s.EndSessionFromDesk
+	}
 	s.routes()
 	return s
 }
@@ -128,6 +134,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
 	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
+	s.mountDeskRoutes()
 	s.mountUIRoutes(s.uiFS)
 }
 
@@ -160,6 +167,15 @@ func (s *statusRecorder) Flush() {
 	if f, ok := s.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+// Hijack lets /edge/fs WebSocket upgrades work through the logging wrapper.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := s.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("response does not support hijacking")
+	}
+	return h.Hijack()
 }
 
 func (s *Server) authMiddleware(next http.Handler) http.Handler {

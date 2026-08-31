@@ -84,6 +84,9 @@ type Talk struct {
 	Obs *observe.Observer
 	// ProfileVersion pinned at session create (for turn payload / Obs meta).
 	ProfileVersion int
+	// OnDeskEnd fires when a Contact Desk guided path ends the call (after the
+	// closing line is spoken). Control uses it to stop the session.
+	OnDeskEnd func(disposition string)
 
 	mu           sync.Mutex
 	state        TurnState
@@ -93,6 +96,7 @@ type Talk struct {
 	lastBargeIn  bool
 	cancelCount  int
 	answered     bool
+	lastActivity time.Time
 }
 
 // NewTalk builds a composer. VAD may be nil (defaults to energy VAD when clock enables it).
@@ -228,15 +232,22 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	t.mu.Unlock()
 
 	var parts []string
-	for _, rule := range t.Doc.Rules {
-		if rule.Phase == "pre_speak_first" && rule.Action == "inject_text" {
-			if s := strings.TrimSpace(rule.Text); s != "" {
-				parts = append(parts, s)
-			}
+	if t.Path != nil && t.Path.Desk != nil {
+		if text, ok := t.Path.Desk.Welcome(); ok && strings.TrimSpace(text) != "" {
+			parts = append(parts, strings.TrimSpace(text))
 		}
 	}
-	if g := openingGreeting(t.Doc); g != "" {
-		parts = append(parts, g)
+	if len(parts) == 0 {
+		for _, rule := range t.Doc.Rules {
+			if rule.Phase == "pre_speak_first" && rule.Action == "inject_text" {
+				if s := strings.TrimSpace(rule.Text); s != "" {
+					parts = append(parts, s)
+				}
+			}
+		}
+		if g := openingGreeting(t.Doc); g != "" {
+			parts = append(parts, g)
+		}
 	}
 	spoken = strings.TrimSpace(strings.Join(parts, " "))
 	if spoken == "" {
@@ -285,6 +296,7 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Lock()
 	t.thinkCancel = cancel
 	t.lastBargeIn = false
+	t.lastActivity = time.Now()
 	t.mu.Unlock()
 	defer cancel()
 
@@ -322,8 +334,28 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	if barge {
 		outcome = "barge_in"
 	}
+	t.mu.Lock()
+	t.lastActivity = time.Now()
+	t.mu.Unlock()
 	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
+	if res.DeskEnd && t.OnDeskEnd != nil {
+		go t.OnDeskEnd(res.Disposition)
+	}
 	return err
+}
+
+// LastActivity is when the last turn started or finished (silence watchdog).
+func (t *Talk) LastActivity() time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lastActivity
+}
+
+// MarkActivity refreshes the silence watchdog clock.
+func (t *Talk) MarkActivity() {
+	t.mu.Lock()
+	t.lastActivity = time.Now()
+	t.mu.Unlock()
 }
 
 func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thinkpath.Result, barge bool, outcome string, started time.Time) {
