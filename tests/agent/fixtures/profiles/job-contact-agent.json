@@ -14,6 +14,29 @@
       "sarvam-tts": "shubh"
     }
   },
+  "response": {
+    "ladder": ["clip", "template", "llm"],
+    "clips": {
+      "clip-apology-en": {
+        "text": "Sorry — please hold while we connect you."
+      },
+      "greeting-en": {
+        "text": "Welcome to support.",
+        "when": { "regex": "(?i)\\b(hi|hello|hey)\\b" }
+      }
+    },
+    "templates": {
+      "clarify": {
+        "text": "Could you rephrase that?",
+        "when": { "regex": "(?i)\\b(what|huh)\\b" }
+      }
+    }
+  },
+  "fallback": {
+    "listen_down": { "speak_canned": "clip-apology-en", "skill": "warm_transfer" },
+    "think_down": { "speak_canned": "clip-apology-en", "skill": "warm_transfer" },
+    "speak_down": { "text_sink": true, "skill": "warm_transfer" }
+  },
   "routers": {
     "listen": { "providers": ["fake-listen"] },
     "speak": { "providers": ["fake-speak"] },

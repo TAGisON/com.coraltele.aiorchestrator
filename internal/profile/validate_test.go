@@ -115,3 +115,63 @@ func TestParse_PersonaVoiceStringAlias(t *testing.T) {
 		t.Fatalf("voice_id=%q", doc.Persona.VoiceID)
 	}
 }
+
+func TestValidate_ResponseLadderAndFallback(t *testing.T) {
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	doc := profile.Document{}
+	doc.Modes.Talk = true
+	doc.Persona.VoiceID = "lab"
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "template", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"clip-apology-en": {Text: "sorry"},
+		},
+	}
+	doc.Fallback = &profile.FallbackConfig{
+		ThinkDown: &profile.FallbackAction{SpeakCanned: "clip-apology-en", Skill: "warm_transfer"},
+	}
+	if err := profile.Validate(doc, reg); err != nil {
+		t.Fatal(err)
+	}
+
+	doc.Response.Ladder = []string{"clip", "bogus"}
+	err := profile.Validate(doc, reg)
+	if _, ok := err.(*profile.ValidationError); !ok {
+		t.Fatalf("want ValidationError for bad ladder, got %v", err)
+	}
+
+	doc.Response.Ladder = []string{"clip", "llm"}
+	doc.Fallback.ThinkDown.SpeakCanned = "missing-clip"
+	err = profile.Validate(doc, reg)
+	if _, ok := err.(*profile.ValidationError); !ok {
+		t.Fatalf("want ValidationError for dangling speak_canned, got %v", err)
+	}
+}
+
+func TestParse_ResponseAndFallback(t *testing.T) {
+	doc, err := profile.Parse([]byte(`{
+  "id":"p","modes":{"talk":true},
+  "response":{
+    "ladder":["clip","template","llm"],
+    "clips":{"greeting-en":{"text":"Welcome","when":{"regex":"(?i)hi"}}},
+    "templates":{"clarify":{"text":"rephrase?","when":{"regex":"huh"}}}
+  },
+  "fallback":{"think_down":{"speak_canned":"greeting-en","skill":"warm_transfer"}}
+}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Response == nil || len(doc.Response.Ladder) != 3 {
+		t.Fatalf("response %+v", doc.Response)
+	}
+	if doc.Response.Clips["greeting-en"].Text != "Welcome" {
+		t.Fatal("clip parse")
+	}
+	if doc.Fallback == nil || doc.Fallback.ThinkDown == nil || doc.Fallback.ThinkDown.SpeakCanned != "greeting-en" {
+		t.Fatalf("fallback %+v", doc.Fallback)
+	}
+}

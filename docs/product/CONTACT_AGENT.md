@@ -83,3 +83,21 @@ For `family: contact-agent`:
 **Audit:** `turn.completed` payload includes `voice_id` alongside `gateways.speak` when resolved.
 
 No profile-level Speak vendor override. Voices catalog API is out of scope (see `CONTROL_API.md`).
+
+---
+
+## 8. Response ladder (cc-4)
+
+**Order (before free LLM):** rules pre_think (refuse / escalate / block_think) → walk `response.ladder` → grounding safety → Think.Complete when `llm` is enabled.
+
+| Tier | Behaviour |
+|---|---|
+| `clip` | First `response.clips` entry whose `when.regex` matches user text → Speak clip text; **no** Think |
+| `template` | First `response.templates` match → Speak template text; **no** Think |
+| `llm` | Existing Think.Complete path |
+
+Omit `response` → ladder is a no-op (current LLM/rules behaviour). Empty clip `when` does not auto-match (fallback / explicit id only).
+
+**Vendor total failure (session `gateway_binding` pinned):** Think.Complete error applies `fallback.think_down` — speak `speak_canned` clip + escalate skill. **No** mid-session Think vendor switch.
+
+**Analytics:** `turn_completed` dimensions include `response_tier` ∈ {`clip`, `template`, `llm`, `refuse`, `escalate`}.

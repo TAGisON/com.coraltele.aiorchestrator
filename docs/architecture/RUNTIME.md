@@ -228,7 +228,7 @@ Every hop has a **budget** (timeout). On expiry: fail that hop, not the process.
 |---|---|
 | Feeder gone | Terminal; analytics |
 | Listen down | No dead air: canned audio or text apology + optional transfer skill |
-| Think down | Rule/template fallback or escalate; do not improvise from empty |
+| Think down | Profile `fallback.think_down`: canned clip + escalate skill when session engines are pinned (`gateway_binding`); do not improvise from empty or hop Think vendors mid-session (cc-4) |
 | Speak down | Skip Speak; push text sink if any; or canned clip |
 | Skill down | Fail the act; do not retry side effects blindly |
 | Partial STT only | Do not Think on garbage; wait for final or timeout the turn |

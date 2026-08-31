@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
@@ -15,10 +16,20 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 )
 
+// Response tier vocabulary (analytics / audit).
+const (
+	TierClip     = "clip"
+	TierTemplate = "template"
+	TierLLM      = "llm"
+	TierRefuse   = "refuse"
+	TierEscalate = "escalate"
+)
+
 // Result is the outcome of one Think-path pass.
 type Result struct {
 	ResponseText  string
 	Action        string // allow | refuse | escalate | block_think | strip_response | inject_text
+	ResponseTier string // clip | template | llm | refuse | escalate
 	RuleID        string
 	KnowledgeHit  bool
 	SkillName     string
@@ -78,6 +89,9 @@ type Path struct {
 	ConfirmedSkills map[string]bool
 	// ActiveLanguage returns session active_language when locked (cc-2). Nil/empty → no instruction.
 	ActiveLanguage func() string
+	// PinnedEngines is true when session gateway_binding is set (CC) — no mid-session vendor hop;
+	// Think total failure uses profile.fallback.think_down.
+	PinnedEngines bool
 }
 
 // Run executes the locked order for one inbound utterance (or playback transcript).
@@ -130,6 +144,7 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 		res.Action = rule.Action
 		switch rule.Action {
 		case "refuse":
+			res.ResponseTier = TierRefuse
 			res.ResponseText = rule.Message
 			if res.ResponseText == "" {
 				res.ResponseText = "I cannot help with that."
@@ -138,6 +153,7 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 			return res, nil
 		case "block_think":
 			res.BlockedThink = true
+			res.ResponseTier = TierRefuse
 			res.ResponseText = rule.Message
 			if res.ResponseText == "" {
 				res.ResponseText = "Thinking blocked by policy."
@@ -145,6 +161,7 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 			p.Mem.Append("assistant", res.ResponseText)
 			return res, nil
 		case "escalate":
+			res.ResponseTier = TierEscalate
 			res.ResponseText = rule.Message
 			if res.ResponseText == "" {
 				res.ResponseText = "Escalating to a human."
@@ -168,9 +185,28 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 		}
 	}
 
+	// 5b. response ladder (clip → template) before free LLM
+	if text, tier, ok := matchLadderCanned(p.Doc.Response, redacted); ok {
+		res.Action = "allow"
+		res.ResponseTier = tier
+		res.ResponseText = text
+		p.Mem.Append("assistant", text)
+		return res, nil
+	}
+
 	if p.Doc.Grounding.Required && !hit {
 		res.Action = "refuse"
+		res.ResponseTier = TierRefuse
 		res.ResponseText = "No grounding hit; cannot invent an answer."
+		p.Mem.Append("assistant", res.ResponseText)
+		return res, nil
+	}
+
+	// Ladder present without llm tier → do not call Think
+	if p.Doc.Response != nil && len(p.Doc.Response.Ladder) > 0 && !ladderAllowsLLM(p.Doc.Response.Ladder) {
+		res.Action = "refuse"
+		res.ResponseTier = TierRefuse
+		res.ResponseText = "No clip or template matched."
 		p.Mem.Append("assistant", res.ResponseText)
 		return res, nil
 	}
@@ -195,6 +231,9 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 		Stream:          false,
 	})
 	if err != nil {
+		if deg, used, derr := p.degradeThinkDown(ctx, res); used {
+			return deg, derr
+		}
 		return res, err
 	}
 	out := tr.Text
@@ -209,8 +248,10 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 			out = ""
 		case "refuse":
 			out = rule.Message
+			res.ResponseTier = TierRefuse
 		case "escalate":
 			out = rule.Message
+			res.ResponseTier = TierEscalate
 			if rule.Skill != "" {
 				ok, err := p.executeSkill(ctx, rule.Skill, nil)
 				if err != nil {
@@ -238,7 +279,106 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 	if res.Action == "" {
 		res.Action = "allow"
 	}
+	if res.ResponseTier == "" {
+		res.ResponseTier = TierLLM
+	}
 	return res, nil
+}
+
+// degradeThinkDown applies fallback.think_down when engines are session-pinned (CC).
+// Does not re-Select Think / switch vendors. used=false if no fallback configured.
+func (p *Path) degradeThinkDown(ctx context.Context, res Result) (out Result, used bool, err error) {
+	if !p.PinnedEngines || p.Doc.Fallback == nil || p.Doc.Fallback.ThinkDown == nil {
+		return res, false, nil
+	}
+	fb := p.Doc.Fallback.ThinkDown
+	out = res
+	out.Action = "escalate"
+	out.ResponseTier = TierEscalate
+	if id := strings.TrimSpace(fb.SpeakCanned); id != "" && p.Doc.Response != nil && p.Doc.Response.Clips != nil {
+		if clip, ok := p.Doc.Response.Clips[id]; ok {
+			out.ResponseText = clip.Text
+		}
+	}
+	if out.ResponseText == "" {
+		return res, false, nil // no invented clip
+	}
+	if skill := strings.TrimSpace(fb.Skill); skill != "" {
+		ok, skErr := p.executeSkill(ctx, skill, nil)
+		if skErr != nil {
+			return out, true, skErr
+		}
+		out.SkillName = skill
+		out.SkillOK = ok
+	}
+	p.Mem.Append("assistant", out.ResponseText)
+	return out, true, nil
+}
+
+func ladderAllowsLLM(ladder []string) bool {
+	for _, t := range ladder {
+		if strings.TrimSpace(t) == "llm" {
+			return true
+		}
+	}
+	return false
+}
+
+// matchLadderCanned walks response.ladder for clip/template tiers only.
+// Empty/absent when.regex does not auto-match (fallback / explicit id only).
+func matchLadderCanned(resp *profile.ResponseConfig, userText string) (text, tier string, ok bool) {
+	if resp == nil || len(resp.Ladder) == 0 {
+		return "", "", false
+	}
+	for _, tok := range resp.Ladder {
+		switch strings.TrimSpace(tok) {
+		case "clip":
+			if t, hit := firstMatchingCanned(resp.Clips, userText); hit {
+				return t, TierClip, true
+			}
+		case "template":
+			if t, hit := firstMatchingCanned(resp.Templates, userText); hit {
+				return t, TierTemplate, true
+			}
+		case "llm":
+			return "", "", false // fall through to Think
+		}
+	}
+	return "", "", false
+}
+
+func firstMatchingCanned(m map[string]profile.CannedUtterance, userText string) (string, bool) {
+	if len(m) == 0 {
+		return "", false
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		u := m[k]
+		if cannedWhenMatches(u.When, userText) {
+			return u.Text, true
+		}
+	}
+	return "", false
+}
+
+func cannedWhenMatches(when map[string]any, userText string) bool {
+	if len(when) == 0 {
+		return false
+	}
+	pat, _ := when["regex"].(string)
+	pat = strings.TrimSpace(pat)
+	if pat == "" {
+		return false
+	}
+	re, err := regexp.Compile(pat)
+	if err != nil || !re.MatchString(userText) {
+		return false
+	}
+	return true
 }
 
 func (p *Path) executeSkill(ctx context.Context, name string, args []byte) (bool, error) {

@@ -59,6 +59,10 @@ type Document struct {
 	Rules []Rule `json:"rules"`
 	// Playbook is an optional FSM for playbook-grounded profiles.
 	Playbook *Playbook `json:"playbook"`
+	// Response is the Talk response ladder (clip → template → llm). Omit = ladder no-op.
+	Response *ResponseConfig `json:"response"`
+	// Fallback is hop degradation (listen/think/speak down) — PROFILE_SCHEMA.
+	Fallback *FallbackConfig `json:"fallback"`
 	Templates struct {
 		Disposition *struct {
 			ID string `json:"id"`
@@ -70,6 +74,33 @@ type Document struct {
 	Analytics struct {
 		Emit []string `json:"emit"`
 	} `json:"analytics"`
+}
+
+// ResponseConfig is response.ladder + clips + turn templates (distinct from post-call templates.*).
+type ResponseConfig struct {
+	Ladder    []string                   `json:"ladder"`
+	Clips     map[string]CannedUtterance `json:"clips"`
+	Templates map[string]CannedUtterance `json:"templates"`
+}
+
+// CannedUtterance is a clip or turn-template body (V1 = text via Speak).
+type CannedUtterance struct {
+	Text string         `json:"text"`
+	When map[string]any `json:"when"`
+}
+
+// FallbackConfig holds per-hop degradation actions.
+type FallbackConfig struct {
+	ListenDown *FallbackAction `json:"listen_down"`
+	ThinkDown  *FallbackAction `json:"think_down"`
+	SpeakDown  *FallbackAction `json:"speak_down"`
+}
+
+// FallbackAction is one hop-down action (canned clip and/or skill).
+type FallbackAction struct {
+	SpeakCanned string `json:"speak_canned"`
+	Skill       string `json:"skill"`
+	TextSink    bool   `json:"text_sink"`
 }
 
 // Persona is the profile persona subsection (voice, tone, instructions).
@@ -265,6 +296,9 @@ func Validate(doc Document, reg port.Registry) error {
 			}
 		}
 	}
+	if err := validateResponseAndFallback(doc); err != nil {
+		return err
+	}
 
 	type ref struct {
 		id   string
@@ -311,6 +345,59 @@ func Validate(doc Document, reg port.Registry) error {
 			return &ValidationError{
 				Message: fmt.Sprintf("gateway id %s wrong port (want %s got %s)", r.id, r.kind, rec.Port),
 				Details: map[string]any{"gateway_id": r.id, "path": r.path, "want_port": string(r.kind), "got_port": string(rec.Port)},
+			}
+		}
+	}
+	return nil
+}
+
+var allowedLadderTiers = map[string]bool{
+	"clip": true, "template": true, "llm": true,
+}
+
+func validateResponseAndFallback(doc Document) error {
+	if doc.Response != nil {
+		for i, tok := range doc.Response.Ladder {
+			t := strings.TrimSpace(tok)
+			if t == "" || !allowedLadderTiers[t] {
+				return &ValidationError{
+					Message: "unknown response.ladder token: " + tok,
+					Details: map[string]any{"field": "response.ladder", "index": i, "token": tok},
+				}
+			}
+		}
+	}
+	clips := map[string]CannedUtterance{}
+	if doc.Response != nil && doc.Response.Clips != nil {
+		clips = doc.Response.Clips
+	}
+	checkCanned := func(path, id string) error {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return nil
+		}
+		if _, ok := clips[id]; !ok {
+			return &ValidationError{
+				Message: "fallback speak_canned references unknown clip: " + id,
+				Details: map[string]any{"field": path, "clip": id},
+			}
+		}
+		return nil
+	}
+	if doc.Fallback != nil {
+		if doc.Fallback.ListenDown != nil {
+			if err := checkCanned("fallback.listen_down.speak_canned", doc.Fallback.ListenDown.SpeakCanned); err != nil {
+				return err
+			}
+		}
+		if doc.Fallback.ThinkDown != nil {
+			if err := checkCanned("fallback.think_down.speak_canned", doc.Fallback.ThinkDown.SpeakCanned); err != nil {
+				return err
+			}
+		}
+		if doc.Fallback.SpeakDown != nil {
+			if err := checkCanned("fallback.speak_down.speak_canned", doc.Fallback.SpeakDown.SpeakCanned); err != nil {
+				return err
 			}
 		}
 	}

@@ -27,7 +27,7 @@ Analytics answers ROI and ops questions; audit answers disputes. Overlap is mini
 | `session_started` | Running |
 | `session_completed` | Terminal success |
 | `session_failed` | Terminal failure |
-| `turn_completed` | After each Talk turn |
+| `turn_completed` | After each Talk turn; dimensions may include `response_tier` ∈ {`clip`, `template`, `llm`, `refuse`, `escalate`} (cc-4) |
 | `no_grounding_hit` | Grounded profile, Knowledge miss |
 | `handoff` | warm_transfer skill success |
 | `contained` | Session ended without handoff (profile-defined) |
@@ -36,6 +36,8 @@ Analytics answers ROI and ops questions; audit answers disputes. Overlap is mini
 | `hop_cost` | Optional if gateway reports usage |
 
 Stored in `analytics_event` (append-only) and nightly **rollups** per tenant/profile (`analytics_daily`).
+
+`turn.completed` audit payload may also carry `response_tier` for correlation with analytics.
 
 ### Export
 

@@ -137,3 +137,136 @@ func regMustSkill(t *testing.T, reg port.Registry) *fake.Skill {
 	}
 	return sk
 }
+
+func TestThinkPath_ClipSkipsLLM(t *testing.T) {
+	reg := router.NewMemRegistry()
+	th := &fake.Think{}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var doc profile.Document
+	doc.Modes.Think = true
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "template", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"greeting-en": {
+				Text: "Welcome to support.",
+				When: map[string]any{"regex": `(?i)\b(hi|hello|hey)\b`},
+			},
+			"clip-apology-en": {Text: "Please hold."}, // no when → ladder skip
+		},
+	}
+	deps, err := thinkpath.Resolve(reg, doc, "live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &thinkpath.Path{Doc: doc, Mem: session.NewMemory(), Deps: deps, Reg: reg, Session: "s-clip"}
+	res, err := p.Run(context.Background(), "hello there")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ResponseTier != thinkpath.TierClip || res.ResponseText != "Welcome to support." {
+		t.Fatalf("%+v", res)
+	}
+	if th.CompleteCalls.Load() != 0 {
+		t.Fatalf("Think.Complete called %d times; want 0", th.CompleteCalls.Load())
+	}
+}
+
+func TestThinkPath_TemplateSkipsLLM(t *testing.T) {
+	reg := router.NewMemRegistry()
+	th := &fake.Think{}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var doc profile.Document
+	doc.Modes.Think = true
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "template", "llm"},
+		Templates: map[string]profile.CannedUtterance{
+			"clarify": {Text: "Could you rephrase that?", When: map[string]any{"regex": `(?i)\b(what|huh)\b`}},
+		},
+	}
+	deps, err := thinkpath.Resolve(reg, doc, "live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &thinkpath.Path{Doc: doc, Mem: session.NewMemory(), Deps: deps, Reg: reg, Session: "s-tpl"}
+	res, err := p.Run(context.Background(), "huh?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ResponseTier != thinkpath.TierTemplate {
+		t.Fatalf("%+v", res)
+	}
+	if th.CompleteCalls.Load() != 0 {
+		t.Fatal("template path called Think")
+	}
+}
+
+func TestThinkPath_ThinkDownFallbackPinned(t *testing.T) {
+	reg := router.NewMemRegistry()
+	th := &fake.Think{FailWith: &port.GatewayError{Code: port.CodeUnavailable, Message: "think down", Retryable: true}}
+	sk := &fake.Skill{}
+	for _, it := range []port.Registration{
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th},
+		{ID: fake.IDSkill, Port: port.PortSkill, Capabilities: sk.Capabilities(), Instance: sk},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var doc profile.Document
+	doc.Modes.Think = true
+	doc.Routers.Think.Providers = []string{"fake-think"}
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"clip-escalate-en": {Text: "Connecting you to an agent."},
+		},
+	}
+	doc.Fallback = &profile.FallbackConfig{
+		ThinkDown: &profile.FallbackAction{SpeakCanned: "clip-escalate-en", Skill: "warm_transfer"},
+	}
+	doc.Skills.Allowed = []string{"warm_transfer"}
+	doc.Skills.Definitions = map[string]profile.SkillDefinition{
+		"warm_transfer": {Gateway: "fake-skill", Authority: "act", Confirm: false},
+	}
+	deps, err := thinkpath.Resolve(reg, doc, "live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &thinkpath.Path{
+		Doc: doc, Mem: session.NewMemory(), Deps: deps, Reg: reg, Session: "s-fail",
+		PinnedEngines: true,
+	}
+	res, err := p.Run(context.Background(), "need help with billing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ResponseTier != thinkpath.TierEscalate || res.ResponseText != "Connecting you to an agent." {
+		t.Fatalf("%+v", res)
+	}
+	if !res.SkillOK || res.SkillName != "warm_transfer" {
+		t.Fatalf("skill %+v", res)
+	}
+	if th.CompleteCalls.Load() != 1 {
+		t.Fatalf("want exactly one Think.Complete (no vendor re-Select), got %d", th.CompleteCalls.Load())
+	}
+	if sk.Calls.Load() < 1 {
+		t.Fatal("escalate skill not executed")
+	}
+
+	// Without pin → error, no invented clip
+	p2 := &thinkpath.Path{Doc: doc, Mem: session.NewMemory(), Deps: deps, Reg: reg, Session: "s-nopin"}
+	_, err = p2.Run(context.Background(), "need help")
+	if err == nil {
+		t.Fatal("want think error without gateway_binding")
+	}
+}

@@ -93,6 +93,7 @@ type TurnCompleted struct {
 	ThinkGateway   string
 	SpeakGateway   string
 	VoiceID        string
+	ResponseTier  string // clip | template | llm | refuse | escalate
 	Outcome        string
 	LatencyMs      int64
 }
@@ -116,12 +117,22 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	if t.VoiceID != "" {
 		payload["voice_id"] = t.VoiceID
 	}
+	if t.ResponseTier != "" {
+		payload["response_tier"] = t.ResponseTier
+	}
 	if t.SkillName != "" {
 		payload["skill_name"] = t.SkillName
 		payload["skill_ok"] = t.SkillOK
 	}
 	o.Audit(ctx, store.AuditTurnCompleted, payload)
-	o.Metric(ctx, store.MetricTurnCompleted, 1, nil)
+	dims := map[string]any{}
+	if t.ResponseTier != "" {
+		dims["response_tier"] = t.ResponseTier
+	}
+	if len(dims) == 0 {
+		dims = nil
+	}
+	o.Metric(ctx, store.MetricTurnCompleted, 1, dims)
 	if t.SkillName != "" {
 		o.Audit(ctx, store.AuditSkillExecuted, map[string]any{
 			"name": t.SkillName,

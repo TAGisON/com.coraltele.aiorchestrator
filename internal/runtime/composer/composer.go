@@ -127,6 +127,7 @@ func (t *Talk) BindActor(a *session.Actor) {
 	t.Actor = a
 	if t.Path != nil && a != nil {
 		t.Path.ActiveLanguage = a.ActiveLanguage
+		t.Path.PinnedEngines = a.GatewayBinding != nil
 	}
 }
 
@@ -223,6 +224,11 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Unlock()
 	defer cancel()
 
+	if t.Path != nil && t.Actor != nil {
+		t.Path.PinnedEngines = t.Actor.GatewayBinding != nil
+		t.Path.ActiveLanguage = t.Actor.ActiveLanguage
+	}
+
 	started := time.Now()
 	res, err := t.Path.Run(thinkCtx, userText)
 	if err != nil {
@@ -287,17 +293,22 @@ func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thin
 			ThinkGateway:  thinkGW,
 			SpeakGateway:  speakGW,
 			VoiceID:       voiceID,
+			ResponseTier: res.ResponseTier,
 			Outcome:       outcome,
 			LatencyMs:     time.Since(started).Milliseconds(),
 		})
 	}
 	if t.Bus != nil {
-		t.Bus.PublishEvent(bus.Event{Kind: "turn.completed", Data: map[string]any{
+		data := map[string]any{
 			"outcome":    outcome,
 			"skill_name": res.SkillName,
 			"skill_ok":   res.SkillOK,
 			"barge_in":   barge,
-		}})
+		}
+		if res.ResponseTier != "" {
+			data["response_tier"] = res.ResponseTier
+		}
+		t.Bus.PublishEvent(bus.Event{Kind: "turn.completed", Data: data})
 		if res.SkillName != "" {
 			t.Bus.PublishEvent(bus.Event{Kind: "skill.completed", Data: map[string]any{
 				"name": res.SkillName,

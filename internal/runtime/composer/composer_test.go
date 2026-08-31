@@ -2,6 +2,7 @@ package composer_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
@@ -245,5 +247,118 @@ func TestComposer_VoiceIDFromPersonaMapAndBoundSpeak(t *testing.T) {
 	}
 	if spk.LastVoiceID != "scalar-only" {
 		t.Fatalf("VoiceID=%q want scalar-only", spk.LastVoiceID)
+	}
+}
+
+func TestComposer_ClipPathSkipsLLM(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 1}
+	th := &fake.Think{}
+	for _, it := range []port.Registration{
+		{ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th},
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc := talkProfile()
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "template", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"greeting-en": {
+				Text: "Welcome to support.",
+				When: map[string]any{"regex": `(?i)\b(hi|hello|hey)\b`},
+			},
+		},
+	}
+	memStore := store.NewMemory()
+	obs := &observe.Observer{Repo: memStore, Meta: observe.SessionMeta{
+		SessionID: "sess-clip", TenantID: "t1", ProfileID: "talk", ProfileVersion: 1,
+	}}
+	talk, err := composer.NewTalk(doc, reg, bus.New(), session.NewMemory(), "live", "sess-clip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.Obs = obs
+	if err := talk.InjectFinal(context.Background(), "hello"); err != nil {
+		t.Fatal(err)
+	}
+	if th.CompleteCalls.Load() != 0 {
+		t.Fatalf("Think.Complete called %d; clip must skip LLM", th.CompleteCalls.Load())
+	}
+	if spk.LastText != "Welcome to support." {
+		t.Fatalf("Speak text=%q", spk.LastText)
+	}
+	ams, _ := memStore.ListAnalyticsEvents(context.Background(), "sess-clip")
+	found := false
+	for _, m := range ams {
+		if m.Metric != store.MetricTurnCompleted {
+			continue
+		}
+		var dims map[string]any
+		if len(m.Dimensions) > 0 {
+			_ = json.Unmarshal(m.Dimensions, &dims)
+		}
+		if dims["response_tier"] == "clip" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("want turn_completed response_tier=clip, got %#v", ams)
+	}
+}
+
+func TestComposer_ThinkDownClipEscalateNoVendorSwitch(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 1}
+	th := &fake.Think{FailWith: &port.GatewayError{Code: port.CodeUnavailable, Message: "down"}}
+	sk := &fake.Skill{}
+	for _, it := range []port.Registration{
+		{ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: th.Capabilities(), Instance: th},
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+		{ID: fake.IDSkill, Port: port.PortSkill, Capabilities: sk.Capabilities(), Instance: sk},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc := talkProfile()
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "llm"},
+		Clips: map[string]profile.CannedUtterance{
+			"clip-escalate-en": {Text: "Connecting you now."},
+		},
+	}
+	doc.Fallback = &profile.FallbackConfig{
+		ThinkDown: &profile.FallbackAction{SpeakCanned: "clip-escalate-en", Skill: "warm_transfer"},
+	}
+	doc.Skills.Allowed = []string{"warm_transfer"}
+	doc.Skills.Definitions = map[string]profile.SkillDefinition{
+		"warm_transfer": {Gateway: "fake-skill", Authority: "act", Confirm: false},
+	}
+	actor := &session.Actor{
+		GatewayBinding: &store.GatewayBinding{
+			Listen: "fake-listen", Think: "fake-think", Speak: "fake-speak",
+		},
+	}
+	talk, err := composer.NewTalk(doc, reg, bus.New(), session.NewMemory(), "live", "sess-down")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.BindActor(actor)
+	if err := talk.InjectFinal(context.Background(), "billing question"); err != nil {
+		t.Fatal(err)
+	}
+	if spk.LastText != "Connecting you now." {
+		t.Fatalf("Speak=%q", spk.LastText)
+	}
+	if th.CompleteCalls.Load() != 1 {
+		t.Fatalf("CompleteCalls=%d want 1 (no second Think gateway)", th.CompleteCalls.Load())
+	}
+	if sk.Calls.Load() < 1 {
+		t.Fatal("warm_transfer not run")
 	}
 }

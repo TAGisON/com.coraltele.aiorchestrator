@@ -15,6 +15,7 @@ For `metadata.family: contact-agent`, profiles are **behaviour only**: persona, 
 - `routers.listen|think|speak.providers` are **optional** on the CC path (deprecated for new CC profiles). If both profile lists and tenant engines are set and differ, **tenant engines win**; publish/session may warn.
 - Knowledge / skill / translate routers remain profile-owned.
 - **Voice required for Talk/Speak** (persona `voice_id` / voice) — enforced in cc-3; document now so schema readers expect it.
+- **Response ladder** (`response.ladder` + `response.clips` + `response.templates`) — recommended for Contact Agent; V1 clip body is text spoken via Speak (PCM asset store deferred). `fallback.*.speak_canned` must reference an existing `response.clips` id.
 
 ---
 
@@ -71,6 +72,22 @@ persona:
     fake-speak: lab-voice
   # Optional scalar alias when map miss/absent (also accept persona.voice as a string)
   # voice_id: shubh
+
+# Response ladder (cc-4): evaluate before free LLM. Omit `response` → ladder no-op (LLM/rules only).
+# Recommended default for metadata.family: contact-agent — ladder: [clip, template, llm]
+response:
+  ladder: [clip, template, llm]   # ordered; omit a tier to disable it
+  clips:
+    clip-apology-en:
+      text: "Sorry — please hold while we connect you."
+      when: { regex: "" }         # empty/absent when = fallback / explicit id only (no auto-match)
+    greeting-en:
+      text: "Welcome to support."
+      when: { regex: "(?i)\\b(hi|hello|hey)\\b" }
+  templates:                        # turn canned strings (≠ post-call templates.mom|disposition)
+    clarify:
+      text: "Could you rephrase that?"
+      when: { regex: "(?i)\\b(what|huh)\\b" }
 
 routers:
   listen:
