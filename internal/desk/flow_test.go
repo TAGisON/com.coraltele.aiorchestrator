@@ -443,6 +443,15 @@ func TestUnclearRequestClarifies(t *testing.T) {
 	c.wantSaid(c.say("hmm xyz"), "briefly describe what you need")
 }
 
+func TestHinglishProductInformationIntent(t *testing.T) {
+	c := newCall(t)
+	out := c.say("मुझे प्रोडक्ट के बारे में जानना है")
+	if c.eng.Attributes()[desk.AttrIntent] != "product_information" {
+		c.fail("intent=%q want product_information", c.eng.Attributes()[desk.AttrIntent])
+	}
+	c.wantSaid(out, "उत्पाद")
+}
+
 // §20: after one request is closed the desk accepts a second one.
 func TestSecondRequestInSameCall(t *testing.T) {
 	c := newCall(t)

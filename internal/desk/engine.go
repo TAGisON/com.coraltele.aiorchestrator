@@ -449,12 +449,10 @@ func (e *Engine) selectIntentLocked(ctx context.Context, text string, out *Outco
 	e.attempts++
 	e.failures++
 	if e.attempts >= 3 || e.failures >= e.doc.CX.MaxTurnFailures {
-		if row, ok := e.doc.MatrixFor("technical_support"); ok {
-			e.transferLocked(ctx, row, out)
-			return
+		out.Text = e.prompt(PromptClarify)
+		if t := e.prompt("clarify_2"); t != "" && e.attempts >= 3 {
+			out.Text = t
 		}
-		out.Text = e.prompt(PromptClosing)
-		e.endLocked(DispOutOfScope)
 		return
 	}
 	if e.attempts == 1 {

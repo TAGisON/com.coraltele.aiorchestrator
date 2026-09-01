@@ -332,9 +332,9 @@ func coralIntents() []Intent {
 			ID: "product_information", Display: "Product Information", Active: true, PathID: "product_information",
 			Phrases: map[string][]string{
 				"en-IN": {"product information", "information about", "tell me about", "details about", "specification",
-					"features", "what is", "know more", "brochure", "datasheet"},
-				"hi-IN": {"जानकारी", "उत्पाद की जानकारी", "फीचर", "विवरण",
-					"jankari chahiye", "product ki jankari", "batao product", "feature kya hai"},
+					"features", "what is", "know more", "know about", "brochure", "datasheet", "product", "pbx"},
+				"hi-IN": {"जानकारी", "उत्पाद की जानकारी", "प्रोडक्ट", "उत्पाद", "फीचर", "विवरण",
+					"jankari chahiye", "product ki jankari", "batao product", "feature kya hai", "produk", "product ke bare"},
 			},
 		},
 		{
