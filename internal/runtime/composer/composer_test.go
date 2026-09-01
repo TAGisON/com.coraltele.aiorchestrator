@@ -14,7 +14,6 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
-	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -74,11 +73,15 @@ func TestComposer_TurnAndBargeIn(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	// Inject loud speech frames to trigger barge-in while Speaking.
-	for i := 0; i < 5; i++ {
-		talk.OnPCM(vad.SpeechFrame(16000, uint64(i+1), 640))
+	// STT commit barge while Speaking (energy VAD no longer flushes — WP1).
+	for talk.State() != composer.Speaking {
+		if time.Now().After(deadline) {
+			t.Fatalf("never reached Speaking; state=%s", talk.State())
+		}
 		time.Sleep(5 * time.Millisecond)
 	}
+
+	talk.Interrupt()
 
 	select {
 	case err := <-errCh:

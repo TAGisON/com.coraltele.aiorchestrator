@@ -333,6 +333,16 @@ func (r *SessionRuntime) consumeListenFinals(ctx context.Context, sessionID stri
 	}
 }
 
+const defaultMinBargeChars = 2
+
+func listenFinalCommit(text string) bool {
+	t := strings.TrimSpace(text)
+	if len([]rune(t)) < defaultMinBargeChars {
+		return false
+	}
+	return true
+}
+
 func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID string, talk *composer.Talk, final port.ListenFinal) {
 	text := strings.TrimSpace(final.Text)
 	if text == "" {
@@ -340,7 +350,11 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 	}
 	st := talk.State()
 	if st == composer.Thinking || st == composer.Speaking {
-		applog.Info("live listen final barge", "session", string(talk.Session), "state", string(st), "chars", len(text))
+		if !listenFinalCommit(text) {
+			applog.Info("live listen final suppressed (short)", "session", string(talk.Session), "chars", len(text))
+			return
+		}
+		applog.Info("live listen final barge commit", "session", string(talk.Session), "state", string(st), "chars", len(text))
 		talk.Interrupt()
 	}
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))

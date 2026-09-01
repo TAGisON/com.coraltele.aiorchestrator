@@ -201,15 +201,8 @@ func (t *Talk) OnPCM(frame port.PCMFrame) {
 	case Capturing:
 		// silence endpoint handled by EndCapture / InjectFinal
 	case Speaking:
-		t.mu.Lock()
-		blockBarge := t.welcoming && !t.welcomeBargeAllowed
-		t.mu.Unlock()
-		if blockBarge {
-			return
-		}
-		if dec == vad.Speech {
-			t.bargeIn()
-		}
+		// Energy VAD is endpointing aid only while Speaking; barge Commit is STT-driven (WP1).
+		return
 	}
 }
 
