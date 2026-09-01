@@ -4,10 +4,12 @@ Three separate UIs replace the old monolithic lab console.
 
 | Console | URL | Purpose |
 |---|---|---|
-| Portal | http://127.0.0.1:8011/ | Entry + readiness banner |
-| **Admin** | http://127.0.0.1:8011/admin/ | Engines, credentials, settings, publish profiles, readiness |
-| **Supervisor** | http://127.0.0.1:8011/supervisor/ | Session list, transcript, audit, analytics, disposition |
-| **User** | http://127.0.0.1:8011/user/ | Start session, send Talk turns (text inject), stop |
+| Portal | http://127.0.0.1:8011/ (or `:8012` if 8011 is an older binary) | Entry + readiness banner |
+| **Admin** | http://127.0.0.1:8011/admin/ | Engines, credentials, **Contact desks** (EN/HI editor), readiness |
+| **Supervisor** | http://127.0.0.1:8011/supervisor/ | Session list, attributes, handoff, transcript, disposition |
+| **User** | http://127.0.0.1:8011/user/ | **Text call** on a published desk (EN/HI) and live voice |
+
+If port 8011 is already taken by an older process, start a current build with `HTTP_ADDR=:8012`. Install and smoke-test the Coral TFN desk with `.\tools\lab\Setup-CoralDesk.ps1 -Base http://127.0.0.1:8012`.
 
 ## Fresh install
 
