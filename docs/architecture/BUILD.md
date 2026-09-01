@@ -2,7 +2,7 @@
 
 See **`ARCHITECTURE.md`** for the approach. This file is only Coral fit and latency numbers we already measured.
 
-**Kernel: Go.** `mod_audio_stream-1/Ai_code` is a **reference** for FS WS + 20 ms inject, not the codebase we extend.
+**Kernel: Go.** The sibling `mod_audio_stream-1` repo’s legacy `Ai_code` (if present) is a **reference** for FS WS + 20 ms inject, not the codebase we extend.
 
 **FS:** `uuid_audio_stream` URL → this Go service’s edge WebSocket; JSON schema unchanged. Auth: signed token in URL — see `EDGE_FS.md`.
 

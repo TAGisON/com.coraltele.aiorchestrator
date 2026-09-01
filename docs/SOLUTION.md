@@ -16,7 +16,7 @@ If this file and the product lock disagree after review, update one of them so t
 
 ## 1. Product summary (reference only)
 
-Full product lock: **`docs/product/PRODUCT_DECISIONS.md`**. Vertical (call center): `mod_audio_stream-1/docs/AI_Call_Center_Product_Decisions.md`.
+Full product lock: **`docs/product/PRODUCT_DECISIONS.md`**. Vertical (call center): [`mod_audio_stream-1`](https://github.com/TAGisON/mod_audio_stream-1) repo.
 
 | Item | Summary |
 |---|---|

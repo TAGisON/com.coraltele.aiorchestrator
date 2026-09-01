@@ -2,7 +2,7 @@
 
 **Status:** LOCKED  
 **Date:** 27 August 2026  
-**Reference implementation:** `mod_audio_stream-1` (C module + WS dialect)
+**Reference implementation:** sibling repo [`mod_audio_stream-1`](https://github.com/TAGisON/mod_audio_stream-1) (C module + WS dialect; clone next to this repo, not as a submodule)
 
 The FS edge is **`internal/edge/modaudiostream`**. It implements Feeder + Sink ports. FS JSON/binary dialect never leaks past this package.
 
@@ -109,4 +109,4 @@ DTMF digits arrive as **feeder events** on the session bus (not Listen input). C
 
 ## 7. Live talk answer gate (Contact Desk)
 
-FS Lua (`mod_audio_stream-1/fs/ai_voice_bot.lua`) must **not** call `POST /v1/sessions/{id}/answer` until orchestrator reports `media_phase=ready` on `GET /v1/sessions/{id}` (or dedicated media-ready probe). RTP settle (~500 ms default, desk `rtp_settle_ms`) prevents welcome-before-uplink races. Full phase machine: `docs/product/LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §2–§3.
+FS Lua (`../mod_audio_stream-1/fs/ai_voice_bot.lua` in the sibling repo) calls `POST /v1/sessions/{id}/answer` after a short media settle (`session:sleep`, ~1500 ms) once `uuid_audio_stream` is up — do **not** poll `media_phase` from Lua (curl keep-alive can stall on voip) and do **not** `uuid_broadcast silence_stream` (blocks Lua until hangup). Full phase machine: `docs/product/LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §2–§3.

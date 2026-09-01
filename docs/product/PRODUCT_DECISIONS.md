@@ -4,7 +4,7 @@
 **Date:** 25 August 2026  
 **Home:** `com.coraltele.aiorchestrator`  
 **Audience:** Product, delivery, sales packaging, future tickets  
-**Contact-center vertical:** `mod_audio_stream-1/docs/AI_Call_Center_Product_Decisions.md`
+**Contact-center vertical:** [`mod_audio_stream-1`](https://github.com/TAGisON/mod_audio_stream-1) repo (`docs/AI_Call_Center_Product_Decisions.md` when present)
 
 This file is the product source of truth for **the platform**.  
 It is **not** an architecture, vendor list, or integration SOW.  

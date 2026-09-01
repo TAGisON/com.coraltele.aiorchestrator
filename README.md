@@ -8,7 +8,7 @@ A server-side runtime that attaches audio or text **in**, runs a **named profile
 |---|---|
 | **Artifact id** | `com.coraltele.aiorchestrator` |
 | **Status** | Product locked. Architecture locked: Go, gateway routers, in-memory audio. |
-| **Not this repo** | Telephony (`mod_audio_stream`), Coral ACD, TTS-Engine process, vendor clouds |
+| **Not this repo** | Telephony ([`mod_audio_stream-1`](https://github.com/TAGisON/mod_audio_stream-1) — sibling clone under `GitHub/`), Coral ACD, TTS-Engine process, vendor clouds |
 
 ## Documents
 

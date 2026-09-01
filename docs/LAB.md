@@ -13,15 +13,23 @@ If port 8011 is already taken by an older process, start a current build with `H
 
 ## FreeSWITCH edge (VoIP)
 
-Telephony give/take lives in the **`mod_audio_stream-1`** git submodule at repo root. Deploy Lua + dialplan from there:
+Telephony give/take lives in the **separate repo** [`mod_audio_stream-1`](https://github.com/TAGisON/mod_audio_stream-1) — clone as a **sibling** of this repo (not a submodule):
 
-```powershell
-# After git submodule update --init
-copy mod_audio_stream-1\fs\ai_voice_bot.lua \\sipserver\...\scripts\
-copy mod_audio_stream-1\fs\ai_profiles.conf \\sipserver\...\scripts\
+```text
+GitHub/
+  com.coraltele.aiorchestrator/   ← this repo (Go orchestrator)
+  mod_audio_stream-1/             ← FreeSWITCH module + fs/ Lua dialplan
 ```
 
-See `mod_audio_stream-1/fs/README.md` for sipserver install, DID map (`101=coral-tfn`), and `ai_orch_url` if the orchestrator IP differs from `192.168.25.130:8011`.
+Deploy Lua + dialplan from the sibling clone:
+
+```powershell
+# From your machine (adjust sipserver path)
+copy ..\mod_audio_stream-1\fs\ai_voice_bot.lua \\sipserver\...\scripts\
+copy ..\mod_audio_stream-1\fs\ai_profiles.conf \\sipserver\...\scripts\
+```
+
+See `../mod_audio_stream-1/fs/README.md` (or `fs/README.md` inside that repo) for sipserver install, DID map (`101=coral-tfn`), and `ai_orch_url` if the orchestrator IP differs from `192.168.25.130:8011`.
 
 Set `edge.base_url` in `conf/aiorchestrator.properties` to the **same host IP** FreeSWITCH uses for WSS (`ws://<ip>:8011/edge/fs`).
 
