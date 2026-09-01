@@ -310,6 +310,71 @@ func TestComposer_ClipPathSkipsLLM(t *testing.T) {
 	}
 }
 
+func TestComposer_AnswerCallWritesAttachedSink(t *testing.T) {
+	reg := router.NewMemRegistry()
+	spk := &fake.Speak{FrameCount: 3}
+	for _, it := range []port.Registration{
+		{ID: fake.IDSpeak, Port: port.PortSpeak, Capabilities: spk.Capabilities(), Instance: spk},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: (&fake.Think{}).Capabilities(), Instance: &fake.Think{}},
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc := talkProfile()
+	doc.Response = &profile.ResponseConfig{
+		Ladder: []string{"clip", "llm"},
+		Clips:  map[string]profile.CannedUtterance{"greeting-en": {Text: "Hello from sink test."}},
+	}
+	mgr := session.NewManager(reg)
+	actor, err := mgr.Start(context.Background(), session.StartParams{
+		SessionID: "sess-sink", Clock: "live", SampleRate: 16000, Profile: doc, Reg: reg,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Stop(context.Background(), "sess-sink", "test")
+
+	sink := &recordingSink{}
+	actor.AttachSink(sink, "test-sink")
+
+	talk, err := composer.NewTalk(doc, reg, bus.New(), session.NewMemory(), "live", "sess-sink")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.BindActor(actor)
+
+	spoken, err := talk.AnswerCall(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spoken == "" {
+		t.Fatal("expected spoken greeting")
+	}
+	if sink.writes == 0 {
+		t.Fatal("Speak must WritePCM to attached edge sink (FS downlink)")
+	}
+	if sink.marks == 0 {
+		t.Fatal("Speak must WaitMark after TTS so playout can drain")
+	}
+}
+
+type recordingSink struct {
+	writes int
+	marks  int
+	flushes int
+}
+
+func (s *recordingSink) ID() port.GatewayID { return "recording-sink" }
+func (s *recordingSink) WritePCM(ctx context.Context, frame port.PCMFrame) error {
+	s.writes++
+	return nil
+}
+func (s *recordingSink) Flush(ctx context.Context) error  { s.flushes++; return nil }
+func (s *recordingSink) WaitMark(ctx context.Context) error { s.marks++; return nil }
+func (s *recordingSink) Close(ctx context.Context) error    { return nil }
+
 func TestComposer_AnswerCallSpeaksGreetingNoUserTurn(t *testing.T) {
 	reg := router.NewMemRegistry()
 	spk := &fake.Speak{FrameCount: 1}

@@ -26,6 +26,11 @@ func encodeStreamAudio(pcm []byte, sampleRate int) ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// encodeFlush asks mod_audio_stream to clear its inject buffer (barge-in).
+func encodeFlush() []byte {
+	return []byte(`{"type":"flush"}`)
+}
+
 // inboundEvent is optional JSON from FS (DTMF/stop/error).
 type inboundEvent struct {
 	Type  string `json:"type"`

@@ -257,7 +257,7 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 		t.Mem.Append("assistant", spoken)
 	}
 	if err := t.speak(ctx, spoken); err != nil {
-		return spoken, err
+		return spoken, fmt.Errorf("answer speak: %w", err)
 	}
 	if t.Obs != nil {
 		t.Obs.AppendAssistantOnly(ctx, spoken)
@@ -275,13 +275,16 @@ func openingGreeting(doc profile.Document) string {
 	if doc.Response == nil || doc.Response.Clips == nil {
 		return ""
 	}
-	if u, ok := doc.Response.Clips["greeting-en"]; ok {
-		if s := strings.TrimSpace(u.Text); s != "" {
-			return s
+	for _, id := range []string{"greeting-en", "welcome", "greeting"} {
+		if u, ok := doc.Response.Clips[id]; ok {
+			if s := strings.TrimSpace(u.Text); s != "" {
+				return s
+			}
 		}
 	}
 	for id, u := range doc.Response.Clips {
-		if strings.HasPrefix(strings.ToLower(id), "greeting") {
+		low := strings.ToLower(id)
+		if strings.HasPrefix(low, "greeting") || strings.HasPrefix(low, "welcome") {
 			if s := strings.TrimSpace(u.Text); s != "" {
 				return s
 			}
@@ -452,6 +455,7 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 		case frame, ok := <-stream.Frames():
 			if !ok {
 				<-stream.Done()
+				_ = t.waitSinkMarks(ctx)
 				t.finishSpeakToListening()
 				return nil
 			}
@@ -459,14 +463,50 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 				return nil
 			}
 			t.Sink.Push(frame)
+			t.writeSinks(speakCtx, frame)
 			if t.Bus != nil {
 				t.Bus.PublishAudio(frame)
 			}
 		case <-stream.Done():
+			_ = t.waitSinkMarks(ctx)
 			t.finishSpeakToListening()
 			return nil
 		}
 	}
+}
+
+// writeSinks fans Speak PCM to attached edge sinks (FreeSWITCH / browser). Bus taps are UI-only.
+func (t *Talk) writeSinks(ctx context.Context, frame port.PCMFrame) {
+	if t.Actor == nil {
+		return
+	}
+	for _, s := range t.Actor.Sinks() {
+		if err := s.WritePCM(ctx, frame); err != nil {
+			return
+		}
+	}
+}
+
+func (t *Talk) flushSinks() {
+	if t.Actor == nil {
+		return
+	}
+	ctx := context.Background()
+	for _, s := range t.Actor.Sinks() {
+		_ = s.Flush(ctx)
+	}
+}
+
+func (t *Talk) waitSinkMarks(ctx context.Context) error {
+	if t.Actor == nil {
+		return nil
+	}
+	for _, s := range t.Actor.Sinks() {
+		if err := s.WaitMark(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *Talk) finishSpeakToListening() {
@@ -485,9 +525,15 @@ func (t *Talk) finishSpeakToListening() {
 	}
 }
 
+// Interrupt stops in-flight Think/Speak (barge-in). Safe from the Listen finals path.
+func (t *Talk) Interrupt() {
+	t.bargeIn()
+}
+
 func (t *Talk) bargeIn() {
 	t.mu.Lock()
-	if t.state != Speaking {
+	st := t.state
+	if st != Speaking && st != Thinking {
 		t.mu.Unlock()
 		return
 	}
@@ -498,6 +544,7 @@ func (t *Talk) bargeIn() {
 	t.mu.Unlock()
 
 	t.Sink.Flush()
+	t.flushSinks()
 	if stream != nil {
 		_ = stream.Cancel(context.Background())
 		t.mu.Lock()

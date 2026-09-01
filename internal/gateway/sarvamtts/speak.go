@@ -92,6 +92,10 @@ func (g *Gateway) Speak(ctx context.Context, req port.SpeakRequest) (port.SpeakS
 	if model == "" {
 		model = sarvam.DefaultTTSModel
 	}
+	// Bulbul v2 speaker names are rejected by bulbul:v3; remap known lab defaults.
+	if strings.HasPrefix(strings.ToLower(model), "bulbul:v3") {
+		speaker = mapBulbulV2Speaker(speaker)
+	}
 
 	payload := map[string]any{
 		"text":               text,
@@ -211,6 +215,18 @@ func (s *speakStream) Cancel(ctx context.Context) error {
 	s.cancel.Store(true)
 	s.finish()
 	return nil
+}
+
+// mapBulbulV2Speaker remaps Bulbul v2 speaker names that Sarvam rejects on bulbul:v3.
+func mapBulbulV2Speaker(speaker string) string {
+	switch strings.ToLower(strings.TrimSpace(speaker)) {
+	case "anushka", "manisha", "vidya", "arya":
+		return "priya"
+	case "abhilash", "karun", "hitesh":
+		return "shubh"
+	default:
+		return speaker
+	}
 }
 
 // Register adds sarvam-tts. API key may be supplied later via DB credentials.

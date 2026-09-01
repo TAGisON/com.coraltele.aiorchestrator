@@ -140,9 +140,23 @@ func TestRoundTrip_PCMAndStreamAudio(t *testing.T) {
 		t.Fatalf("audioData: %v len=%d", err, len(raw))
 	}
 
-	// Flush barge-in
+	// Flush barge-in — must clear local queue AND send {"type":"flush"} to FS
 	if err := serverConn.Flush(ctx); err != nil {
 		t.Fatal(err)
+	}
+	_ = client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, flushMsg, err := client.ReadMessage()
+	if err != nil {
+		t.Fatalf("read flush: %v", err)
+	}
+	var flushDecoded struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(flushMsg, &flushDecoded); err != nil {
+		t.Fatal(err)
+	}
+	if flushDecoded.Type != "flush" {
+		t.Fatalf("flush type %q body %s", flushDecoded.Type, flushMsg)
 	}
 
 	_ = serverConn.Close(ctx)

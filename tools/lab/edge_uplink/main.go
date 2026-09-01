@@ -16,7 +16,7 @@ import (
 
 func main() {
 	created := post("http://127.0.0.1:8011/v1/sessions", map[string]any{
-		"profile_id": "coral-cc", "profile_version": "latest", "clock": "live",
+		"profile_id": "coral-tfn", "profile_version": "latest", "clock": "live",
 	})
 	sid, _ := created["session_id"].(string)
 	tok, _ := created["edge_token"].(string)

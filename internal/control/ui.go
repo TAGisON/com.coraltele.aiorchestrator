@@ -131,6 +131,12 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 		if sess.GatewayBinding != nil {
 			item["gateway_binding"] = sess.GatewayBinding
 		}
+		if len(sess.Caller) > 0 {
+			item["caller"] = json.RawMessage(sess.Caller)
+		}
+		if len(sess.Metadata) > 0 {
+			item["metadata"] = json.RawMessage(sess.Metadata)
+		}
 		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"sessions": items})

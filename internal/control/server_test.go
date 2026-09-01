@@ -224,3 +224,83 @@ func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
 		t.Fatalf("want Cancelled got %v", stopped["state"])
 	}
 }
+
+func TestSession_CreateStoresCallerAndMetadata(t *testing.T) {
+	reg := router.NewMemRegistry()
+	if err := fake.RegisterAll(reg); err != nil {
+		t.Fatal(err)
+	}
+	mem := store.NewMemory()
+	seedFakeTenantEngines(t, mem)
+	rt := &control.SessionRuntime{Mgr: session.NewManager(reg)}
+	srv := control.NewWithRuntime(mem, reg, rt, control.Config{}, nil)
+	createProfile(t, srv, "rt-lab")
+	publishOK(t, srv, "rt-lab", `{
+  "id":"rt-lab",
+  "modes":{"listen":true,"speak":true,"think":true},
+  "audio":{"canonical_sample_rate_hz":16000},
+  "persona":{"voice":{"fake-speak":"lab-voice"}},
+  "routers":{
+    "listen":{"providers":["fake-listen"]},
+    "speak":{"providers":["fake-speak"]},
+    "think":{"providers":["fake-think"]}
+  }
+}`)
+	body := `{
+  "profile_id":"rt-lab",
+  "profile_version":"latest",
+  "clock":"live",
+  "caller":{"ani":"5001","caller_id_name":"Desk"},
+  "metadata":{"edge":"mod_audio_stream","call_uuid":"fs-uuid-1","sip_call_id":"sip-abc","destination":"101"}
+}`
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &created)
+	sid := created["session_id"].(string)
+
+	rr = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/sessions/"+sid, nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("get %d %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	caller, _ := got["caller"].(map[string]any)
+	meta, _ := got["metadata"].(map[string]any)
+	if caller["ani"] != "5001" {
+		t.Fatalf("caller %#v", got["caller"])
+	}
+	if meta["call_uuid"] != "fs-uuid-1" || meta["destination"] != "101" {
+		t.Fatalf("metadata %#v", got["metadata"])
+	}
+
+	rr = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/sessions/"+sid+"/audit", nil))
+	var audit struct {
+		Events []struct {
+			Type    string         `json:"event_type"`
+			Payload map[string]any `json:"payload"`
+		} `json:"audit_events"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &audit)
+	found := false
+	for _, e := range audit.Events {
+		if e.Type != "session.started" {
+			continue
+		}
+		found = true
+		md, _ := e.Payload["metadata"].(map[string]any)
+		if md["sip_call_id"] != "sip-abc" {
+			t.Fatalf("audit metadata %#v", e.Payload["metadata"])
+		}
+	}
+	if !found {
+		t.Fatal("missing session.started audit")
+	}
+}

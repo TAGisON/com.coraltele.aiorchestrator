@@ -32,6 +32,8 @@ type Conn struct {
 	seq      uint64
 	closed   bool
 
+	writeMu sync.Mutex // serializes websocket writes (flushOne + Flush)
+
 	markMu   sync.Mutex
 	markCond *sync.Cond
 	pending  int // queued+inflight frames waiting mark
@@ -160,8 +162,11 @@ func (c *Conn) flushOne() {
 	if closed {
 		return
 	}
+	c.writeMu.Lock()
 	_ = c.conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
-	if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+	err = c.conn.WriteMessage(websocket.TextMessage, msg)
+	c.writeMu.Unlock()
+	if err != nil {
 		return
 	}
 	c.markMu.Lock()
@@ -209,17 +214,30 @@ func (c *Conn) WritePCM(ctx context.Context, frame port.PCMFrame) error {
 	return nil
 }
 
-// Flush drops unplayed queue (barge-in).
+// Flush drops unplayed queue locally and tells FS mod_audio_stream to clear inject (barge-in).
 func (c *Conn) Flush(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 	c.mu.Lock()
 	c.queue = nil
 	c.flushGen++
+	closed := c.closed
 	c.mu.Unlock()
 	c.markMu.Lock()
 	c.pending = 0
 	c.markCond.Broadcast()
 	c.markMu.Unlock()
-	return nil
+	if closed {
+		return context.Canceled
+	}
+	c.writeMu.Lock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+	err := c.conn.WriteMessage(websocket.TextMessage, encodeFlush())
+	c.writeMu.Unlock()
+	return err
 }
 
 // WaitMark blocks until queued playout is drained (or ctx/done).

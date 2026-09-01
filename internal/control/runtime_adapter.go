@@ -140,9 +140,11 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 
 	applog.Info("live talk started", "session", sessionID, "listen", string(listenGW.ID()))
 	// Direct feeder→Listen tap (bus SubscribeAudio alone dropped/blocked under STT write latency).
+	// Also feed OnPCM here — bus PublishAudio includes TTS frames and must not drive barge-in VAD.
 	queue := make(chan port.PCMFrame, 128)
 	var dropped atomic.Int64
 	a.SetPCMTap(func(frame port.PCMFrame) {
+		talk.OnPCM(frame)
 		select {
 		case queue <- frame:
 		default:
@@ -154,7 +156,6 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 		r.drainListenQueue(liveCtx, a, stream, queue, &dropped)
 	}()
 	go r.consumeListenFinals(liveCtx, talk, stream)
-	go talk.WatchPCMForBarge(liveCtx)
 	go r.silenceWatch(liveCtx, a, talk)
 	return nil
 }
@@ -254,18 +255,18 @@ func (r *SessionRuntime) consumeListenFinals(ctx context.Context, talk *composer
 			if text == "" {
 				continue
 			}
-			// Drop STT while Thinking/Speaking so speaker echo of TTS does not start
-			// overlapping turns (barge-in can be added later via VAD).
+			// Caller speech while bot is Thinking/Speaking → barge-in, then take the final.
 			st := talk.State()
 			if st == composer.Thinking || st == composer.Speaking {
-				applog.Info("live listen final ignored (busy)", "session", string(talk.Session), "state", string(st), "chars", len(text))
-				continue
+				applog.Info("live listen final barge", "session", string(talk.Session), "state", string(st), "chars", len(text))
+				talk.Interrupt()
 			}
 			applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
 			if ctrl, ok := r.DeskController(string(talk.Session)); ok && strings.TrimSpace(final.Language) != "" {
 				ctrl.Engine().SetLanguage(final.Language)
 			}
-			if err := talk.OnListenFinal(ctx, final); err != nil {
+			// Durable observe must not use liveCtx — stop cancels it and drops transcripts.
+			if err := talk.OnListenFinal(context.Background(), final); err != nil {
 				applog.Warn("OnListenFinal", "session", string(talk.Session), "err", err)
 			}
 		}

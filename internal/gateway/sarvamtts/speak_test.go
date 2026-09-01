@@ -100,8 +100,8 @@ func TestSpeakVoiceIDOverridesDefaultSpeaker(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		if req["speaker"] != "anushka" {
-			t.Errorf("speaker=%v want anushka (from VoiceID)", req["speaker"])
+		if req["speaker"] != "priya" {
+			t.Errorf("speaker=%v want priya (v2 anushka remapped for bulbul:v3)", req["speaker"])
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"audios": []string{base64.StdEncoding.EncodeToString(pcm)},

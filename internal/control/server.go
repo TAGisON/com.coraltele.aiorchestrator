@@ -422,6 +422,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			SessionID: sess.ID, TenantID: sess.TenantID,
 			ProfileID: sess.ProfileID, ProfileVersion: sess.ProfileVersion,
 			Clock: sess.Clock, RecordingRef: sess.RecordingRef,
+			Caller: sess.Caller, Metadata: sess.Metadata,
 		}}
 		obs.OnSessionStarted(r.Context())
 	}
@@ -491,6 +492,15 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if sess.GatewayBinding != nil {
 		out["gateway_binding"] = sess.GatewayBinding
+	}
+	if sess.RecordingRef != "" {
+		out["recording_ref"] = sess.RecordingRef
+	}
+	if len(sess.Caller) > 0 {
+		out["caller"] = json.RawMessage(sess.Caller)
+	}
+	if len(sess.Metadata) > 0 {
+		out["metadata"] = json.RawMessage(sess.Metadata)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

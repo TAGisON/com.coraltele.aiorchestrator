@@ -136,10 +136,14 @@ CoralUI.onReady(function () {
       el("sessBody").innerHTML = rows.map(function (s) {
         var id = s.session_id;
         var sel = id === selected ? " selected" : "";
+        var caller = (s.caller && (s.caller.ani || s.caller.number)) || "";
+        var dest = (s.metadata && s.metadata.destination) || "";
         return '<tr class="clickable' + sel + '" data-id="' + id + '">' +
           "<td><code>" + id.slice(0, 12) + "…</code></td>" +
           "<td>" + statePill(s.state) + "</td>" +
           "<td>" + (s.profile_id || "") + " v" + (s.profile_version || "?") + "</td>" +
+          "<td>" + caller + "</td>" +
+          "<td>" + dest + "</td>" +
           "<td>" + (s.updated_at || "") + "</td></tr>";
       }).join("");
       var trs = el("sessBody").querySelectorAll("tr.clickable");
@@ -186,6 +190,9 @@ CoralUI.onReady(function () {
           sess.gateway_binding.think + " / " + sess.gateway_binding.speak + "</span>");
       }
       if (sess.active_language) pills.push('<span class="pill">lang ' + sess.active_language + "</span>");
+      if (sess.caller && sess.caller.ani) pills.push('<span class="pill">ani ' + sess.caller.ani + "</span>");
+      if (sess.metadata && sess.metadata.destination) pills.push('<span class="pill">dest ' + sess.metadata.destination + "</span>");
+      if (sess.metadata && sess.metadata.call_uuid) pills.push('<span class="pill">uuid ' + String(sess.metadata.call_uuid).slice(0, 8) + "…</span>");
       if (sess.recording_ref) pills.push('<span class="pill warn">recording_ref set (external)</span>');
       else pills.push('<span class="pill">no recording_ref (orchestrator does not store call audio)</span>');
       el("metaPills").innerHTML = pills.join(" ");

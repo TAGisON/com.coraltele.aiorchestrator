@@ -22,12 +22,22 @@ type SessionMeta struct {
 	ProfileVersion int
 	Clock          string
 	RecordingRef   string
+	Caller         json.RawMessage
+	Metadata       json.RawMessage
 }
 
 // Observer appends audit/analytics rows (best-effort).
 type Observer struct {
 	Repo store.Repository
 	Meta SessionMeta
+}
+
+// storeCtx ignores caller cancel so hangup/stop does not drop transcript/audit rows.
+func storeCtx(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return context.WithoutCancel(ctx)
 }
 
 // Audit appends an immutable audit_event. Errors are logged only.
@@ -47,7 +57,7 @@ func (o *Observer) Audit(ctx context.Context, eventType string, payload map[stri
 		payload["recording_ref"] = o.Meta.RecordingRef
 	}
 	raw, _ := json.Marshal(payload)
-	_, err := o.Repo.AppendAuditEvent(ctx, store.AuditEvent{
+	_, err := o.Repo.AppendAuditEvent(storeCtx(ctx), store.AuditEvent{
 		SessionID: o.Meta.SessionID,
 		TenantID:  o.Meta.TenantID,
 		EventType: eventType,
@@ -70,7 +80,7 @@ func (o *Observer) Metric(ctx context.Context, metric string, value float64, dim
 	if dims != nil {
 		raw, _ = json.Marshal(dims)
 	}
-	_, err := o.Repo.AppendAnalyticsEvent(ctx, store.AnalyticsEvent{
+	_, err := o.Repo.AppendAnalyticsEvent(storeCtx(ctx), store.AnalyticsEvent{
 		TenantID:   o.Meta.TenantID,
 		ProfileID:  o.Meta.ProfileID,
 		SessionID:  o.Meta.SessionID,
@@ -163,11 +173,12 @@ func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, respo
 	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
 		return
 	}
+	writeCtx := storeCtx(ctx)
 	for _, row := range []store.TranscriptTurn{
 		{SessionID: o.Meta.SessionID, Role: store.RoleUser, Text: userText, TurnID: turnID},
 		{SessionID: o.Meta.SessionID, Role: store.RoleAssistant, Text: responseText, TurnID: turnID},
 	} {
-		if _, err := o.Repo.AppendTranscriptTurn(ctx, row); err != nil {
+		if _, err := o.Repo.AppendTranscriptTurn(writeCtx, row); err != nil {
 			applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", row.Role, "err", err)
 		}
 	}
@@ -182,7 +193,7 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 		return
 	}
 	turnID := newTurnID()
-	_, err := o.Repo.AppendTranscriptTurn(ctx, store.TranscriptTurn{
+	_, err := o.Repo.AppendTranscriptTurn(storeCtx(ctx), store.TranscriptTurn{
 		SessionID: o.Meta.SessionID,
 		Role:      store.RoleAssistant,
 		Text:      responseText,
@@ -215,7 +226,11 @@ func (o *Observer) OnSessionStarted(ctx context.Context) {
 	if o == nil {
 		return
 	}
-	o.Audit(ctx, store.AuditSessionStarted, map[string]any{"state": store.StateRunning})
+	o.Audit(ctx, store.AuditSessionStarted, map[string]any{
+		"state":    store.StateRunning,
+		"caller":   jsonOrNil(o.Meta.Caller),
+		"metadata": jsonOrNil(o.Meta.Metadata),
+	})
 	o.Metric(ctx, store.MetricSessionStarted, 1, nil)
 }
 
@@ -236,6 +251,13 @@ func (o *Observer) OnSessionTerminal(ctx context.Context, terminal string, hando
 	} else if !handoff && terminal == store.StateCompleted && emitContained {
 		o.Metric(ctx, store.MetricContained, 1, nil)
 	}
+}
+
+func jsonOrNil(raw json.RawMessage) any {
+	if len(raw) == 0 {
+		return nil
+	}
+	return json.RawMessage(raw)
 }
 
 func truncate(s string, n int) string {
