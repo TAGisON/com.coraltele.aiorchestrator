@@ -23,6 +23,8 @@ CoralUI.onReady(function () {
   var callActive = false;
   var micBytesSent = 0;
   var micStatusTimer = null;
+  var liveCaptionEl = null;
+  var liveCaptionText = "";
 
   function setJson(id, data) {
     var node = el(id);
@@ -64,6 +66,26 @@ CoralUI.onReady(function () {
     div.innerHTML = '<div class="meta">' + escapeHtml(meta || role) + "</div>" + escapeHtml(text || "");
     el("chat").appendChild(div);
     el("chat").scrollTop = el("chat").scrollHeight;
+  }
+
+  function setLiveCaption(text) {
+    var chat = el("chat");
+    if (!chat) return;
+    liveCaptionText = text || "";
+    if (!text) {
+      if (liveCaptionEl && liveCaptionEl.parentNode) {
+        liveCaptionEl.parentNode.removeChild(liveCaptionEl);
+      }
+      liveCaptionEl = null;
+      return;
+    }
+    if (!liveCaptionEl) {
+      liveCaptionEl = document.createElement("div");
+      liveCaptionEl.className = "bubble user live-partial";
+      chat.appendChild(liveCaptionEl);
+    }
+    liveCaptionEl.innerHTML = '<div class="meta">you · live</div>' + escapeHtml(text);
+    chat.scrollTop = chat.scrollHeight;
   }
 
   function refreshReady() {
@@ -123,10 +145,23 @@ CoralUI.onReady(function () {
 
   function openSSE(id) {
     closeSSE();
+    setLiveCaption("");
     try {
       eventSource = new EventSource("/v1/sessions/" + encodeURIComponent(id) + "/events");
       eventSource.addEventListener("turn.completed", function () {
+        setLiveCaption("");
         refreshTranscript();
+      });
+      eventSource.addEventListener("caption", function (ev) {
+        try {
+          var payload = JSON.parse(ev.data);
+          if (payload.partial) {
+            setLiveCaption(payload.text || "");
+          } else {
+            setLiveCaption("");
+            refreshTranscript();
+          }
+        } catch (_) { /* ignore */ }
       });
       eventSource.addEventListener("session.state", function (ev) {
         try {
@@ -137,6 +172,7 @@ CoralUI.onReady(function () {
             setActive(false);
             closeSSE();
             setCallStatus("Idle", "");
+            refreshTranscript();
           }
         } catch (_) { /* ignore */ }
       });
@@ -200,9 +236,9 @@ CoralUI.onReady(function () {
     }
   }
 
-  // Must unlock AudioContext inside the Start-call click (before awaits), or Chrome
-  // keeps it suspended and ScriptProcessor never fires — bot greets but never hears mic.
-  function unlockMicAudio() {
+  // Must unlock both AudioContexts inside the Start-call click (before awaits), or Chrome
+  // keeps them suspended — mic uplink silent and TTS playback inaudible even when edge sends audio.
+  function unlockAudioContexts() {
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!audioCtx) {
       try {
@@ -211,14 +247,26 @@ CoralUI.onReady(function () {
         audioCtx = new AC();
       }
     }
-    if (audioCtx.state === "suspended") {
-      return audioCtx.resume().catch(function () { /* still try capture */ });
+    if (!playCtx) {
+      try {
+        playCtx = new AC({ sampleRate: peerRate });
+      } catch (_) {
+        playCtx = new AC();
+      }
+      playTime = playCtx.currentTime;
     }
-    return Promise.resolve();
+    var jobs = [];
+    if (audioCtx.state === "suspended") {
+      jobs.push(audioCtx.resume().catch(function () { /* still try capture */ }));
+    }
+    if (playCtx.state === "suspended") {
+      jobs.push(playCtx.resume().catch(function () { /* still try playback */ }));
+    }
+    return jobs.length ? Promise.all(jobs) : Promise.resolve();
   }
 
   function startMicCapture(ws) {
-    return unlockMicAudio().then(function () {
+    return unlockAudioContexts().then(function () {
       if (!mediaStream) {
         throw new Error("microphone stream missing");
       }
@@ -360,9 +408,10 @@ CoralUI.onReady(function () {
       return Promise.resolve();
     }
     el("chat").innerHTML = "";
+    setLiveCaption("");
     setCallStatus("Requesting mic…", "warn");
     // Unlock playback/mic AudioContext while still in the click gesture chain.
-    return unlockMicAudio().then(function () {
+    return unlockAudioContexts().then(function () {
       return navigator.mediaDevices.getUserMedia({
         audio: {
           // Speakers + AEC often cancel the user's voice while TTS plays (lab).
@@ -395,6 +444,7 @@ CoralUI.onReady(function () {
       if (!created.edge_token) {
         throw new Error("session create missing edge_token");
       }
+      openSSE(sessionId);
       setCallStatus("Connecting audio edge…", "warn");
       return connectEdge(created.edge_token).then(function () {
         return created;
@@ -405,7 +455,6 @@ CoralUI.onReady(function () {
     }).then(function (ans) {
       setJson("turnJson", ans);
       setActive(true);
-      openSSE(sessionId);
       setCallStatus("On call", "ok");
       showBanner(el("banner"), "ok",
         "Call live — speak after the greeting (headphones help). Status shows mic uplink KB while audio is sent.");
@@ -450,10 +499,13 @@ CoralUI.onReady(function () {
     if (!sessionId) return Promise.resolve();
     return api("GET", "/v1/sessions/" + encodeURIComponent(sessionId) + "/transcript").then(function (tr) {
       var turns = tr.turns || [];
+      var partial = liveCaptionText;
       el("chat").innerHTML = "";
+      liveCaptionEl = null;
       turns.forEach(function (t) {
         appendBubble(t.role || "assistant", t.text || "", (t.role || "") + " · seq " + t.seq);
       });
+      if (partial) setLiveCaption(partial);
     }).catch(function (e) {
       setJson("turnJson", { transcript_error: formatApiError(e) });
     });

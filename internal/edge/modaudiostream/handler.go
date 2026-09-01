@@ -105,6 +105,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		SessionID: port.SessionID(claims.SessionID),
 	}
 	conn := newConn(ws, meta, canonical, frameMs)
+	conn.start()
 	if err := h.Binder.AttachConn(claims.SessionID, conn); err != nil {
 		_ = ws.Close()
 		h.unbind(claims.SessionID)
@@ -113,7 +114,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	conn.start()
 
 	go func() {
 		<-conn.done

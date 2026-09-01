@@ -117,6 +117,7 @@ pre.log, .log {
 .bubble.user { align-self: flex-end; background: #e7f3f3; border-color: #b7d6d6; }
 .bubble.assistant { align-self: flex-start; }
 .bubble .meta { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.2rem; }
+.bubble.live-partial { border-style: dashed; opacity: 0.92; }
 
 .checklist { list-style: none; padding: 0; margin: 0; }
 .checklist li {

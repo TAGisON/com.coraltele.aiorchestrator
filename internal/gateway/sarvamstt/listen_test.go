@@ -59,7 +59,10 @@ func TestOpenStreamWritePCMFinals(t *testing.T) {
 			}
 			var envelope map[string]any
 			_ = json.Unmarshal(msg, &envelope)
-			if _, ok := envelope["audio"]; ok {
+			if audio, ok := envelope["audio"].(map[string]any); ok {
+				if enc, _ := audio["encoding"].(string); enc != "audio/wav" {
+					t.Errorf("encoding=%q want audio/wav", enc)
+				}
 				once.Do(func() {
 					_ = c.WriteMessage(websocket.TextMessage, []byte(`{"type":"data","data":{"transcript":"hi","language_code":"en-IN"}}`))
 				})

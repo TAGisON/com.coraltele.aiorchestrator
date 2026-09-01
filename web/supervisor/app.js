@@ -8,6 +8,9 @@ CoralUI.onReady(function () {
   var formatApiError = CoralUI.formatApiError;
   var bindClick = CoralUI.bindClick;
   var selected = "";
+  var eventSource = null;
+  var liveCaptionEl = null;
+  var liveCaptionText = "";
 
   function setJson(id, data) {
     var node = el(id);
@@ -35,8 +38,9 @@ CoralUI.onReady(function () {
     var turns = (data && data.turns) || [];
     var chat = el("transcriptChat");
     if (!chat) return;
-    if (!turns.length) {
+    if (!turns.length && !liveCaptionText) {
       chat.innerHTML = '<div class="hint">No transcript turns.</div>';
+      liveCaptionEl = null;
       return;
     }
     chat.innerHTML = turns.map(function (t) {
@@ -46,6 +50,82 @@ CoralUI.onReady(function () {
         " · seq " + t.seq + (t.turn_id ? " · " + escapeHtml(t.turn_id) : "") +
         "</div>" + escapeHtml(t.text || "") + "</div>";
     }).join("");
+    liveCaptionEl = null;
+    if (liveCaptionText) {
+      liveCaptionEl = document.createElement("div");
+      liveCaptionEl.className = "bubble user live-partial";
+      liveCaptionEl.innerHTML = '<div class="meta">caller · live</div>' + escapeHtml(liveCaptionText);
+      chat.appendChild(liveCaptionEl);
+    }
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function setLiveCaption(text) {
+    liveCaptionText = text || "";
+    var chat = el("transcriptChat");
+    if (!chat) return;
+    if (!liveCaptionText) {
+      if (liveCaptionEl && liveCaptionEl.parentNode) {
+        liveCaptionEl.parentNode.removeChild(liveCaptionEl);
+      }
+      liveCaptionEl = null;
+      return;
+    }
+    if (!liveCaptionEl) {
+      liveCaptionEl = document.createElement("div");
+      liveCaptionEl.className = "bubble user live-partial";
+      chat.appendChild(liveCaptionEl);
+    }
+    liveCaptionEl.innerHTML = '<div class="meta">caller · live</div>' + escapeHtml(liveCaptionText);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function closeSSE() {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    setLiveCaption("");
+  }
+
+  function openLiveSSE(id, state) {
+    closeSSE();
+    if (!/Running|Attached|Created|Draining/.test(String(state || ""))) {
+      return;
+    }
+    try {
+      eventSource = new EventSource("/v1/sessions/" + encodeURIComponent(id) + "/events");
+      eventSource.addEventListener("turn.completed", function () {
+        setLiveCaption("");
+        api("GET", "/v1/sessions/" + encodeURIComponent(id) + "/transcript").then(function (tr) {
+          setJson("transcriptJson", tr);
+          renderTranscript(tr);
+        }).catch(function () { /* ignore */ });
+      });
+      eventSource.addEventListener("caption", function (ev) {
+        try {
+          var payload = JSON.parse(ev.data);
+          if (payload.partial) {
+            setLiveCaption(payload.text || "");
+          } else {
+            setLiveCaption("");
+            api("GET", "/v1/sessions/" + encodeURIComponent(id) + "/transcript").then(function (tr) {
+              setJson("transcriptJson", tr);
+              renderTranscript(tr);
+            }).catch(function () { /* ignore */ });
+          }
+        } catch (_) { /* ignore */ }
+      });
+      eventSource.addEventListener("session.state", function (ev) {
+        try {
+          var payload = JSON.parse(ev.data);
+          if (payload.state && /Completed|Failed|Cancelled/.test(payload.state)) {
+            closeSSE();
+            inspect(id);
+          }
+        } catch (_) { /* ignore */ }
+      });
+    } catch (_) { /* SSE optional */ }
   }
 
   function refreshList() {
@@ -91,8 +171,11 @@ CoralUI.onReady(function () {
     }
     selected = id;
     el("metaPills").innerHTML = "";
+    closeSSE();
 
+    var sessState = "";
     var pSess = api("GET", "/v1/sessions/" + encodeURIComponent(id)).then(function (sess) {
+      sessState = sess.state || "";
       setJson("sessJson", sess);
       var pills = [
         statePill(sess.state),
@@ -141,7 +224,9 @@ CoralUI.onReady(function () {
     });
 
     return Promise.all([pSess, pTr, pDisp, pAudit, pAn,
-      loadAttributes(false), loadHandoff(), loadSkills()]);
+      loadAttributes(false), loadHandoff(), loadSkills()]).then(function () {
+      openLiveSSE(id, sessState);
+    });
   }
 
   /* ------------------------------------------------------ desk inspection */

@@ -18,6 +18,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvam"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 )
@@ -32,6 +33,7 @@ type WSConn interface {
 	WriteMessage(messageType int, data []byte) error
 	ReadMessage() (messageType int, p []byte, err error)
 	Close() error
+	SetWriteDeadline(t time.Time) error
 }
 
 // Gateway is Listen over Sarvam REST + legacy speech-to-text WebSocket.
@@ -163,6 +165,7 @@ func (g *Gateway) OpenStream(ctx context.Context, req port.ListenRequest) (port.
 	q.Set("input_audio_codec", "pcm_s16le")
 	q.Set("flush_signal", "true")
 	q.Set("high_vad_sensitivity", "true")
+	q.Set("vad_signals", "true")
 	u := g.Cfg.STTWSURL
 	if strings.Contains(u, "?") {
 		u += "&" + q.Encode()
@@ -233,6 +236,17 @@ func (s *listenStream) WritePCM(ctx context.Context, frame port.PCMFrame) error 
 	if rate != s.wsRate {
 		pcm = sarvam.ResamplePCM(pcm, rate, s.wsRate)
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed.Load() {
+		return &port.GatewayError{Code: port.CodeCancelled, Message: "stream closed"}
+	}
+	return s.writeAudioLocked(pcm)
+}
+
+func (s *listenStream) writeAudioLocked(pcm []byte) error {
+	// LiveKit / Sarvam Python SDK: raw pcm_s16le bytes with encoding label "audio/wav"
+	// while connection input_audio_codec=pcm_s16le.
 	payload := map[string]any{
 		"audio": map[string]any{
 			"data":        base64.StdEncoding.EncodeToString(pcm),
@@ -241,11 +255,7 @@ func (s *listenStream) WritePCM(ctx context.Context, frame port.PCMFrame) error 
 		},
 	}
 	raw, _ := json.Marshal(payload)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed.Load() {
-		return &port.GatewayError{Code: port.CodeCancelled, Message: "stream closed"}
-	}
+	_ = s.conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	if err := s.conn.WriteMessage(websocket.TextMessage, raw); err != nil {
 		return sarvam.MapDialError(err)
 	}
@@ -272,6 +282,7 @@ func (s *listenStream) readLoop() {
 	for {
 		_, msg, err := s.conn.ReadMessage()
 		if err != nil {
+			s.closed.Store(true)
 			return
 		}
 		var envelope struct {
@@ -280,20 +291,26 @@ func (s *listenStream) readLoop() {
 				Transcript   string  `json:"transcript"`
 				LanguageCode string  `json:"language_code"`
 				Message      string  `json:"message"`
+				Error        string  `json:"error"`
+				Code         string  `json:"code"`
 				SignalType   string  `json:"signal_type"`
 				Confidence   float32 `json:"confidence"`
+				LanguageProb float32 `json:"language_probability"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(msg, &envelope); err != nil {
 			continue
 		}
 		switch envelope.Type {
-		case "data":
+		case "data", "transcript":
 			lang := envelope.Data.LanguageCode
 			if lang == "" {
 				lang = s.lang
 			}
 			conf := envelope.Data.Confidence
+			if conf == 0 {
+				conf = envelope.Data.LanguageProb
+			}
 			if conf == 0 {
 				conf = 1
 			}
@@ -305,10 +322,23 @@ func (s *listenStream) readLoop() {
 			case s.finals <- port.ListenFinal{Text: text, Confidence: conf, Language: lang}:
 			default:
 			}
-		case "events":
-			// VAD signals — ignore for Listen port contract
+		case "events", "speech_start", "speech_end":
+			// VAD signals — Listen port only surfaces finals
 		case "error":
+			msg := envelope.Data.Message
+			if msg == "" {
+				msg = envelope.Data.Error
+			}
+			if msg == "" {
+				msg = "sarvam stt error"
+			}
+			applog.Warn("sarvam stt stream error", "code", envelope.Data.Code, "message", msg)
+			s.closed.Store(true)
 			return
+		default:
+			if envelope.Type != "" {
+				applog.Info("sarvam stt message", "type", envelope.Type, "signal", envelope.Data.SignalType)
+			}
 		}
 	}
 }
