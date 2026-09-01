@@ -11,6 +11,20 @@ Three separate UIs replace the old monolithic lab console.
 
 If port 8011 is already taken by an older process, start a current build with `HTTP_ADDR=:8012`. Install and smoke-test the Coral TFN desk with `.\tools\lab\Setup-CoralDesk.ps1 -Base http://127.0.0.1:8012`.
 
+## FreeSWITCH edge (VoIP)
+
+Telephony give/take lives in the **`mod_audio_stream-1`** git submodule at repo root. Deploy Lua + dialplan from there:
+
+```powershell
+# After git submodule update --init
+copy mod_audio_stream-1\fs\ai_voice_bot.lua \\sipserver\...\scripts\
+copy mod_audio_stream-1\fs\ai_profiles.conf \\sipserver\...\scripts\
+```
+
+See `mod_audio_stream-1/fs/README.md` for sipserver install, DID map (`101=coral-tfn`), and `ai_orch_url` if the orchestrator IP differs from `192.168.25.130:8011`.
+
+Set `edge.base_url` in `conf/aiorchestrator.properties` to the **same host IP** FreeSWITCH uses for WSS (`ws://<ip>:8011/edge/fs`).
+
 ## Fresh install
 
 ```powershell
