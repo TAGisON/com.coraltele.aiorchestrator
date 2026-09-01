@@ -172,7 +172,11 @@ func (e *Engine) SetLanguage(lang string) {
 }
 
 func (e *Engine) allowedLanguage(lang string) bool {
-	for _, l := range e.doc.Languages {
+	list := e.doc.CX.RuntimeLanguages
+	if len(list) == 0 {
+		list = e.doc.Languages
+	}
+	for _, l := range list {
 		if l == lang || baseLang(l) == baseLang(lang) {
 			return true
 		}

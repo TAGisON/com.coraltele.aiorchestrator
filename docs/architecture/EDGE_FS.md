@@ -104,3 +104,9 @@ DTMF digits arrive as **feeder events** on the session bus (not Listen input). C
 - Orchestrator does not speak SIP/RTP.  
 - Do not change C module JSON schema without a coordinated module release.  
 - Generic platform WS feeder is a **separate** edge package (`internal/edge/ws`); it does not replace FS dialect.
+
+---
+
+## 7. Live talk answer gate (Contact Desk)
+
+FS Lua (`mod_audio_stream-1/fs/ai_voice_bot.lua`) must **not** call `POST /v1/sessions/{id}/answer` until orchestrator reports `media_phase=ready` on `GET /v1/sessions/{id}` (or dedicated media-ready probe). RTP settle (~500 ms default, desk `rtp_settle_ms`) prevents welcome-before-uplink races. Full phase machine: `docs/product/LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §2–§3.

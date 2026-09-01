@@ -4,6 +4,7 @@
 **Date:** 1 September 2026  
 **Parents:** `PRODUCT_DECISIONS.md`, `CONTACT_AGENT.md`, `SYSTEM_ENGINES.md`, `LANGUAGE_POLICY.md`, Coral Telecom TFN script  
 **Architecture parents:** `PORTS.md`, `RUNTIME.md`, `RULES_AND_SKILLS.md`, `PROFILE_SCHEMA.md`, `CONTROL_API.md`, `INTEGRATION.md`, `ANALYTICS_AND_POSTCALL.md`, `EDGE_FS.md`, `OPERATIONS.md`  
+**Live talk CX (welcome, barge, India language):** `LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` — normative for Contact Desk media phase, STT barge Commit, and desk CX knobs (`welcome_barge_allowed`, `min_barge_chars`, `rtp_settle_ms`).  
 **Audience:** Product, architects, implementers, AI coding agents  
 
 **How to use this file:** An implementer or agent must be able to build from **this document alone** for the Contact Desk vertical, without inventing entities, vocabularies, or flows. Platform kernel details remain in architecture parents; this file defines the **vertical completely**.
@@ -835,6 +836,8 @@ AdmitSession(tenant):
 | `cd_skill_latency_ms{skill}` | histogram | p95 ≤ skill timeout × 0.8 |
 | `cd_skill_error_ratio{skill}` | ratio | alert > 5 % / 15 min |
 | `cd_barge_in_total` / `cd_echo_suppressed_total` | counter | echo suppressed ≫ 0 means gate working |
+| `cd_barge_candidate_total` / `cd_barge_commit_total` / `cd_barge_suppress_echo_total` | counter | STT barge gate (see `LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §3.5) |
+| `cd_welcome_first_audio_ms` | histogram | Ready → first welcome PCM |
 | `cd_containment_ratio` | ratio | `resolved_self_service` ÷ completed |
 | `cd_transfer_ratio{target}` | ratio | trend, not gate |
 | `cd_abandoned_silence_ratio` | ratio | alert > 10 % |

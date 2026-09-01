@@ -43,11 +43,11 @@ func TestMediaPhaseQueueFinalsUntilConversing(t *testing.T) {
 	m.onEdgeAttach()
 	m.noteFirstUplink()
 	_ = m.beginWelcome()
-	if !m.shouldQueueFinals() {
+	if !m.shouldQueueFinal(false) {
 		t.Fatal("should queue during welcoming")
 	}
 	m.completeWelcome()
-	if m.shouldQueueFinals() {
+	if m.shouldQueueFinal(false) {
 		t.Fatal("should not queue during conversing")
 	}
 	m.queueFinal(port.ListenFinal{Text: "hello"})

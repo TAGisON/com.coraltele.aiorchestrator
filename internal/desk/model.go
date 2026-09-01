@@ -203,6 +203,13 @@ type CXPolicy struct {
 	MaxTurnFailures   int  `json:"max_turn_failures"`
 	IntentAcceptScore float64 `json:"intent_accept_score"`
 	IntentConfirmScore float64 `json:"intent_confirm_score"`
+	// Live-talk CX (LIVE_TALK_CX_AND_INDIA_LANGUAGE.md §7).
+	WelcomeBargeAllowed    *bool   `json:"welcome_barge_allowed,omitempty"`
+	MinBargeChars          int     `json:"min_barge_chars,omitempty"`
+	MinBargeMs             int     `json:"min_barge_ms,omitempty"`
+	BargePartialConfidence float64 `json:"barge_partial_confidence,omitempty"`
+	RTPSettleMs            int     `json:"rtp_settle_ms,omitempty"`
+	RuntimeLanguages       []string `json:"runtime_languages,omitempty"`
 }
 
 // SkillBind is a desk-level skill enable + connector config (§10).
@@ -251,6 +258,10 @@ func DefaultCX() CXPolicy {
 		MaxTurnFailures:    3,
 		IntentAcceptScore:  0.60,
 		IntentConfirmScore: 0.40,
+		MinBargeChars:      2,
+		MinBargeMs:         280,
+		BargePartialConfidence: 0.70,
+		RTPSettleMs:        500,
 	}
 }
 

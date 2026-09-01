@@ -57,6 +57,7 @@ type sessionMedia struct {
 	sinkAttached     bool
 	firstUplink      bool
 	attachAt         time.Time
+	readyAt          time.Time
 	settleMs         int
 
 	queuedFinals []port.ListenFinal
@@ -78,6 +79,15 @@ func (m *sessionMedia) view() SessionMediaView {
 		WelcomeCompleted:  m.welcomeCompleted,
 		WelcomeInProgress: inProgress,
 	}
+}
+
+func (m *sessionMedia) setSettleMs(ms int) {
+	if ms <= 0 {
+		ms = defaultRTPSettleMs
+	}
+	m.mu.Lock()
+	m.settleMs = ms
+	m.mu.Unlock()
 }
 
 func (m *sessionMedia) onEdgeAttach() {
@@ -122,8 +132,21 @@ func (m *sessionMedia) tryEnterReadyLocked() bool {
 	if !m.firstUplink && time.Since(m.attachAt) < time.Duration(m.settleMs)*time.Millisecond {
 		return false
 	}
-	m.phase = MediaReady
+	m.markReadyLocked()
 	return true
+}
+
+func (m *sessionMedia) readyAtTime() time.Time {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.readyAt
+}
+
+func (m *sessionMedia) markReadyLocked() {
+	if m.readyAt.IsZero() {
+		m.readyAt = time.Now()
+	}
+	m.phase = MediaReady
 }
 
 func (m *sessionMedia) enterReadyFromSettle() bool {
@@ -134,6 +157,9 @@ func (m *sessionMedia) enterReadyFromSettle() bool {
 	}
 	if time.Since(m.attachAt) < time.Duration(m.settleMs)*time.Millisecond {
 		return false
+	}
+	if m.readyAt.IsZero() {
+		m.readyAt = time.Now()
 	}
 	m.phase = MediaReady
 	return true
@@ -191,10 +217,16 @@ func (m *sessionMedia) queueFinal(f port.ListenFinal) {
 	m.queuedFinals = append(m.queuedFinals, f)
 }
 
-func (m *sessionMedia) shouldQueueFinals() bool {
+func (m *sessionMedia) shouldQueueFinal(welcomeBargeAllowed bool) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return mediaPhaseRank(m.phase) < mediaPhaseRank(MediaConversing)
+	if mediaPhaseRank(m.phase) >= mediaPhaseRank(MediaConversing) {
+		return false
+	}
+	if m.phase == MediaWelcoming && welcomeBargeAllowed {
+		return false
+	}
+	return true
 }
 
 func (m *sessionMedia) takeQueuedFinals() []port.ListenFinal {

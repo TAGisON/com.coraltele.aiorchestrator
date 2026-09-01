@@ -163,6 +163,8 @@ Existing mechanism: `uuid_audio_stream` starts a WebSocket to a URL.
 | Speak | response or inject text → Speak router → sink |
 | Talk | composer drives Listen + Think + Speak + VAD + barge-in |
 
+**Contact Desk live talk:** welcome media phase, STT Commit barge (not energy flush while Speaking), and desk CX compilation are specified in `docs/product/LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` (supersedes generic RUNTIME barge notes for guided-path calls).
+
 LLM off: Listen and Speak still run. Captions and read-outs do not require Think.
 
 ---
@@ -433,6 +435,7 @@ Listening ──VAD speech──► Capturing ──endpoint──► Thinking �
 |---|---|
 | Endpointing | Us (silence ms, STT final, max utterance) — **profile knobs** |
 | Barge-in | Us: flush sink → cancel Speak gateway → cancel Think → Capturing |
+| Contact Desk barge | STT final/partial **Commit** only (energy VAD does not flush while Speaking); desk CX knobs — `LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` |
 | Mark | Sink/Speak gateway; composer waits only when not barged |
 | Listen-only | Never enters this machine |
 | Playback Think | One-shot; no barge-in |

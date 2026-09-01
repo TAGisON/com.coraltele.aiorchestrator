@@ -27,6 +27,11 @@ const (
 	MetricContained        = "contained"
 	MetricBargeIn          = "barge_in"
 	MetricHopLatencyMs     = "hop_latency_ms"
+	// Live-talk barge (LIVE_TALK_CX_AND_INDIA_LANGUAGE.md §3.5).
+	MetricBargeCandidateTotal    = "cd_barge_candidate_total"
+	MetricBargeCommitTotal       = "cd_barge_commit_total"
+	MetricBargeSuppressEchoTotal = "cd_barge_suppress_echo_total"
+	MetricWelcomeFirstAudioMs    = "cd_welcome_first_audio_ms"
 )
 
 // AuditEvent is an append-only compliance row.

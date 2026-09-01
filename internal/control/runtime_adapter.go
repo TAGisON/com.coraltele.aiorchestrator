@@ -140,6 +140,7 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 
 	med := r.sessionMedia(sessionID)
 	med.onEdgeAttach()
+	med.setSettleMs(int(r.rtpSettleFor(sessionID) / time.Millisecond))
 
 	talk, err := r.talkFor(a)
 	if err != nil {
@@ -195,6 +196,7 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 		r.drainListenQueue(liveCtx, sessionID, a, stream, queue, &dropped)
 	}()
 	go r.consumeListenFinals(liveCtx, sessionID, talk, stream)
+	go r.consumeListenPartials(liveCtx, sessionID, talk, stream)
 	go r.silenceWatch(liveCtx, silenceArm, a, talk)
 	go r.rtpSettleWatch(liveCtx, sessionID)
 	return nil
@@ -323,38 +325,94 @@ func (r *SessionRuntime) consumeListenFinals(ctx context.Context, sessionID stri
 			if text == "" {
 				continue
 			}
-			if med.shouldQueueFinals() {
+			policy := r.bargePolicy(sessionID)
+			if med.shouldQueueFinal(policy.WelcomeBargeAllowed) {
 				med.queueFinal(final)
 				applog.Info("live listen final queued (pre-conversing)", "session", sessionID, "chars", len(text))
 				continue
 			}
-			r.deliverListenFinal(ctx, sessionID, talk, final)
+			r.deliverListenFinal(ctx, sessionID, talk, final, policy)
 		}
 	}
 }
 
-const defaultMinBargeChars = 2
-
-func listenFinalCommit(text string) bool {
-	t := strings.TrimSpace(text)
-	if len([]rune(t)) < defaultMinBargeChars {
-		return false
+func (r *SessionRuntime) consumeListenPartials(ctx context.Context, sessionID string, talk *composer.Talk, stream port.ListenStream) {
+	if talk == nil || stream == nil {
+		return
 	}
-	return true
+	med := r.sessionMedia(sessionID)
+	partials := stream.Partials()
+	var partialSince time.Time
+	var lastPartialText string
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case partial, ok := <-partials:
+			if !ok {
+				return
+			}
+			policy := r.bargePolicy(sessionID)
+			if !policy.Allowed || !policy.ListenWhileSpeak {
+				continue
+			}
+			st := talk.State()
+			if st != composer.Thinking && st != composer.Speaking {
+				partialSince = time.Time{}
+				lastPartialText = ""
+				continue
+			}
+			view := med.view()
+			if view.WelcomeInProgress && !policy.WelcomeBargeAllowed {
+				continue
+			}
+			text := strings.TrimSpace(partial.Text)
+			if text == "" {
+				continue
+			}
+			r.bargeMetric(talk, store.MetricBargeCandidateTotal, map[string]any{"source": "partial"})
+			if text != lastPartialText {
+				partialSince = time.Now()
+				lastPartialText = text
+			}
+			if !policy.partialCommit(partial, partialSince) {
+				continue
+			}
+			applog.Info("live listen partial barge commit", "session", sessionID, "state", string(st), "chars", len(text))
+			r.bargeMetric(talk, store.MetricBargeCommitTotal, map[string]any{"source": "partial"})
+			talk.Interrupt()
+			partialSince = time.Time{}
+			lastPartialText = ""
+		}
+	}
 }
 
-func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID string, talk *composer.Talk, final port.ListenFinal) {
+func (r *SessionRuntime) bargeMetric(talk *composer.Talk, metric string, dims map[string]any) {
+	if talk == nil || talk.Obs == nil {
+		return
+	}
+	talk.Obs.Metric(context.Background(), metric, 1, dims)
+}
+
+func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID string, talk *composer.Talk, final port.ListenFinal, policy bargePolicy) {
 	text := strings.TrimSpace(final.Text)
 	if text == "" {
 		return
 	}
 	st := talk.State()
 	if st == composer.Thinking || st == composer.Speaking {
-		if !listenFinalCommit(text) {
+		if !policy.Allowed {
+			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "barge_disabled"})
+			applog.Info("live listen final suppressed (barge disabled)", "session", string(talk.Session))
+			return
+		}
+		if !policy.textCommit(text) {
+			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "short"})
 			applog.Info("live listen final suppressed (short)", "session", string(talk.Session), "chars", len(text))
 			return
 		}
 		applog.Info("live listen final barge commit", "session", string(talk.Session), "state", string(st), "chars", len(text))
+		r.bargeMetric(talk, store.MetricBargeCommitTotal, map[string]any{"source": "final"})
 		talk.Interrupt()
 	}
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
@@ -368,8 +426,9 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 
 func (r *SessionRuntime) drainQueuedFinals(ctx context.Context, sessionID string, talk *composer.Talk) {
 	med := r.sessionMedia(sessionID)
+	policy := r.bargePolicy(sessionID)
 	for _, final := range med.takeQueuedFinals() {
-		r.deliverListenFinal(ctx, sessionID, talk, final)
+		r.deliverListenFinal(ctx, sessionID, talk, final, policy)
 	}
 }
 
@@ -478,6 +537,7 @@ func (r *SessionRuntime) AnswerCall(ctx context.Context, sessionID string) (stri
 			return "", err
 		}
 		talk.SetWelcoming(true)
+		talk.SetWelcomeReadyAt(med.readyAtTime())
 	}
 
 	spoken, err := talk.AnswerCall(ctx)
@@ -538,6 +598,9 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		if lang := strings.TrimSpace(a.ActiveLanguage()); lang != "" {
 			ctrl.Engine().SetLanguage(lang)
 		}
+		cx := ctrl.Engine().Doc().CX
+		welcomeBarge := cx.WelcomeBargeAllowed != nil && *cx.WelcomeBargeAllowed
+		talk.SetWelcomeBargeAllowed(welcomeBarge)
 		talk.Path.Desk = ctrl
 		talk.OnDeskEnd = r.deskEndHandler(a.ID)
 		if r.desks == nil {

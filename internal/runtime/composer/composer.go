@@ -17,6 +17,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/thinkpath"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/vad"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
 // TurnState is the Talk composer state (RUNTIME.md §6).
@@ -98,6 +99,8 @@ type Talk struct {
 	welcomeCompleted bool
 	welcoming       bool
 	welcomeBargeAllowed bool
+	welcomeReadyAt  time.Time
+	welcomeFirstPCM bool
 	lastActivity    time.Time
 }
 
@@ -172,6 +175,23 @@ func (t *Talk) CancelCount() int {
 func (t *Talk) SetWelcoming(on bool) {
 	t.mu.Lock()
 	t.welcoming = on
+	if !on {
+		t.welcomeFirstPCM = false
+	}
+	t.mu.Unlock()
+}
+
+// SetWelcomeBargeAllowed configures whether STT barge may flush during welcome.
+func (t *Talk) SetWelcomeBargeAllowed(allowed bool) {
+	t.mu.Lock()
+	t.welcomeBargeAllowed = allowed
+	t.mu.Unlock()
+}
+
+// SetWelcomeReadyAt anchors cd_welcome_first_audio_ms (Ready → first welcome PCM).
+func (t *Talk) SetWelcomeReadyAt(at time.Time) {
+	t.mu.Lock()
+	t.welcomeReadyAt = at
 	t.mu.Unlock()
 }
 
@@ -484,6 +504,7 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 			}
 			t.Sink.Push(frame)
 			t.writeSinks(speakCtx, frame)
+			t.noteWelcomeFirstPCM(ctx)
 			if t.Bus != nil {
 				t.Bus.PublishAudio(frame)
 			}
@@ -492,6 +513,21 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 			t.finishSpeakToListening()
 			return nil
 		}
+	}
+}
+
+func (t *Talk) noteWelcomeFirstPCM(ctx context.Context) {
+	t.mu.Lock()
+	if !t.welcoming || t.welcomeFirstPCM || t.welcomeReadyAt.IsZero() {
+		t.mu.Unlock()
+		return
+	}
+	t.welcomeFirstPCM = true
+	at := t.welcomeReadyAt
+	t.mu.Unlock()
+	if t.Obs != nil {
+		ms := time.Since(at).Milliseconds()
+		t.Obs.Metric(ctx, store.MetricWelcomeFirstAudioMs, float64(ms), nil)
 	}
 }
 
