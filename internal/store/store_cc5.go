@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"hash/fnv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -14,6 +16,10 @@ func (s *Store) AppendTranscriptTurn(ctx context.Context, turn TranscriptTurn) (
 		return TranscriptTurn{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, transcriptSessionLockKey(turn.SessionID)); err != nil {
+		return TranscriptTurn{}, err
+	}
 
 	var nextSeq int
 	err = tx.QueryRow(ctx, `
@@ -58,6 +64,13 @@ FROM transcript_turn WHERE session_id=$1 ORDER BY seq ASC
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+func transcriptSessionLockKey(sessionID string) int64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte("transcript:"))
+	_, _ = h.Write([]byte(strings.TrimSpace(sessionID)))
+	return int64(h.Sum64())
 }
 
 func (s *Store) UpsertSessionDisposition(ctx context.Context, d SessionDisposition) (SessionDisposition, error) {

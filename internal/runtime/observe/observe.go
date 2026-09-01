@@ -122,7 +122,7 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	if turnID == "" {
 		turnID = newTurnID()
 	}
-	o.appendTranscript(ctx, turnID, t.UserText, t.ResponseText)
+	o.appendTranscript(ctx, turnID, t.UserText, t.ResponseText, t.BargeIn)
 
 	payload := map[string]any{
 		"turn_id":            turnID,
@@ -169,18 +169,34 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	}
 }
 
-func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, responseText string) {
+func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, responseText string, barge bool) {
 	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
 		return
 	}
 	writeCtx := storeCtx(ctx)
+	if barge && strings.TrimSpace(responseText) != "" {
+		if _, err := o.Repo.AppendTranscriptTurn(writeCtx, store.TranscriptTurn{
+			SessionID: o.Meta.SessionID,
+			Role:      store.RoleAssistant,
+			Text:      responseText,
+			TurnID:    turnID + "-interrupted",
+		}); err != nil {
+			applog.Warn("observe interrupted assistant fail-open", "session", o.Meta.SessionID, "err", err)
+		}
+	}
 	for _, row := range []store.TranscriptTurn{
 		{SessionID: o.Meta.SessionID, Role: store.RoleUser, Text: userText, TurnID: turnID},
 		{SessionID: o.Meta.SessionID, Role: store.RoleAssistant, Text: responseText, TurnID: turnID},
 	} {
+		if row.Role == store.RoleAssistant && barge {
+			continue
+		}
 		if _, err := o.Repo.AppendTranscriptTurn(writeCtx, row); err != nil {
 			applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", row.Role, "err", err)
 		}
+	}
+	if barge && strings.TrimSpace(responseText) != "" {
+		return
 	}
 }
 
