@@ -29,11 +29,14 @@ type SessionRuntime struct {
 	talks map[string]*composer.Talk
 	lives map[string]*liveTalk
 	desks map[string]*deskController
+	media map[string]*sessionMedia
 }
 
 type liveTalk struct {
-	cancel context.CancelFunc
-	stream port.ListenStream
+	cancel      context.CancelFunc
+	stream      port.ListenStream
+	silenceArm  chan struct{}
+	silenceOnce sync.Once
 }
 
 func (r *SessionRuntime) StartSession(ctx context.Context, p RuntimeStart) error {
@@ -73,6 +76,9 @@ func (r *SessionRuntime) stopLiveTalk(sessionID string) {
 	if lt != nil {
 		delete(r.lives, sessionID)
 	}
+	if m := r.media[sessionID]; m != nil {
+		m.markDraining()
+	}
 	r.mu.Unlock()
 	if lt == nil {
 		return
@@ -83,6 +89,35 @@ func (r *SessionRuntime) stopLiveTalk(sessionID string) {
 	if lt.stream != nil {
 		_ = lt.stream.Close(context.Background())
 	}
+}
+
+func (r *SessionRuntime) sessionMedia(sessionID string) *sessionMedia {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.media == nil {
+		r.media = make(map[string]*sessionMedia)
+	}
+	m, ok := r.media[sessionID]
+	if !ok {
+		m = newSessionMedia()
+		r.media[sessionID] = m
+	}
+	return m
+}
+
+func (r *SessionRuntime) hasLiveTalk(sessionID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.lives[sessionID]
+	return ok
+}
+
+// SessionMedia returns live media phase for GET /v1/sessions/{id}.
+func (r *SessionRuntime) SessionMedia(sessionID string) (SessionMediaView, bool) {
+	if r == nil || !r.hasLiveTalk(sessionID) {
+		return SessionMediaView{}, false
+	}
+	return r.sessionMedia(sessionID).view(), true
 }
 
 // StartLiveTalk opens Listen on the session bus and drives Talk on finals (edge attach).
@@ -102,6 +137,9 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 		}
 	}
 	r.mu.Unlock()
+
+	med := r.sessionMedia(sessionID)
+	med.onEdgeAttach()
 
 	talk, err := r.talkFor(a)
 	if err != nil {
@@ -125,6 +163,7 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 		return err
 	}
 	liveCtx, cancel := context.WithCancel(context.Background())
+	silenceArm := make(chan struct{})
 	r.mu.Lock()
 	if r.lives == nil {
 		r.lives = make(map[string]*liveTalk)
@@ -135,10 +174,10 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 		_ = stream.Close(context.Background())
 		return nil
 	}
-	r.lives[sessionID] = &liveTalk{cancel: cancel, stream: stream}
+	r.lives[sessionID] = &liveTalk{cancel: cancel, stream: stream, silenceArm: silenceArm}
 	r.mu.Unlock()
 
-	applog.Info("live talk started", "session", sessionID, "listen", string(listenGW.ID()))
+	applog.Info("live talk started", "session", sessionID, "listen", string(listenGW.ID()), "media_phase", MediaEstablishing)
 	// Direct feeder→Listen tap (bus SubscribeAudio alone dropped/blocked under STT write latency).
 	// Also feed OnPCM here — bus PublishAudio includes TTS frames and must not drive barge-in VAD.
 	queue := make(chan port.PCMFrame, 128)
@@ -153,15 +192,39 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 	})
 	go func() {
 		defer a.SetPCMTap(nil)
-		r.drainListenQueue(liveCtx, a, stream, queue, &dropped)
+		r.drainListenQueue(liveCtx, sessionID, a, stream, queue, &dropped)
 	}()
-	go r.consumeListenFinals(liveCtx, talk, stream)
-	go r.silenceWatch(liveCtx, a, talk)
+	go r.consumeListenFinals(liveCtx, sessionID, talk, stream)
+	go r.silenceWatch(liveCtx, silenceArm, a, talk)
+	go r.rtpSettleWatch(liveCtx, sessionID)
 	return nil
 }
 
+func (r *SessionRuntime) rtpSettleWatch(ctx context.Context, sessionID string) {
+	med := r.sessionMedia(sessionID)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if med.enterReadyFromSettle() {
+				applog.Info("media ready (settle)", "session", sessionID)
+				return
+			}
+		}
+	}
+}
+
 // silenceWatch runs the desk no-response ladder on a live call (§19).
-func (r *SessionRuntime) silenceWatch(ctx context.Context, a *session.Actor, talk *composer.Talk) {
+// Armed only after welcome completes (LIVE_TALK §2.3).
+func (r *SessionRuntime) silenceWatch(ctx context.Context, arm <-chan struct{}, a *session.Actor, talk *composer.Talk) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-arm:
+	}
 	ctrl, ok := r.DeskController(a.ID)
 	if !ok {
 		return
@@ -207,10 +270,11 @@ func (r *SessionRuntime) silenceWatch(ctx context.Context, a *session.Actor, tal
 	}
 }
 
-func (r *SessionRuntime) drainListenQueue(ctx context.Context, a *session.Actor, stream port.ListenStream, queue <-chan port.PCMFrame, dropped *atomic.Int64) {
+func (r *SessionRuntime) drainListenQueue(ctx context.Context, sessionID string, a *session.Actor, stream port.ListenStream, queue <-chan port.PCMFrame, dropped *atomic.Int64) {
 	if a == nil || stream == nil || queue == nil {
 		return
 	}
+	med := r.sessionMedia(sessionID)
 	var bytesOut int64
 	var framesOut int64
 	lastLog := time.Now()
@@ -222,6 +286,9 @@ func (r *SessionRuntime) drainListenQueue(ctx context.Context, a *session.Actor,
 		case frame := <-queue:
 			if framesOut == 0 {
 				applog.Info("live listen first uplink frame", "session", a.ID, "bytes", len(frame.Data), "rate", frame.SampleRate)
+				if med.noteFirstUplink() {
+					applog.Info("media ready (first uplink)", "session", sessionID)
+				}
 			}
 			if err := stream.WritePCM(ctx, frame); err != nil {
 				applog.Warn("live listen WritePCM", "session", a.ID, "err", err, "frames", framesOut, "bytes", bytesOut)
@@ -237,10 +304,11 @@ func (r *SessionRuntime) drainListenQueue(ctx context.Context, a *session.Actor,
 	}
 }
 
-func (r *SessionRuntime) consumeListenFinals(ctx context.Context, talk *composer.Talk, stream port.ListenStream) {
+func (r *SessionRuntime) consumeListenFinals(ctx context.Context, sessionID string, talk *composer.Talk, stream port.ListenStream) {
 	if talk == nil || stream == nil {
 		return
 	}
+	med := r.sessionMedia(sessionID)
 	finals := stream.Finals()
 	for {
 		select {
@@ -255,22 +323,52 @@ func (r *SessionRuntime) consumeListenFinals(ctx context.Context, talk *composer
 			if text == "" {
 				continue
 			}
-			// Caller speech while bot is Thinking/Speaking → barge-in, then take the final.
-			st := talk.State()
-			if st == composer.Thinking || st == composer.Speaking {
-				applog.Info("live listen final barge", "session", string(talk.Session), "state", string(st), "chars", len(text))
-				talk.Interrupt()
+			if med.shouldQueueFinals() {
+				med.queueFinal(final)
+				applog.Info("live listen final queued (pre-conversing)", "session", sessionID, "chars", len(text))
+				continue
 			}
-			applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
-			if ctrl, ok := r.DeskController(string(talk.Session)); ok && strings.TrimSpace(final.Language) != "" {
-				ctrl.Engine().SetLanguage(final.Language)
-			}
-			// Durable observe must not use liveCtx — stop cancels it and drops transcripts.
-			if err := talk.OnListenFinal(context.Background(), final); err != nil {
-				applog.Warn("OnListenFinal", "session", string(talk.Session), "err", err)
-			}
+			r.deliverListenFinal(ctx, sessionID, talk, final)
 		}
 	}
+}
+
+func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID string, talk *composer.Talk, final port.ListenFinal) {
+	text := strings.TrimSpace(final.Text)
+	if text == "" {
+		return
+	}
+	st := talk.State()
+	if st == composer.Thinking || st == composer.Speaking {
+		applog.Info("live listen final barge", "session", string(talk.Session), "state", string(st), "chars", len(text))
+		talk.Interrupt()
+	}
+	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
+	if ctrl, ok := r.DeskController(string(talk.Session)); ok && strings.TrimSpace(final.Language) != "" {
+		ctrl.Engine().SetLanguage(final.Language)
+	}
+	if err := talk.OnListenFinal(context.Background(), final); err != nil {
+		applog.Warn("OnListenFinal", "session", string(talk.Session), "err", err)
+	}
+}
+
+func (r *SessionRuntime) drainQueuedFinals(ctx context.Context, sessionID string, talk *composer.Talk) {
+	med := r.sessionMedia(sessionID)
+	for _, final := range med.takeQueuedFinals() {
+		r.deliverListenFinal(ctx, sessionID, talk, final)
+	}
+}
+
+func (r *SessionRuntime) armSilenceWatch(sessionID string) {
+	r.mu.Lock()
+	lt := r.lives[sessionID]
+	r.mu.Unlock()
+	if lt == nil {
+		return
+	}
+	lt.silenceOnce.Do(func() {
+		close(lt.silenceArm)
+	})
 }
 
 func selectListen(a *session.Actor) (port.Listen, error) {
@@ -354,7 +452,37 @@ func (r *SessionRuntime) AnswerCall(ctx context.Context, sessionID string) (stri
 	if err != nil {
 		return "", err
 	}
-	return talk.AnswerCall(ctx)
+
+	live := r.hasLiveTalk(sessionID)
+	if live {
+		med := r.sessionMedia(sessionID)
+		view := med.view()
+		if view.WelcomeCompleted {
+			return "", nil
+		}
+		if err := med.beginWelcome(); err != nil {
+			return "", err
+		}
+		talk.SetWelcoming(true)
+	}
+
+	spoken, err := talk.AnswerCall(ctx)
+	if live {
+		talk.SetWelcoming(false)
+	}
+	if err != nil {
+		if live {
+			r.sessionMedia(sessionID).revertWelcome()
+		}
+		return spoken, err
+	}
+
+	if live {
+		r.sessionMedia(sessionID).completeWelcome()
+		r.armSilenceWatch(sessionID)
+		r.drainQueuedFinals(ctx, sessionID, talk)
+	}
+	return spoken, nil
 }
 
 func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {

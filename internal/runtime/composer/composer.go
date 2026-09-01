@@ -88,15 +88,17 @@ type Talk struct {
 	// closing line is spoken). Control uses it to stop the session.
 	OnDeskEnd func(disposition string)
 
-	mu           sync.Mutex
-	state        TurnState
-	speakStream  port.SpeakStream
-	speakCancel  context.CancelFunc
-	thinkCancel  context.CancelFunc
-	lastBargeIn  bool
-	cancelCount  int
-	answered     bool
-	lastActivity time.Time
+	mu              sync.Mutex
+	state           TurnState
+	speakStream     port.SpeakStream
+	speakCancel     context.CancelFunc
+	thinkCancel     context.CancelFunc
+	lastBargeIn     bool
+	cancelCount     int
+	welcomeCompleted bool
+	welcoming       bool
+	welcomeBargeAllowed bool
+	lastActivity    time.Time
 }
 
 // NewTalk builds a composer. VAD may be nil (defaults to energy VAD when clock enables it).
@@ -166,6 +168,20 @@ func (t *Talk) CancelCount() int {
 	return t.cancelCount
 }
 
+// SetWelcoming marks welcome TTS in flight (suppresses energy barge when welcome_barge_allowed is false).
+func (t *Talk) SetWelcoming(on bool) {
+	t.mu.Lock()
+	t.welcoming = on
+	t.mu.Unlock()
+}
+
+// WelcomeCompleted reports whether the opening speak finished.
+func (t *Talk) WelcomeCompleted() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.welcomeCompleted
+}
+
 // OnPCM feeds one bus PCM frame into VAD / barge-in logic.
 func (t *Talk) OnPCM(frame port.PCMFrame) {
 	if t.VAD == nil {
@@ -185,6 +201,12 @@ func (t *Talk) OnPCM(frame port.PCMFrame) {
 	case Capturing:
 		// silence endpoint handled by EndCapture / InjectFinal
 	case Speaking:
+		t.mu.Lock()
+		blockBarge := t.welcoming && !t.welcomeBargeAllowed
+		t.mu.Unlock()
+		if blockBarge {
+			return
+		}
 		if dec == vad.Speech {
 			t.bargeIn()
 		}
@@ -221,14 +243,13 @@ func (t *Talk) InjectFinal(ctx context.Context, userText string) error {
 }
 
 // AnswerCall speaks the opening (pre_speak_first inject_text + greeting clip) without Think or a user turn.
-// Idempotent: a second call returns ("", nil).
+// Idempotent: a second call returns ("", nil). Sets welcomeCompleted only after speak mark.
 func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	t.mu.Lock()
-	if t.answered {
+	if t.welcomeCompleted {
 		t.mu.Unlock()
 		return "", nil
 	}
-	t.answered = true
 	t.mu.Unlock()
 
 	var parts []string
@@ -251,6 +272,9 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	}
 	spoken = strings.TrimSpace(strings.Join(parts, " "))
 	if spoken == "" {
+		t.mu.Lock()
+		t.welcomeCompleted = true
+		t.mu.Unlock()
 		return "", nil
 	}
 	if t.Mem != nil {
@@ -259,6 +283,9 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	if err := t.speak(ctx, spoken); err != nil {
 		return spoken, fmt.Errorf("answer speak: %w", err)
 	}
+	t.mu.Lock()
+	t.welcomeCompleted = true
+	t.mu.Unlock()
 	if t.Obs != nil {
 		t.Obs.AppendAssistantOnly(ctx, spoken)
 	}

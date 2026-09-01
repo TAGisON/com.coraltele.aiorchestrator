@@ -2,7 +2,9 @@ package control
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,20 +26,39 @@ func (s *Server) handleAnswer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, CodeInternal, "runtime not configured", nil)
 		return
 	}
-	// Detach from the HTTP request: FreeSWITCH curl often times out before TTS+WaitMark
-	// finishes; canceling speak mid-greeting drops the welcome on the wire.
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	spoken, err := s.rt.AnswerCall(ctx, id)
 	if err != nil {
+		var ae *AnswerError
+		if errors.As(err, &ae) {
+			if ae.RetryAfter > 0 {
+				w.Header().Set("Retry-After", strconv.Itoa(ae.RetryAfter))
+			}
+			writeError(w, ae.HTTPStatus, ae.Code, ae.Message, nil)
+			return
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			writeError(w, http.StatusGatewayTimeout, ErrWelcomeTimeout.Code, ErrWelcomeTimeout.Message, nil)
+			return
+		}
 		writeError(w, http.StatusUnprocessableEntity, CodeBadRequest, err.Error(), nil)
 		return
 	}
 	applog.Info("answer spoken", "session", id, "chars", len(spoken))
+
+	welcomeCompleted := true
+	if sr, ok := s.rt.(*SessionRuntime); ok {
+		if view, ok := sr.SessionMedia(id); ok {
+			welcomeCompleted = view.WelcomeCompleted
+		}
+	}
+
 	out := map[string]any{
-		"session_id": id,
-		"answered":   true,
-		"spoken":     spoken,
+		"session_id":         id,
+		"welcome_completed":  welcomeCompleted,
+		"answered":           welcomeCompleted,
+		"spoken":             spoken,
 	}
 	if det, act, ok := s.rt.Languages(id); ok {
 		out["detected_language"] = det

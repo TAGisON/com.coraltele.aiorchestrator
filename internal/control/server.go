@@ -489,6 +489,13 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 			out["detected_language"] = det
 			out["active_language"] = act
 		}
+		if sr, ok := s.rt.(*SessionRuntime); ok {
+			if view, ok := sr.SessionMedia(sess.ID); ok {
+				out["media_phase"] = view.Phase
+				out["welcome_completed"] = view.WelcomeCompleted
+				out["welcome_in_progress"] = view.WelcomeInProgress
+			}
+		}
 	}
 	if sess.GatewayBinding != nil {
 		out["gateway_binding"] = sess.GatewayBinding
