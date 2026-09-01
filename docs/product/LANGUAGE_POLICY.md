@@ -1,9 +1,9 @@
 # Language policy (Contact Agent)
 
 **Status:** LOCKED  
-**Date:** 31 August 2026  
+**Date:** 1 September 2026  
 **Parents:** `CONTACT_AGENT.md`, `PRODUCT_DECISIONS.md`  
-**Related:** `SYSTEM_ENGINES.md`, `docs/architecture/PROFILE_SCHEMA.md`, `docs/architecture/RUNTIME.md` §9, `docs/architecture/CONTROL_API.md`
+**Related:** `SYSTEM_ENGINES.md`, `docs/architecture/PROFILE_SCHEMA.md`, `docs/architecture/RUNTIME.md` §9, `docs/architecture/CONTROL_API.md`, **`LIVE_TALK_CX_AND_INDIA_LANGUAGE.md`** (runtime India multilingual + CX)
 
 ---
 
@@ -14,6 +14,7 @@ For Contact Agent Talk sessions:
 1. **Auto-detect** caller language by default (Listen without a hard-coded primary).
 2. **Lock** after the first confident detection — later ambient re-detect does not flip the session.
 3. **Switch** only via explicit operator action (`PATCH …/profile-fields` with `language.primary`) — not by drifting STT guesses.
+4. **Author once, speak many (India):** Desk **primary locale** is enough to publish a complete flow. Runtime may serve any **allowlisted Indian language** supported by pinned Listen/Think/Speak gateways (see `LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §6). Locale tabs are optional exact-wording overrides, not a requirement to duplicate the tree.
 
 Playbook/rule `set_language` action: **N/A this phase** (`RULES_AND_SKILLS.md` has no such action). Operator PATCH is the explicit path.
 
@@ -45,8 +46,9 @@ Phase F lab notes that mention STT default `en-IN` remain historical for callers
 |---|---|
 | `detected_language` | First confident Listen final BCP-47 (historical; not overwritten by ambient re-detect) |
 | `active_language` | Language Think + Speak consume; Listen hint after lock |
+| `canonical_locale` | Desk primary locale — prompt/path **lookup** key (authoring language) |
 
-Both start empty. Set together on first confident lock.
+`detected_language` / `active_language` start empty. Set together on first confident lock (when tag ∈ runtime allowlist). `canonical_locale` is set at session create from the pinned desk/profile.
 
 ### Confident (locked definition)
 
@@ -73,6 +75,12 @@ Empty `Language` never locks.
 
 - Speak: `SpeakRequest.Language = active_language`
 - Think: thinkpath injects a system instruction to respond in `active_language` (no new `ThinkRequest` field; PORTS freeze)
+- Prompt assets: resolve by `active_language` → `canonical_locale` → **locale synthesis** (render canonical meaning in `active_language`) → fail/escalate (`LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §6.3)
+
+### Allowlist
+
+- Runtime languages = desk `runtime_languages` ∩ engine capabilities (India default set in live-CX solution §6.4).
+- Detect outside allowlist: do not lock to unsupported tag; keep canonical Speak; soft offer supported languages; do not hard-fail the call.
 
 ---
 
@@ -92,6 +100,7 @@ Other PATCH keys: reject with 422 (this phase scopes to `language.primary` only 
 ## 6. Out of scope
 
 - coral-file / home-page language UI
-- Full MT `one_way` / `two_way` interpret
-- Voice mapping by language (**cc-3**)
+- Full MT `one_way` / `two_way` interpret as the Contact Desk default path (platform §24 remains available for interpret **profiles**)
+- Voice mapping by language (**cc-3** / live-CX **P2**)
 - Playbook `set_language` rule action
+- Requiring operators to author full guided paths in every Indian language (primary + optional tabs + synthesis is the model)

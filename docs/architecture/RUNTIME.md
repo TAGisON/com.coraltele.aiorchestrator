@@ -134,6 +134,8 @@ Only when profile has Talk (or live Listen+Think+Speak used as conversation). Li
 
 **Barge-in (ours):**
 
+**Contact Desk live (2026-09):** energy VAD does **not** commit barge while Speaking. Commit requires Listen STT evidence; see `docs/product/LIVE_TALK_CX_AND_INDIA_LANGUAGE.md` §3. Diagram below is generic; desk supersedes steps 1–2 for flush.
+
 1. VAD (or STT partials that look like speech) while state=Speaking.  
 2. Sink **flush** (unplayed audio gone).  
 3. Speak gateway **cancel**.  
