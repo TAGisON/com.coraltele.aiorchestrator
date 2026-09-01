@@ -591,7 +591,9 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		}
 		talk.Obs = &observe.Observer{Repo: r.Repo, Meta: meta}
 	}
-	if ctrl, ok := newDeskController(a.Profile, a.Reg, r.Repo, a.ID, a.TenantID, profileVersion); ok {
+	think := thinkFromActor(a)
+	if ctrl, ok := newDeskController(a.Profile, a.Reg, r.Repo, a.ID, a.TenantID, profileVersion, think); ok {
+		a.SetLanguageAllowlist(ctrl.Engine().Doc().RuntimeAllowlist())
 		if a.GatewayBinding != nil {
 			ctrl.Engine().SetAttribute("gateway_speak", a.GatewayBinding.Speak)
 		}
@@ -654,4 +656,29 @@ func bindThinkFromGateway(talk *composer.Talk, a *session.Actor) error {
 	}
 	talk.Path.Deps.Think = th
 	return nil
+}
+
+func thinkFromActor(a *session.Actor) port.Think {
+	if a == nil || a.Reg == nil {
+		return nil
+	}
+	id := ""
+	if a.GatewayBinding != nil {
+		id = strings.TrimSpace(a.GatewayBinding.Think)
+	}
+	if id == "" && len(a.Profile.Routers.Think.Providers) > 0 {
+		id = strings.TrimSpace(a.Profile.Routers.Think.Providers[0])
+	}
+	if id == "" {
+		return nil
+	}
+	rec, ok := a.Reg.Get(port.GatewayID(id))
+	if !ok {
+		return nil
+	}
+	th, ok := rec.Instance.(port.Think)
+	if !ok {
+		return nil
+	}
+	return th
 }

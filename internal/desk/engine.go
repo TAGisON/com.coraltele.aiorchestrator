@@ -87,6 +87,10 @@ type Engine struct {
 	doc    Doc
 	skills SkillRunner
 
+	intentClassify IntentClassifier
+	localeSynth    LocaleSynthesizer
+	turnCtx        context.Context
+
 	mu                sync.Mutex
 	language          string
 	pathID            string
@@ -111,6 +115,20 @@ func (e *Engine) detectLanguage(text string) string {
 		return DetectLanguage(text, e.doc.Languages)
 	}
 	return SwitchLanguageEvidence(text, e.doc.Languages, e.language)
+}
+
+// SetIntentClassifier wires Think enum bridge for multilingual classify (WP4).
+func (e *Engine) SetIntentClassifier(c IntentClassifier) {
+	e.mu.Lock()
+	e.intentClassify = c
+	e.mu.Unlock()
+}
+
+// SetLocaleSynthesizer wires Think render-in-language for prompt gaps (WP4).
+func (e *Engine) SetLocaleSynthesizer(s LocaleSynthesizer) {
+	e.mu.Lock()
+	e.localeSynth = s
+	e.mu.Unlock()
 }
 
 // NewEngine builds a per-session engine. skills may be nil (all Action steps fail).
@@ -172,16 +190,7 @@ func (e *Engine) SetLanguage(lang string) {
 }
 
 func (e *Engine) allowedLanguage(lang string) bool {
-	list := e.doc.CX.RuntimeLanguages
-	if len(list) == 0 {
-		list = e.doc.Languages
-	}
-	for _, l := range list {
-		if l == lang || baseLang(l) == baseLang(lang) {
-			return true
-		}
-	}
-	return false
+	return e.doc.LanguageAllowed(lang)
 }
 
 // Ended reports whether the desk finished the call.
@@ -227,7 +236,11 @@ func (e *Engine) Welcome() Outcome {
 // Turn advances the desk with one caller utterance.
 func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.turnCtx = ctx
+	defer func() {
+		e.turnCtx = nil
+		e.mu.Unlock()
+	}()
 
 	out := Outcome{Tier: TierClip}
 	if e.ended {
@@ -296,7 +309,11 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 // Silence advances the no-response ladder (§19). Returns the nudge or goodbye.
 func (e *Engine) Silence(ctx context.Context) Outcome {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.turnCtx = ctx
+	defer func() {
+		e.turnCtx = nil
+		e.mu.Unlock()
+	}()
 	out := Outcome{Tier: TierClip}
 	return e.silenceLocked(&out)
 }
@@ -419,7 +436,7 @@ func (e *Engine) shouldRouteHuman(text string, step Step, waiting bool) bool {
 func (e *Engine) routeHumanLocked(ctx context.Context, text string, out *Outcome) {
 	intent := e.attrs[AttrIntent]
 	if intent == "" {
-		if id, score := ClassifyIntent(e.doc, text); score >= e.doc.CX.IntentConfirmScore {
+		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify); score >= e.doc.CX.IntentConfirmScore {
 			intent = id
 		}
 	}
@@ -440,7 +457,7 @@ func (e *Engine) routeHumanLocked(ctx context.Context, text string, out *Outcome
 }
 
 func (e *Engine) selectIntentLocked(ctx context.Context, text string, out *Outcome) {
-	id, score := ClassifyIntent(e.doc, text)
+	id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify)
 	if id != "" && score >= e.doc.CX.IntentAcceptScore {
 		e.applyIntentLocked(ctx, id, text, out)
 		return
@@ -555,7 +572,7 @@ func (e *Engine) handleEndAnswerLocked(ctx context.Context, step Step, text stri
 	}
 	if !ok {
 		// Treat an unrelated sentence as a new request.
-		if id, score := ClassifyIntent(e.doc, text); id != "" && score >= e.doc.CX.IntentAcceptScore {
+		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify); id != "" && score >= e.doc.CX.IntentAcceptScore {
 			e.pathID = ""
 			e.stepID = ""
 			e.askedAnythingElse = false
@@ -981,7 +998,22 @@ func (e *Engine) prompt(id string) string {
 	if id == "" {
 		return ""
 	}
-	return e.render(e.doc.PromptText(id, e.language))
+	ctx := e.turnCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res := ResolvePromptLocale(e.doc, id, e.language)
+	text := res.Text
+	if res.NeedsSynthesis && e.localeSynth != nil {
+		if syn, ok := e.localeSynth(ctx, res.CanonicalText, e.language); ok && strings.TrimSpace(syn) != "" {
+			text = syn
+		} else {
+			text = res.CanonicalText
+		}
+	} else if text == "" {
+		text = res.CanonicalText
+	}
+	return e.render(text)
 }
 
 func (e *Engine) render(text string) string {

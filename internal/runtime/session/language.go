@@ -52,6 +52,13 @@ func (a *Actor) ListenLanguageHint() string {
 	return a.activeLanguage
 }
 
+// SetLanguageAllowlist restricts first-lock to desk runtime languages (empty = any).
+func (a *Actor) SetLanguageAllowlist(langs []string) {
+	a.mu.Lock()
+	a.languageAllowlist = append([]string(nil), langs...)
+	a.mu.Unlock()
+}
+
 // OnListenFinal applies language lock on the first confident final.
 // Later ambient re-detects are ignored. Returns true if this call locked.
 func (a *Actor) OnListenFinal(f port.ListenFinal) bool {
@@ -61,6 +68,10 @@ func (a *Actor) OnListenFinal(f port.ListenFinal) bool {
 	lang := strings.TrimSpace(f.Language)
 	a.mu.Lock()
 	if a.languageLocked {
+		a.mu.Unlock()
+		return false
+	}
+	if len(a.languageAllowlist) > 0 && !languageInList(lang, a.languageAllowlist) {
 		a.mu.Unlock()
 		return false
 	}
@@ -102,4 +113,29 @@ func (a *Actor) ConsumeListenFlush() bool {
 	}
 	a.flushListenPartials = false
 	return true
+}
+
+func languageInList(lang string, list []string) bool {
+	lang = strings.TrimSpace(strings.ToLower(lang))
+	if lang == "" {
+		return false
+	}
+	base := lang
+	if i := strings.IndexAny(lang, "-_"); i > 0 {
+		base = lang[:i]
+	}
+	for _, l := range list {
+		l = strings.TrimSpace(strings.ToLower(l))
+		if l == lang {
+			return true
+		}
+		lbase := l
+		if i := strings.IndexAny(l, "-_"); i > 0 {
+			lbase = l[:i]
+		}
+		if lbase == base {
+			return true
+		}
+	}
+	return false
 }

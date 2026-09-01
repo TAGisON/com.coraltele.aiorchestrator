@@ -280,6 +280,15 @@ func (s *Server) handlePublishDesk(w http.ResponseWriter, r *http.Request) {
 			map[string]any{"checklist": check})
 		return
 	}
+	if err := desk.ValidateRuntimeEngineCoverage(doc, desk.LabEngineLanguages()); err != nil {
+		var ce *desk.CompileError
+		details := map[string]any{}
+		if errors.As(err, &ce) {
+			details = ce.Details
+		}
+		writeError(w, http.StatusUnprocessableEntity, CodeProfileInvalid, err.Error(), details)
+		return
+	}
 	profileRaw, err := desk.Compile(doc)
 	if err != nil {
 		var ce *desk.CompileError

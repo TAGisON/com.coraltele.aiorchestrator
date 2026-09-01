@@ -210,6 +210,8 @@ type CXPolicy struct {
 	BargePartialConfidence float64 `json:"barge_partial_confidence,omitempty"`
 	RTPSettleMs            int     `json:"rtp_settle_ms,omitempty"`
 	RuntimeLanguages       []string `json:"runtime_languages,omitempty"`
+	PrimaryLocale          string   `json:"primary_locale,omitempty"`
+	LocaleSynthesis        *bool    `json:"locale_synthesis,omitempty"`
 }
 
 // SkillBind is a desk-level skill enable + connector config (§10).
@@ -306,6 +308,12 @@ func (d *Doc) Normalize() {
 	}
 	if d.CX.IntentConfirmScore == 0 {
 		d.CX.IntentConfirmScore = DefaultCX().IntentConfirmScore
+	}
+	if d.CX.PrimaryLocale == "" {
+		d.CX.PrimaryLocale = d.DefaultLanguage
+	}
+	if len(d.CX.RuntimeLanguages) == 0 {
+		d.CX.RuntimeLanguages = append([]string(nil), d.Languages...)
 	}
 	if d.Prompts == nil {
 		d.Prompts = map[string]Prompt{}

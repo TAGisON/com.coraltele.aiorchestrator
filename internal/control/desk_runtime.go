@@ -77,7 +77,7 @@ func newSkillRunner(reg port.Registry, doc desk.Doc, sessionID, tenantID string)
 }
 
 // newDeskController builds the controller when the pinned profile carries a desk.
-func newDeskController(doc profile.Document, reg port.Registry, repo store.Repository, sessionID, tenantID string, profileVersion int) (*deskController, bool) {
+func newDeskController(doc profile.Document, reg port.Registry, repo store.Repository, sessionID, tenantID string, profileVersion int, think port.Think) (*deskController, bool) {
 	if len(doc.XDesk) == 0 {
 		return nil, false
 	}
@@ -88,6 +88,11 @@ func newDeskController(doc profile.Document, reg port.Registry, repo store.Repos
 	}
 	d.Normalize()
 	eng := desk.NewEngine(d, newSkillRunner(reg, d, sessionID, tenantID))
+	if think != nil {
+		sid := port.SessionID(sessionID)
+		eng.SetIntentClassifier(desk.NewThinkIntentClassifier(think, sid))
+		eng.SetLocaleSynthesizer(desk.NewThinkLocaleSynthesizer(think, sid))
+	}
 	eng.SetAttribute(desk.AttrProfileVersion, fmt.Sprint(profileVersion))
 	return &deskController{eng: eng, repo: repo, sessionID: sessionID, tenantID: tenantID}, true
 }

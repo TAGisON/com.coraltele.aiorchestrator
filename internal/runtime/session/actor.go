@@ -103,6 +103,7 @@ type Actor struct {
 	activeLanguage      string
 	languageLocked      bool
 	flushListenPartials bool
+	languageAllowlist   []string
 	// LanguagePersist is optional durability hook (detected, active) after lock/switch.
 	LanguagePersist func(detected, active string)
 

@@ -1,0 +1,25 @@
+id: F-live-talk-india
+feature_id: F-live-talk-india
+title: WP4 India multilingual locale and classify bridge
+area: B-desk
+status: must_test
+tags: [desk, locale, classify, india]
+requires: [F-live-talk-cx]
+packages:
+  - ./internal/desk
+  - ./internal/runtime/session
+fixtures: {}
+what: |
+  ResolvePromptLocale synthesis path; ClassifyIntent Think bridge; allowlist-aware
+  LanguageLock; publish fail-closed when runtime_languages exceed engine coverage.
+how: |
+  go test ./internal/desk ./internal/runtime/session
+steps:
+  - action: go_test
+    packages:
+      - ./internal/desk
+      - ./internal/runtime/session
+expect:
+  go_test: pass
+evidence:
+  kinds: [live_talk_india]

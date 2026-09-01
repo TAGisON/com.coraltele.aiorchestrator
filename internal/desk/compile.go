@@ -123,7 +123,7 @@ func Compile(d Doc) (json.RawMessage, error) {
 		"language": map[string]any{
 			"behaviour":       "none",
 			"primary":         d.DefaultLanguage,
-			"allowed":         d.Languages,
+			"allowed":         d.RuntimeAllowlist(),
 			"auto_detect":     true,
 			"mid_call_switch": true,
 		},
