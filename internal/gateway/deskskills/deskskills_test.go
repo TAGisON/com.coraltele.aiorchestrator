@@ -78,3 +78,26 @@ func TestKnowledgeHasIndianProducts(t *testing.T) {
 		t.Fatalf("expected IP Phone blurb, got %q", ans)
 	}
 }
+
+// A Hindi caller must be answered in Hindi, not have an English paragraph read
+// back — the English-leak seen in live session 09ba9cf4.
+func TestKnowledgeAnswersInCallerLanguage(t *testing.T) {
+	g := New()
+	hi, ok := exec(t, g, "search_knowledge", map[string]any{"product": "ip_phone", "language": "hi-IN"})
+	if !ok {
+		t.Fatal("hindi knowledge should hit")
+	}
+	ans, _ := hi["kb_answer"].(string)
+	if !strings.ContainsAny(ans, "ीेैोा") { // any Devanagari vowel sign = Hindi rendering
+		t.Fatalf("hindi call should get a Hindi answer, got %q", ans)
+	}
+	// English product terms are kept verbatim (Hinglish), not transliterated.
+	if !strings.Contains(ans, "IP Phone") && !strings.Contains(ans, "SIP") {
+		t.Fatalf("product terms should stay in English, got %q", ans)
+	}
+
+	en, _ := exec(t, g, "search_knowledge", map[string]any{"product": "ip_phone", "language": "en-IN"})
+	if strings.ContainsAny(en["kb_answer"].(string), "ीेैोा") {
+		t.Fatalf("english call must get the English blurb, got %q", en["kb_answer"])
+	}
+}

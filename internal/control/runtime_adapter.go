@@ -164,10 +164,13 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 	if err != nil {
 		return err
 	}
-	lang := ""
-	if a != nil {
-		lang = a.ActiveLanguage()
-	}
+	// Pin STT to a concrete language from the first frame instead of leaving it
+	// on Sarvam auto-detect ("unknown"). Auto-detect re-guesses every utterance
+	// and mis-transcribes Hindi/Hinglish as Marathi/Gujarati/Kannada (seen in
+	// live sessions), which then breaks language consistency and prompt rendering.
+	// The desk default (hi-IN for coral-tfn) is the stable per-call language; a
+	// real switch re-pins the stream (see maybeRepinListen).
+	lang := r.initialListenLanguage(sessionID, a)
 	stream, err := listenGW.OpenStream(ctx, port.ListenRequest{
 		SessionID:    port.SessionID(sessionID),
 		SampleRate:   a.SampleRate,
@@ -177,6 +180,7 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 	if err != nil {
 		return err
 	}
+	applog.Info("listen language pinned", "session", sessionID, "language", pickNonEmpty(lang, "auto"))
 	liveCtx, cancel := context.WithCancel(context.Background())
 	silenceArm := make(chan struct{})
 	r.mu.Lock()
@@ -661,6 +665,40 @@ func (r *SessionRuntime) deskEndHandler(sessionID string) func(string) {
 			r.OnSessionEnd(ctx, sessionID, disposition)
 		}
 	}
+}
+
+// initialListenLanguage is the concrete language STT is pinned to at call start.
+// Order: an already-active session language (e.g. a returning caller's saved
+// preference), else the desk's canonical/default locale, else the profile's, and
+// only "" (Sarvam auto-detect) as a last resort when nothing is configured.
+func (r *SessionRuntime) initialListenLanguage(sessionID string, a *session.Actor) string {
+	if a != nil {
+		if l := strings.TrimSpace(a.ActiveLanguage()); l != "" {
+			return l
+		}
+	}
+	if ctrl, ok := r.DeskController(sessionID); ok {
+		doc := ctrl.Engine().Doc()
+		if l := strings.TrimSpace(doc.CanonicalLocale()); l != "" {
+			return l
+		}
+		if l := strings.TrimSpace(doc.DefaultLanguage); l != "" {
+			return l
+		}
+	}
+	if a != nil {
+		if l := strings.TrimSpace(a.Profile.Language.Primary); l != "" {
+			return l
+		}
+	}
+	return ""
+}
+
+func pickNonEmpty(a, b string) string {
+	if strings.TrimSpace(a) != "" {
+		return a
+	}
+	return b
 }
 
 // deskTransferHandler moves the caller's leg once the desk has spoken its

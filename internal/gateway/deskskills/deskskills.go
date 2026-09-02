@@ -67,17 +67,19 @@ type Gateway struct {
 	emails    []Email
 	transfers []Transfer
 	enquiries []map[string]string
-	failures  map[string]string // skill → forced status
-	agentDown map[string]bool   // queue target → unavailable
-	knowledge map[string]string
+	failures    map[string]string // skill → forced status
+	agentDown   map[string]bool   // queue target → unavailable
+	knowledge   map[string]string // English product blurbs
+	knowledgeHI map[string]string // Hindi (Hinglish) product blurbs
 }
 
 // New builds a gateway with the Coral product knowledge blurbs preloaded.
 func New() *Gateway {
 	return &Gateway{
-		failures:  map[string]string{},
-		agentDown: map[string]bool{},
-		knowledge: defaultKnowledge(),
+		failures:    map[string]string{},
+		agentDown:   map[string]bool{},
+		knowledge:   defaultKnowledge(),
+		knowledgeHI: defaultKnowledgeHI(),
 	}
 }
 
@@ -230,12 +232,24 @@ func (g *Gateway) searchKnowledge(args map[string]any) map[string]any {
 		key = strings.ToLower(strings.TrimSpace(str(args["query"])))
 	}
 	g.mu.Lock()
-	answer, ok := g.knowledge[key]
+	answer := g.answerFor(key, str(args["language"]))
 	g.mu.Unlock()
-	if !ok || answer == "" {
+	if answer == "" {
 		return map[string]any{"status": StatusFail, "message": "no approved content"}
 	}
 	return map[string]any{"status": StatusOK, "kb_answer": answer, "kb_source": "coral-products"}
+}
+
+// answerFor resolves the product blurb in the caller's language. Hindi callers
+// hear the Hindi answer (with English product terms kept as-is — Hinglish);
+// anything else falls back to the English blurb. Caller must hold g.mu.
+func (g *Gateway) answerFor(key, language string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(language)), "hi") {
+		if hi := g.knowledgeHI[key]; hi != "" {
+			return hi
+		}
+	}
+	return g.knowledge[key]
 }
 
 func (g *Gateway) findOpenComplaint(req port.SkillRequest, args map[string]any) map[string]any {
@@ -407,6 +421,21 @@ func defaultKnowledge() map[string]string {
 		"call_center": "Coral Call Center is the inbound and outbound contact centre suite with skill based routing, queues, agent desktop, supervisor monitoring and reporting.",
 		"cloud_box":   "Coral Cloud Box is the compact cloud connected communication server for branch offices, bundling call control, voice mail and remote management.",
 		"vms":         "Coral VMS is the voice mail and voice recording system with mailbox management, auto attendant menus and call recording retention controls.",
+	}
+}
+
+// defaultKnowledgeHI is the Hindi (Hinglish) product blurbs — English product
+// and protocol names are kept verbatim, which is how Coral's own agents speak.
+// Authored once here so a Hindi caller is answered in Hindi instead of having an
+// English paragraph read back at them.
+func defaultKnowledgeHI() map[string]string {
+	return map[string]string{
+		"ip_phone":      "Coral Telecom के IP Phone एंटरप्राइज़ टेलीफ़ोनी के लिए SIP डेस्क फ़ोन हैं — HD voice, PoE, programmable keys, और Coral Call Server से central provisioning के साथ।",
+		"media_gateway": "Coral Media Gateway, IP टेलीफ़ोनी को PRI, E1 और FXO या FXS trunks से जोड़ता है, और SIP, transcoding तथा survivable local switching को सपोर्ट करता है।",
+		"call_server":   "Coral Call Server एंटरप्राइज़ IP PBX है, जो extension management, call routing, conferencing, voicemail integration और redundancy विकल्प देता है।",
+		"call_center":   "Coral Call Center, inbound और outbound contact centre suite है — skill based routing, queues, agent desktop, supervisor monitoring और reporting के साथ।",
+		"cloud_box":     "Coral Cloud Box, branch offices के लिए compact cloud-connected communication server है, जिसमें call control, voice mail और remote management एक साथ आते हैं।",
+		"vms":           "Coral VMS, voice mail और voice recording सिस्टम है, जिसमें mailbox management, auto attendant menus और call recording retention controls होते हैं।",
 	}
 }
 
