@@ -73,7 +73,8 @@ func TestComposer_TurnAndBargeIn(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	// STT commit barge while Speaking (energy VAD no longer flushes — WP1).
+	// Explicit Interrupt() barge while Speaking (STT path). Energy VAD barge is
+	// off unless ConfigureBarge(true) — covered by TestComposer_EnergyBargeWhileSpeaking.
 	for talk.State() != composer.Speaking {
 		if time.Now().After(deadline) {
 			t.Fatalf("never reached Speaking; state=%s", talk.State())
@@ -108,6 +109,66 @@ func TestComposer_TurnAndBargeIn(t *testing.T) {
 	st := talk.State()
 	if st != composer.Capturing && st != composer.Listening {
 		t.Fatalf("want Capturing/Listening got %s", st)
+	}
+}
+
+func TestComposer_EnergyBargeWhileSpeaking(t *testing.T) {
+	reg := router.NewMemRegistry()
+	slowSpeak := &fake.Speak{FrameCount: 40, InterFrameDelay: 20 * time.Millisecond}
+	if err := reg.Register(port.Registration{
+		ID: fake.IDSpeak, Port: port.PortSpeak,
+		Capabilities: slowSpeak.Capabilities(), Instance: slowSpeak,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range []port.Registration{
+		{ID: fake.IDListen, Port: port.PortListen, Capabilities: (&fake.Listen{}).Capabilities(), Instance: &fake.Listen{}},
+		{ID: fake.IDThink, Port: port.PortThink, Capabilities: (&fake.Think{}).Capabilities(), Instance: &fake.Think{}},
+	} {
+		if err := reg.Register(it); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	talk, err := composer.NewTalk(talkProfile(), reg, bus.New(), session.NewMemory(), "live", "sess-energy-barge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talk.ConfigureBarge(true, 50*time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() { errCh <- talk.InjectFinal(ctx, "hello there") }()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for talk.State() != composer.Speaking {
+		if time.Now().After(deadline) {
+			t.Fatalf("never reached Speaking; state=%s", talk.State())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	speech := make([]byte, 640)
+	for i := 0; i+1 < len(speech); i += 2 {
+		speech[i], speech[i+1] = 0x00, 0x40
+	}
+	start := time.Now()
+	for time.Since(start) < 200*time.Millisecond && talk.State() == composer.Speaking {
+		talk.OnPCM(port.PCMFrame{Data: speech, SampleRate: 16000, At: time.Now()})
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("speak did not finish after energy barge")
+	}
+	if !talk.LastBargeIn() {
+		t.Fatal("expected energy-VAD barge-in")
 	}
 }
 

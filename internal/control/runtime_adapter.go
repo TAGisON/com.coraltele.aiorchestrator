@@ -624,6 +624,7 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		talk.Obs = &observe.Observer{Repo: r.Repo, Meta: meta}
 	}
 	think := thinkFromActor(a)
+	policy := defaultBargePolicy()
 	if ctrl, ok := newDeskController(a.Profile, a.Reg, r.Repo, a.ID, a.TenantID, profileVersion, think); ok {
 		a.SetLanguageAllowlist(ctrl.Engine().Doc().RuntimeAllowlist())
 		if a.GatewayBinding != nil {
@@ -632,8 +633,9 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		if lang := strings.TrimSpace(a.ActiveLanguage()); lang != "" {
 			ctrl.Engine().SetLanguage(lang)
 		}
-		cx := ctrl.Engine().Doc().CX
-		welcomeBarge := cx.WelcomeBargeAllowed != nil && *cx.WelcomeBargeAllowed
+		doc := ctrl.Engine().Doc()
+		policy = bargePolicyFromDesk(doc)
+		welcomeBarge := doc.CX.WelcomeBargeAllowed != nil && *doc.CX.WelcomeBargeAllowed
 		talk.SetWelcomeBargeAllowed(welcomeBarge)
 		talk.Path.Desk = ctrl
 		talk.OnDeskEnd = r.deskEndHandler(a.ID)
@@ -642,8 +644,12 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 			r.desks = make(map[string]*deskController)
 		}
 		r.desks[a.ID] = ctrl
-		applog.Info("desk controller bound", "session", a.ID, "desk", ctrl.Engine().Doc().ID)
+		applog.Info("desk controller bound", "session", a.ID, "desk", doc.ID)
 	}
+	// Energy-VAD barge while Speaking: Sarvam has no partials, so STT-only barge
+	// cannot interrupt mid-utterance. Desk CX BargeIn/MinBargeMs drives this.
+	// (Computed above under r.mu — do not call bargePolicy/DeskController here.)
+	talk.ConfigureBarge(policy.Allowed, policy.MinBargeMs)
 	r.talks[a.ID] = talk
 	return talk, nil
 }

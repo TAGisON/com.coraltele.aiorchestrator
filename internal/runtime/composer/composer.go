@@ -121,6 +121,29 @@ type Talk struct {
 	welcomeFirstPCM bool
 	lastActivity    time.Time
 	failureOnce     sync.Once
+
+	// Local energy-VAD barge while Speaking. Sarvam STT emits no interim
+	// transcripts, so a mid-utterance interrupt cannot come from the STT partial
+	// path — the caller would talk over the bot and nothing would stop until they
+	// paused. Sustained caller speech on the read leg (which carries the caller
+	// mic, not the bot's injected TTS) triggers the barge instead.
+	bargeEnabled     bool
+	bargeMinSpeech   time.Duration
+	bargeRunStart    time.Time
+}
+
+// ConfigureBarge sets the local energy-VAD barge policy (called by control from
+// the desk CX). minSpeech is how long sustained caller speech must last before
+// it counts as a barge; <=0 keeps the default.
+func (t *Talk) ConfigureBarge(enabled bool, minSpeech time.Duration) {
+	t.mu.Lock()
+	t.bargeEnabled = enabled
+	if minSpeech > 0 {
+		t.bargeMinSpeech = minSpeech
+	} else if t.bargeMinSpeech == 0 {
+		t.bargeMinSpeech = 300 * time.Millisecond
+	}
+	t.mu.Unlock()
 }
 
 // failPipeline routes a pipeline error to OnFailure exactly once. Later failures
@@ -255,8 +278,42 @@ func (t *Talk) OnPCM(frame port.PCMFrame) {
 	case Capturing:
 		// silence endpoint handled by EndCapture / InjectFinal
 	case Speaking:
-		// Energy VAD is endpointing aid only while Speaking; barge Commit is STT-driven (WP1).
-		return
+		// Sarvam STT never emits interim partials, so STT-only barge (WP1) cannot
+		// interrupt mid-utterance. When enabled, sustained caller energy on the
+		// uplink (feeder PCM, not TTS) flushes Speak after MinSpeech.
+		t.mu.Lock()
+		enabled := t.bargeEnabled
+		minSpeech := t.bargeMinSpeech
+		welcoming := t.welcoming
+		welcomeOK := t.welcomeBargeAllowed
+		t.mu.Unlock()
+		if !enabled {
+			return
+		}
+		if welcoming && !welcomeOK {
+			return
+		}
+		if minSpeech <= 0 {
+			minSpeech = 300 * time.Millisecond
+		}
+		if dec == vad.Speech {
+			t.mu.Lock()
+			if t.bargeRunStart.IsZero() {
+				t.bargeRunStart = time.Now()
+			}
+			start := t.bargeRunStart
+			t.mu.Unlock()
+			if time.Since(start) >= minSpeech {
+				t.bargeIn()
+				t.mu.Lock()
+				t.bargeRunStart = time.Time{}
+				t.mu.Unlock()
+			}
+			return
+		}
+		t.mu.Lock()
+		t.bargeRunStart = time.Time{}
+		t.mu.Unlock()
 	}
 }
 
@@ -536,6 +593,7 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 	t.mu.Lock()
 	t.speakStream = stream
 	t.speakCancel = cancel
+	t.bargeRunStart = time.Time{}
 	t.mu.Unlock()
 	t.setState(Speaking)
 
