@@ -15,6 +15,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/thinkpath"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -632,6 +633,7 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		talk.SetWelcomeBargeAllowed(welcomeBarge)
 		talk.Path.Desk = ctrl
 		talk.OnDeskEnd = r.deskEndHandler(a.ID)
+		talk.OnDeskTransfer = r.deskTransferHandler(a.ID)
 		if r.desks == nil {
 			r.desks = make(map[string]*deskController)
 		}
@@ -657,6 +659,35 @@ func (r *SessionRuntime) deskEndHandler(sessionID string) func(string) {
 		applog.Info("desk ended call", "session", sessionID, "disposition", disposition)
 		if r.OnSessionEnd != nil {
 			r.OnSessionEnd(ctx, sessionID, disposition)
+		}
+	}
+}
+
+// deskTransferHandler moves the caller's leg once the desk has spoken its
+// "connecting you now" line. The blind transfer is the real telephony action:
+//
+//	uuid_transfer <call-id> <number> XML calltransfer
+//
+// SessionRuntime.Transfer drains the queued prompt, sends the transfer to the
+// edge, and records the disposition; the session ends when the leg leaves.
+func (r *SessionRuntime) deskTransferHandler(sessionID string) func(context.Context, thinkpath.TransferIntent) {
+	return func(ctx context.Context, ti thinkpath.TransferIntent) {
+		applog.Info("desk transfer requested", "session", sessionID,
+			"number", ti.Number, "owner", ti.Owner, "target", ti.Target)
+		reason := strings.TrimSpace(ti.Reason)
+		if reason == "" {
+			reason = "desk_transfer_" + ti.Target
+		}
+		if err := r.Transfer(ctx, sessionID, port.TransferRequest{
+			Destination: ti.Number,
+			Reason:      reason,
+		}); err != nil {
+			// The caller has already heard "connecting you now"; a failure here
+			// means the leg did not move. Surface it and fail the call over to the
+			// operator fallback so the caller is not left on a dead leg.
+			applog.Error("desk transfer failed", "session", sessionID,
+				"number", ti.Number, "err", err)
+			r.FailCall(ctx, sessionID, fallback.ScenarioSystemBusy, err)
 		}
 	}
 }

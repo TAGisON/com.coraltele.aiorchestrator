@@ -28,6 +28,7 @@ const (
 	AttrEmailSent      = "email_sent"
 	AttrPriority       = "priority"
 	AttrTransferTarget = "transfer_target"
+	AttrTransferNumber = "transfer_number"
 	AttrDisposition    = "disposition"
 	AttrSummary        = "summary"
 	AttrConsent        = "consent"

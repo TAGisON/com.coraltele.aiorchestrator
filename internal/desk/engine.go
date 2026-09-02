@@ -38,9 +38,14 @@ type SkillCall struct {
 }
 
 // Handoff is the warm-transfer payload handed to the human agent (§9).
+//
+// Number is the extension the caller's leg is blind-transferred to, resolved
+// from the routing matrix. Empty means the desk has no destination configured
+// for this queue and the telephony transfer cannot complete.
 type Handoff struct {
 	Target      string            `json:"target"`
 	Owner       string            `json:"owner"`
+	Number      string            `json:"number,omitempty"`
 	Priority    string            `json:"priority"`
 	Language    string            `json:"language"`
 	Summary     string            `json:"summary"`
@@ -866,9 +871,14 @@ func (e *Engine) runActionLocked(ctx context.Context, step Step, out *Outcome) (
 		target, _ := args["target"].(string)
 		owner, _ := args["owner"].(string)
 		e.attrs[AttrTransferTarget] = target
+		number := e.doc.TransferNumberFor(e.attrs[AttrIntent], target)
+		if number != "" {
+			e.attrs[AttrTransferNumber] = number
+		}
 		out.Transfer = &Handoff{
 			Target:     target,
 			Owner:      owner,
+			Number:     number,
 			Priority:   pick(e.attrs[AttrPriority], "normal"),
 			Language:   e.language,
 			Summary:    e.summaryLine(),
@@ -983,9 +993,11 @@ func (e *Engine) HandoffPack() Handoff {
 			target = row.Target
 		}
 	}
+	number := pick(e.attrs[AttrTransferNumber], e.doc.TransferNumberFor(e.attrs[AttrIntent], target))
 	return Handoff{
 		Target:     target,
 		Owner:      owner,
+		Number:     number,
 		Priority:   pick(e.attrs[AttrPriority], "normal"),
 		Language:   e.language,
 		Summary:    e.summaryLine(),

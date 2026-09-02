@@ -90,6 +90,12 @@ type Talk struct {
 	// closing line is spoken). Control uses it to stop the session.
 	OnDeskEnd func(disposition string)
 
+	// OnDeskTransfer fires when a guided path blind-transfers the caller, after
+	// the "connecting you now" line is spoken. Control moves the leg
+	// (uuid_transfer). When set and a transfer is due, OnDeskEnd is NOT fired for
+	// that turn — the leg leaving ends the session on its own.
+	OnDeskTransfer func(ctx context.Context, t thinkpath.TransferIntent)
+
 	// RecordAgent receives every canonical Speak frame that reaches the edge, so
 	// the call recorder captures the agent leg exactly as it was played out.
 	// Optional; must not block.
@@ -421,7 +427,13 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.lastActivity = time.Now()
 	t.mu.Unlock()
 	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
-	if res.DeskEnd && t.OnDeskEnd != nil {
+	// A transfer moves the leg away; do not also stop the session for this turn.
+	// The connect line has now been spoken, so it is safe to move the leg.
+	switch {
+	case res.DeskTransfer != nil && t.OnDeskTransfer != nil && !barge:
+		ti := *res.DeskTransfer
+		go t.OnDeskTransfer(context.WithoutCancel(ctx), ti)
+	case res.DeskEnd && t.OnDeskEnd != nil:
 		go t.OnDeskEnd(res.Disposition)
 	}
 	return err

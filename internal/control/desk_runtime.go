@@ -111,7 +111,7 @@ func (c *deskController) Welcome() (string, bool) {
 func (c *deskController) Turn(ctx context.Context, userText string) (thinkpath.ControllerResult, bool) {
 	out := c.eng.Turn(ctx, userText)
 	c.persist(ctx, out)
-	return thinkpath.ControllerResult{
+	res := thinkpath.ControllerResult{
 		Text:        out.Text,
 		Tier:        out.Tier,
 		SkillName:   out.SkillName,
@@ -119,7 +119,24 @@ func (c *deskController) Turn(ctx context.Context, userText string) (thinkpath.C
 		End:         out.End,
 		Disposition: out.Disposition,
 		StepID:      out.StepID,
-	}, true
+	}
+	// A guided-path transfer only reaches telephony when the routing matrix gave
+	// it a destination. Without a number the caller still gets the spoken
+	// handoff and a screen-pop, but we must not claim a leg move we cannot do.
+	if out.Transfer != nil {
+		if n := strings.TrimSpace(out.Transfer.Number); n != "" {
+			res.Transfer = &thinkpath.TransferIntent{
+				Number: n,
+				Owner:  out.Transfer.Owner,
+				Target: out.Transfer.Target,
+				Reason: out.Transfer.Summary,
+			}
+		} else {
+			applog.Warn("desk transfer has no destination number; leg not moved",
+				"session", c.sessionID, "target", out.Transfer.Target, "owner", out.Transfer.Owner)
+		}
+	}
+	return res, true
 }
 
 // Silence advances the no-response ladder.

@@ -275,6 +275,13 @@ func TestSalesEnquiryTransfers(t *testing.T) {
 	if len(transfers) != 1 || transfers[0].Owner != "Rahul Gupta" {
 		c.fail("expected one sales transfer, got %+v", transfers)
 	}
+	// The outcome must carry a real destination number so the runtime can move
+	// the leg — a handoff without a number is a dead-end "connecting you now".
+	if out.Transfer == nil {
+		c.fail("sales transfer produced no handoff")
+	} else if out.Transfer.Number != "1001" {
+		c.fail("sales transfer number = %q, want 1001 (sales queue)", out.Transfer.Number)
+	}
 }
 
 // §3: when sales is unavailable the desk registers a callback instead.

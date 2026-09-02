@@ -40,6 +40,18 @@ type Result struct {
 	DeskEnd     bool
 	Disposition string
 	DeskStepID  string
+	// DeskTransfer is set when the guided path decided to blind-transfer the
+	// caller. The runtime performs the actual leg move after this turn's line
+	// ("connecting you now") has been spoken.
+	DeskTransfer *TransferIntent
+}
+
+// TransferIntent is a guided-path decision to move the caller's leg to a human.
+type TransferIntent struct {
+	Number string // extension/DID to dial (uuid_transfer destination)
+	Owner  string // human name announced / shown on screen-pop
+	Target string // queue label
+	Reason string // summary for audit
 }
 
 // Controller is an optional deterministic dialog owner (Contact Desk guided paths).
@@ -58,6 +70,7 @@ type ControllerResult struct {
 	End         bool
 	Disposition string
 	StepID      string
+	Transfer    *TransferIntent
 }
 
 // Deps are resolved gateway instances (from registry Select).
@@ -143,6 +156,7 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 			res.DeskEnd = dr.End
 			res.Disposition = dr.Disposition
 			res.DeskStepID = dr.StepID
+			res.DeskTransfer = dr.Transfer
 			if dr.Text != "" {
 				p.Mem.Append("assistant", dr.Text)
 			}
