@@ -18,7 +18,7 @@ type LocaleSynthesizer func(ctx context.Context, canonical, activeLang string) (
 var intentJSONRe = regexp.MustCompile(`(?i)"intent_id"\s*:\s*"([^"]+)"`)
 
 // ClassifyIntentBridge runs phrase scoring first, then optional Think enum bridge.
-func ClassifyIntentBridge(ctx context.Context, d Doc, text string, llm IntentClassifier) (intentID string, score float64) {
+func ClassifyIntentBridge(ctx context.Context, d Doc, text string, llm IntentClassifier, activeLang string) (intentID string, score float64) {
 	id, score := ClassifyIntent(d, text)
 	if score >= d.CX.IntentAcceptScore {
 		return id, score
@@ -26,7 +26,7 @@ func ClassifyIntentBridge(ctx context.Context, d Doc, text string, llm IntentCla
 	if llm == nil {
 		return id, score
 	}
-	llmID, ok := llm(ctx, d, text, "")
+	llmID, ok := llm(ctx, d, text, strings.TrimSpace(activeLang))
 	if !ok {
 		return id, score
 	}
@@ -60,7 +60,8 @@ func NewThinkIntentClassifier(th port.Think, sessionID port.SessionID) IntentCla
 		sys := "Classify the caller utterance into exactly one intent_id from this closed list: " +
 			strings.Join(ids, ", ") + ". Reply with JSON only: {\"intent_id\":\"...\"}."
 		if activeLang != "" {
-			sys += " The caller may speak in " + activeLang + " or any Indian language."
+			sys += " Prefer intents that match speech in " + activeLang +
+				". If the utterance is noise, echo, or a different script with no clear department request, return unclear."
 		}
 		res, err := th.Complete(ctx, port.ThinkRequest{
 			SessionID: sessionID,

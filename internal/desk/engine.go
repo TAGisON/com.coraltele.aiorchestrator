@@ -562,7 +562,7 @@ func (e *Engine) shouldRouteHuman(text string, step Step, waiting bool) bool {
 func (e *Engine) routeHumanLocked(ctx context.Context, text string, out *Outcome) {
 	intent := e.attrs[AttrIntent]
 	if intent == "" {
-		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify); score >= e.doc.CX.IntentConfirmScore {
+		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify, e.language); score >= e.doc.CX.IntentConfirmScore {
 			intent = id
 		}
 	}
@@ -583,7 +583,23 @@ func (e *Engine) routeHumanLocked(ctx context.Context, text string, out *Outcome
 }
 
 func (e *Engine) selectIntentLocked(ctx context.Context, text string, out *Outcome) {
-	id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify)
+	if ForeignScriptNoise(e.language, text) {
+		e.attempts++
+		e.failures++
+		out.Text = e.prompt(PromptClarify)
+		if t := e.prompt("clarify_2"); t != "" && e.attempts >= 2 {
+			out.Text = t
+		}
+		if e.attempts >= 3 || e.failures >= e.doc.CX.MaxTurnFailures {
+			if hang := strings.TrimSpace(e.prompt("ood_hangup")); hang != "" {
+				out.Text = hang
+				e.endLocked(DispOutOfScope)
+				out.End = true
+			}
+		}
+		return
+	}
+	id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify, e.language)
 	if id != "" && score >= e.doc.CX.IntentAcceptScore {
 		e.applyIntentLocked(ctx, id, text, out)
 		return
@@ -704,7 +720,7 @@ func (e *Engine) handleEndAnswerLocked(ctx context.Context, step Step, text stri
 	}
 	if !ok {
 		// Treat an unrelated sentence as a new request.
-		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify); id != "" && score >= e.doc.CX.IntentAcceptScore {
+		if id, score := ClassifyIntentBridge(ctx, e.doc, text, e.intentClassify, e.language); id != "" && score >= e.doc.CX.IntentAcceptScore {
 			e.pathID = ""
 			e.stepID = ""
 			e.askedAnythingElse = false
@@ -712,7 +728,23 @@ func (e *Engine) handleEndAnswerLocked(ctx context.Context, step Step, text stri
 			e.applyIntentLocked(ctx, id, text, out)
 			return
 		}
+		// Unclear (e.g. "आज") — re-ask; do not hang up as resolved.
+		e.attempts++
+		if e.attempts < 2 {
+			out.Text = e.prompt(PromptAnythingElse)
+			if out.Text == "" {
+				out.Text = e.prompt(PromptClarify)
+			}
+			return
+		}
+		e.pathID = ""
+		e.stepID = ""
+		e.askedAnythingElse = false
+		e.attempts = 0
+		out.Text = e.prompt(PromptClarify)
+		return
 	}
+	// Explicit no → close.
 	out.Text = e.prompt(pick(step.ClosingPromptID, PromptClosing))
 	e.endLocked(pick(step.DispositionHint, e.inferDisposition()))
 }

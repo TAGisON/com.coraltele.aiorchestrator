@@ -20,6 +20,19 @@ func TestIsGreetingOnly(t *testing.T) {
 	}
 }
 
+func TestIsLikelyTTSEcho(t *testing.T) {
+	menu := "सेल्स, कॉर्पोरेट, या सपोर्ट — आपको किसमें मदद चाहिए?"
+	if !session.IsLikelyTTSEcho(menu, menu) {
+		t.Fatal("exact echo")
+	}
+	if !session.IsLikelyTTSEcho("सेल्स कॉर्पोरेट या सपोर्ट", menu) {
+		t.Fatal("partial menu echo")
+	}
+	if session.IsLikelyTTSEcho("मुझे कॉर्पोरेट की मदद चाहिए", menu) {
+		t.Fatal("real corporate ask must not be echo")
+	}
+}
+
 func TestLanguageLock_FirstConfidentFinal(t *testing.T) {
 	a := &session.Actor{}
 	locked := a.OnListenFinal(port.ListenFinal{Text: "namaste", Language: "hi-IN", Confidence: 0.9})

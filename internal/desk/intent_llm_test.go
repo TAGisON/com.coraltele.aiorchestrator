@@ -20,7 +20,7 @@ func TestClassifyIntentBridgeUsesThink(t *testing.T) {
 	}
 	d := PresetCoralTFN("default")
 	d.Normalize()
-	id, score := ClassifyIntentBridge(context.Background(), d, "random tamil phrase", classifier)
+	id, score := ClassifyIntentBridge(context.Background(), d, "random tamil phrase", classifier, "hi-IN")
 	if id != "sales_enquiry" || score < d.CX.IntentAcceptScore {
 		t.Fatalf("id=%q score=%v", id, score)
 	}

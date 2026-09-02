@@ -289,7 +289,11 @@ func LanguageSwitchRequest(text string, allowed []string) string {
 	}
 	// Order matters when phrases overlap; prefer specific language names.
 	candidates := []hit{
-		{"en", []string{"english", "angrezi", "angrezi mein", "अंग्रेज", "in english"}},
+		// Include Devanagari STT spellings of "English" / "talk" (कैन वी प्लीज टॉक इन इंग्लिश).
+		{"en", []string{
+			"english", "angrezi", "angrezi mein", "in english",
+			"अंग्रेज", "अंग्रेज़ी", "अंग्रेजी", "इंग्लिश", "इंग्लिश में", "इंगlish",
+		}},
 		{"hi", []string{"hindi", "hindi mein", "हिंदी", "हिन्दी", "in hindi"}},
 		{"pa", []string{"punjabi", "panjabi", "ਪੰਜਾਬੀ", "पंजाबी", "in punjabi"}},
 		{"mr", []string{"marathi", "मराठी", "in marathi"}},
@@ -307,7 +311,10 @@ func LanguageSwitchRequest(text string, allowed []string) string {
 		strings.Contains(n, "please") || strings.Contains(n, "mein") ||
 		strings.Contains(n, "in ") || strings.Contains(n, "करो") ||
 		strings.Contains(n, "बात") || strings.Contains(n, "change") ||
-		strings.Contains(n, "switch") || strings.Contains(n, "language")
+		strings.Contains(n, "switch") || strings.Contains(n, "language") ||
+		strings.Contains(n, "टॉक") || strings.Contains(n, "स्पीक") ||
+		strings.Contains(n, "प्लीज") || strings.Contains(n, "कैन") ||
+		strings.Contains(n, "में")
 	for _, c := range candidates {
 		tag, ok := byBase[c.base]
 		if !ok {
@@ -338,6 +345,28 @@ func IncompleteLanguageChange(text string) bool {
 	asksChange := strings.Contains(n, "change") || strings.Contains(n, "switch") ||
 		strings.Contains(n, "speak in") || strings.Contains(n, "talk in")
 	return asksLang && asksChange
+}
+
+// ForeignScriptNoise is STT garbage in a script that does not match the locked
+// call language (e.g. Telugu/Bengali finals after hi-IN lock) — do not LLM-transfer.
+func ForeignScriptNoise(lockedLang, text string) bool {
+	base := baseLang(lockedLang)
+	if base != "hi" && base != "en" {
+		return false
+	}
+	var other, home int
+	for _, r := range text {
+		switch {
+		case unicode.In(r, unicode.Telugu), unicode.In(r, unicode.Bengali),
+			unicode.In(r, unicode.Tamil), unicode.In(r, unicode.Gujarati),
+			unicode.In(r, unicode.Kannada), unicode.In(r, unicode.Malayalam),
+			unicode.In(r, unicode.Oriya), unicode.In(r, unicode.Gurmukhi):
+			other++
+		case unicode.In(r, unicode.Devanagari), unicode.Is(unicode.Latin, r):
+			home++
+		}
+	}
+	return other >= 4 && other > home*2
 }
 
 var yesWords = []string{"yes", "yeah", "yep", "correct", "right", "sure", "ok", "okay", "confirm", "please do",

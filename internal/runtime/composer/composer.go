@@ -86,8 +86,13 @@ type Talk struct {
 	Obs *observe.Observer
 	// ProfileVersion pinned at session create (for turn payload / Obs meta).
 	ProfileVersion int
+	// OnDeskHangupArm arms edge hangup (with drain) before the closing line is
+	// spoken, so a later WebSocket teardown cannot skip the control verb.
+	OnDeskHangupArm func(disposition string)
+
 	// OnDeskEnd fires when a Contact Desk guided path ends the call (after the
-	// closing line is spoken). Control uses it to stop the session.
+	// closing line is spoken). Control waits for the armed hangup to settle, then
+	// stops the session. Prefer OnDeskHangupArm before Speak for hangup paths.
 	OnDeskEnd func(disposition string)
 
 	// OnDeskTransfer fires when a guided path blind-transfers the caller after the
@@ -120,6 +125,7 @@ type Talk struct {
 	welcomeReadyAt  time.Time
 	welcomeFirstPCM bool
 	lastActivity    time.Time
+	lastSpokenText  string
 	failureOnce     sync.Once
 
 	// Local energy-VAD barge while Speaking. Sarvam STT emits no interim
@@ -130,6 +136,13 @@ type Talk struct {
 	bargeEnabled     bool
 	bargeMinSpeech   time.Duration
 	bargeRunStart    time.Time
+}
+
+// LastSpokenText is the most recent agent TTS line (for echo suppression).
+func (t *Talk) LastSpokenText() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lastSpokenText
 }
 
 // ConfigureBarge sets the local energy-VAD barge policy (called by control from
@@ -466,7 +479,23 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	if res.ResponseText == "" {
 		t.setState(Listening)
 		t.emitTurn(ctx, userText, "", res, false, res.Action, started)
+		// Empty closing line still needs hangup/transfer when the desk decided.
+		switch {
+		case res.DeskTransfer != nil && t.OnDeskTransfer != nil:
+			ti := *res.DeskTransfer
+			go t.OnDeskTransfer(context.WithoutCancel(ctx), ti)
+		case res.DeskEnd && t.OnDeskEnd != nil:
+			if t.OnDeskHangupArm != nil {
+				t.OnDeskHangupArm(res.Disposition)
+			}
+			go t.OnDeskEnd(res.Disposition)
+		}
 		return nil
+	}
+	// Hangup must be armed before Speak: WaitMark can return because the WS died,
+	// and an async OnDeskEnd then finds no CallControl. Transfer never arms hangup.
+	if res.DeskTransfer == nil && res.DeskEnd && t.OnDeskHangupArm != nil {
+		t.OnDeskHangupArm(res.Disposition)
 	}
 	err = t.speak(ctx, res.ResponseText)
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -614,6 +643,7 @@ func (t *Talk) speak(ctx context.Context, text string) error {
 	t.speakStream = stream
 	t.speakCancel = cancel
 	t.bargeRunStart = time.Time{}
+	t.lastSpokenText = strings.TrimSpace(text)
 	t.mu.Unlock()
 	t.setState(Speaking)
 

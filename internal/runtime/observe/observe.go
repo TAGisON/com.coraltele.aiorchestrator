@@ -218,6 +218,30 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 	if err != nil {
 		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleAssistant, "err", err)
 	}
+	o.Audit(ctx, "speak.prompt", map[string]any{
+		"turn_id": turnID,
+		"text":    truncate(responseText, 512),
+	})
+}
+
+// AppendUserOnly writes a single user transcript turn (suppressed/ignored STT still visible).
+func (o *Observer) AppendUserOnly(ctx context.Context, userText string) {
+	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
+		return
+	}
+	if strings.TrimSpace(userText) == "" {
+		return
+	}
+	turnID := newTurnID()
+	_, err := o.Repo.AppendTranscriptTurn(storeCtx(ctx), store.TranscriptTurn{
+		SessionID: o.Meta.SessionID,
+		Role:      store.RoleUser,
+		Text:      userText,
+		TurnID:    turnID,
+	})
+	if err != nil {
+		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleUser, "err", err)
+	}
 }
 
 func newTurnID() string {

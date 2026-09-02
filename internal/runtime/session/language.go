@@ -18,6 +18,75 @@ var greetingOnly = map[string]struct{}{
 	"hola": {}, "hai": {},
 }
 
+// IsLikelyTTSEcho reports caller STT that is mostly a repeat of the last agent line
+// (acoustic echo / listen-while-speak). Used to stop false barge→intent transfers.
+func IsLikelyTTSEcho(heard, spoken string) bool {
+	h := strings.TrimSpace(heard)
+	s := strings.TrimSpace(spoken)
+	if h == "" || s == "" {
+		return false
+	}
+	hn := normalizeEcho(h)
+	sn := normalizeEcho(s)
+	if hn == "" || sn == "" {
+		return false
+	}
+	// Full or near-full containment (menu echoed back).
+	hr, sr := []rune(hn), []rune(sn)
+	if len(hr) >= 8 {
+		if strings.Contains(sn, hn) && len(hr)*2 >= len(sr) {
+			return true
+		}
+		if strings.Contains(hn, sn) && len(sr) >= 8 && len(sr)*2 >= len(hr) {
+			return true
+		}
+	}
+	ht := echoTokens(hn)
+	st := echoTokens(sn)
+	if len(ht) == 0 || len(st) == 0 {
+		return false
+	}
+	matched := 0
+	set := map[string]struct{}{}
+	for _, t := range st {
+		set[t] = struct{}{}
+	}
+	for _, t := range ht {
+		if _, ok := set[t]; ok {
+			matched++
+		}
+	}
+	// High overlap of caller tokens against the last agent utterance.
+	if float64(matched)/float64(len(ht)) >= 0.75 && matched >= 3 {
+		return true
+	}
+	return false
+}
+
+func normalizeEcho(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.Is(unicode.Devanagari, r) || unicode.IsSpace(r) {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte(' ')
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
+
+func echoTokens(s string) []string {
+	var out []string
+	for _, t := range strings.Fields(s) {
+		if len([]rune(t)) < 2 {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 // IsGreetingOnly reports whether text is only a call opener (no intent content).
 // Used so "Hello" / "Namaste" cannot lock STT/prefs to English on a bilingual desk.
 func IsGreetingOnly(text string) bool {

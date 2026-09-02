@@ -42,6 +42,10 @@ type SessionRuntime struct {
 	media        map[string]*sessionMedia
 	recorders    map[string]*record.Recorder
 	failScenario map[string]string // session → first failure scenario
+	// callAction records the first telephony action armed per session:
+	// "hangup" or "transfer". Prevents silence/late desk.end from hanging up
+	// after a successful transfer, and makes hangup arming idempotent.
+	callAction map[string]string
 }
 
 type liveTalk struct {
@@ -96,6 +100,7 @@ func (r *SessionRuntime) StopSession(ctx context.Context, sessionID, reason stri
 	r.stopRecorder(sessionID, reason)
 	r.mu.Lock()
 	delete(r.talks, sessionID)
+	delete(r.callAction, sessionID)
 	r.mu.Unlock()
 	return r.Mgr.Stop(ctx, sessionID, reason)
 }
@@ -302,9 +307,12 @@ func (r *SessionRuntime) silenceWatch(ctx context.Context, arm <-chan struct{}, 
 			}
 			talk.MarkActivity()
 			if out.End {
-				if r.OnSessionEnd != nil {
-					r.OnSessionEnd(context.Background(), a.ID, out.Disposition)
+				// Transfer already moved the leg — never arm hangup from silence.
+				if isTransferDisposition(out.Disposition) || r.sessionCallAction(a.ID) == "transfer" {
+					applog.Info("silence end ignored after transfer", "session", a.ID, "disposition", out.Disposition)
+					return
 				}
+				r.releaseAfterDeskDecision(a.ID, out.Disposition)
 				return
 			}
 		}
@@ -433,6 +441,34 @@ func (r *SessionRuntime) bargeMetric(talk *composer.Talk, metric string, dims ma
 	talk.Obs.Metric(context.Background(), metric, 1, dims)
 }
 
+func (r *SessionRuntime) auditListenDecision(talk *composer.Talk, eventType, text, lang, reason string) {
+	if talk == nil || talk.Obs == nil {
+		return
+	}
+	payload := map[string]any{
+		"reason":     reason,
+		"chars":      len([]rune(text)),
+		"text":       truncateAuditText(text, 512),
+		"language":   lang,
+		"talk_state": string(talk.State()),
+	}
+	talk.Obs.Audit(context.Background(), eventType, payload)
+	// Suppressed/ignored caller speech still belongs in the transcript for CX review.
+	if reason != "accepted" && strings.TrimSpace(text) != "" {
+		note := "[" + reason + "] " + strings.TrimSpace(text)
+		talk.Obs.AppendUserOnly(context.Background(), note)
+	}
+}
+
+func truncateAuditText(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if max <= 0 || len([]rune(s)) <= max {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:max]) + "…"
+}
+
 func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID string, talk *composer.Talk, final port.ListenFinal, policy bargePolicy) {
 	text := strings.TrimSpace(final.Text)
 	if text == "" {
@@ -440,6 +476,13 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 	}
 	if ctrl, ok := r.DeskController(sessionID); ok && ctrl.Engine().Ended() {
 		applog.Info("live listen final ignored (desk ended)", "session", sessionID, "chars", len(text))
+		r.auditListenDecision(talk, "listen.ignored", text, final.Language, "desk_ended")
+		return
+	}
+	if session.IsLikelyTTSEcho(text, talk.LastSpokenText()) {
+		r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "tts_echo"})
+		applog.Info("live listen final suppressed (tts echo)", "session", sessionID, "chars", len(text))
+		r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "tts_echo")
 		return
 	}
 	st := talk.State()
@@ -447,11 +490,13 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 		if !policy.Allowed {
 			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "barge_disabled"})
 			applog.Info("live listen final suppressed (barge disabled)", "session", string(talk.Session))
+			r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "barge_disabled")
 			return
 		}
 		if !policy.textCommit(text) {
 			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "short"})
 			applog.Info("live listen final suppressed (short)", "session", string(talk.Session), "chars", len(text))
+			r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "short")
 			return
 		}
 		applog.Info("live listen final barge commit", "session", string(talk.Session), "state", string(st), "chars", len(text))
@@ -459,6 +504,7 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 		talk.Interrupt()
 	}
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
+	r.auditListenDecision(talk, "listen.final", text, final.Language, "accepted")
 	// Actor locks language once on the first confident final. Do not flip the desk
 	// engine to every ambient STT language guess (Phase C / #2/#3/#10).
 	// Pure greetings ("Hello" / "Namaste") must not lock or persist preferred
@@ -688,6 +734,7 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		welcomeBarge := doc.CX.WelcomeBargeAllowed != nil && *doc.CX.WelcomeBargeAllowed
 		talk.SetWelcomeBargeAllowed(welcomeBarge)
 		talk.Path.Desk = ctrl
+		talk.OnDeskHangupArm = r.deskHangupArmHandler(a.ID)
 		talk.OnDeskEnd = r.deskEndHandler(a.ID)
 		talk.OnDeskTransfer = r.deskTransferHandler(a.ID)
 		if r.desks == nil {
@@ -717,18 +764,124 @@ func (r *SessionRuntime) DeskController(sessionID string) (*deskController, bool
 // leaves the SIP call up until the caller hangs up (dead air).
 func (r *SessionRuntime) deskEndHandler(sessionID string) func(string) {
 	return func(disposition string) {
-		ctx := context.Background()
-		applog.Info("desk ended call", "session", sessionID, "disposition", disposition)
-		r.waitPlayout(ctx, sessionID, 15*time.Second)
-		if cc, _, ok := r.callControl(sessionID); ok && cc != nil {
-			if err := cc.Hangup(ctx, "NORMAL_CLEARING"); err != nil {
-				applog.Warn("desk end hangup", "session", sessionID, "err", err)
-			}
+		r.releaseAfterDeskDecision(sessionID, disposition)
+	}
+}
+
+func (r *SessionRuntime) deskHangupArmHandler(sessionID string) func(string) {
+	return func(disposition string) {
+		r.armDeskHangup(sessionID, disposition)
+	}
+}
+
+func isTransferDisposition(disposition string) bool {
+	d := strings.TrimSpace(disposition)
+	return strings.HasPrefix(d, "transferred_")
+}
+
+func (r *SessionRuntime) sessionCallAction(sessionID string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.callAction == nil {
+		return ""
+	}
+	return r.callAction[sessionID]
+}
+
+// claimCallAction stores the first telephony action for a session.
+// Returns true only when this call newly claimed the action.
+func (r *SessionRuntime) claimCallAction(sessionID, action string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.callAction == nil {
+		r.callAction = make(map[string]string)
+	}
+	if _, ok := r.callAction[sessionID]; ok {
+		return false
+	}
+	r.callAction[sessionID] = action
+	return true
+}
+
+// armDeskHangup sends edge Hangup (with playout drain) as early as possible —
+// typically before the closing TTS — so WS teardown cannot skip the verb.
+func (r *SessionRuntime) armDeskHangup(sessionID, disposition string) {
+	if isTransferDisposition(disposition) || r.sessionCallAction(sessionID) == "transfer" {
+		applog.Info("desk hangup arm skipped (transfer)", "session", sessionID, "disposition", disposition)
+		return
+	}
+	first := r.claimCallAction(sessionID, "hangup")
+	ctx := context.Background()
+	if first {
+		if talk, ok := r.talkForSession(sessionID); ok && talk != nil && talk.Obs != nil {
+			talk.Obs.Audit(ctx, "desk.end", map[string]any{
+				"disposition": disposition,
+				"action":      "hangup_armed",
+			})
 		}
-		if r.OnSessionEnd != nil {
-			r.OnSessionEnd(ctx, sessionID, disposition)
+		if strings.TrimSpace(disposition) != "" {
+			r.recordDisposition(ctx, sessionID, disposition, "desk_end")
 		}
 	}
+	if !first {
+		return
+	}
+	if cc, _, ok := r.callControl(sessionID); ok && cc != nil {
+		if err := cc.Hangup(ctx, "NORMAL_CLEARING"); err != nil {
+			applog.Warn("desk hangup arm", "session", sessionID, "err", err)
+		} else {
+			applog.Info("desk hangup armed before/with closing line", "session", sessionID, "disposition", disposition)
+		}
+	} else {
+		applog.Warn("desk hangup arm: no call control", "session", sessionID)
+	}
+}
+
+// releaseAfterDeskDecision waits for an armed hangup to settle, then ends the session.
+//
+// Critical ordering: Hangup is preferably armed via armDeskHangup before Speak.
+// Do NOT StopSession (closes WebSocket) until after the edge has drained inject
+// and hung up. Closing the WS early aborts the armed hangup and leaves the SIP
+// call up until the caller disconnects.
+func (r *SessionRuntime) releaseAfterDeskDecision(sessionID, disposition string) {
+	ctx := context.Background()
+	applog.Info("desk ended call", "session", sessionID, "disposition", disposition)
+
+	// Transfer path must never hang up — silence or a late End flag after
+	// uuid_transfer would kill the destination leg.
+	if isTransferDisposition(disposition) || r.sessionCallAction(sessionID) == "transfer" {
+		applog.Info("desk end skipped hangup after transfer", "session", sessionID, "disposition", disposition)
+		return
+	}
+
+	r.armDeskHangup(sessionID, disposition)
+	// Closing line may still be draining on the edge after Speak returned.
+	r.waitPlayout(ctx, sessionID, 15*time.Second)
+	r.waitCallControlGone(sessionID, 16*time.Second)
+	if r.OnSessionEnd != nil {
+		r.OnSessionEnd(ctx, sessionID, disposition)
+	}
+}
+
+// waitCallControlGone waits until the edge telephony sink is gone (FS hung up /
+// transferred and closed the WebSocket), or timeout.
+func (r *SessionRuntime) waitCallControlGone(sessionID string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, _, ok := r.callControl(sessionID); !ok {
+			applog.Info("edge settled after call control", "session", sessionID)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	applog.Warn("edge still present after call-control wait", "session", sessionID, "timeout", timeout.String())
+}
+
+func (r *SessionRuntime) talkForSession(sessionID string) (*composer.Talk, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.talks[sessionID]
+	return t, ok
 }
 
 // initialListenLanguage is the Listen LanguageHint at call start.
@@ -794,6 +947,21 @@ func (r *SessionRuntime) deskTransferHandler(sessionID string) func(context.Cont
 			r.FailCall(ctx, sessionID, fallback.ScenarioSystemBusy, fmt.Errorf("no dialable transfer number"))
 			return
 		}
+		// Claim transfer before hangup can win (silence / late End after endStep).
+		if !r.claimCallAction(sessionID, "transfer") {
+			if r.sessionCallAction(sessionID) == "transfer" {
+				applog.Info("desk transfer already armed", "session", sessionID)
+				return
+			}
+			applog.Warn("desk transfer blocked by prior call action", "session", sessionID, "action", r.sessionCallAction(sessionID))
+			return
+		}
+		if talk, ok := r.talkForSession(sessionID); ok && talk != nil && talk.Obs != nil {
+			talk.Obs.Audit(ctx, "desk.transfer", map[string]any{
+				"number": ti.Number, "target": ti.Target, "owner": ti.Owner, "reason": reason,
+				"action": "transfer_armed",
+			})
+		}
 		if err := r.Transfer(ctx, sessionID, port.TransferRequest{
 			Destination: ti.Number,
 			Reason:      reason,
@@ -801,7 +969,11 @@ func (r *SessionRuntime) deskTransferHandler(sessionID string) func(context.Cont
 			applog.Error("desk transfer failed", "session", sessionID,
 				"number", ti.Number, "err", err)
 			r.FailCall(ctx, sessionID, fallback.ScenarioSystemBusy, err)
+			return
 		}
+		// Keep WS up until FS drains connect-line TTS and executes uuid_transfer.
+		// Closing early aborts the armed transfer the same way early StopSession aborts hangup.
+		r.waitCallControlGone(sessionID, 16*time.Second)
 	}
 }
 

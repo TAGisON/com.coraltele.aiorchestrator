@@ -246,6 +246,9 @@ func TestLanguageDetectionAndSwitching(t *testing.T) {
 	if got := desk.LanguageSwitchRequest("English mein baat karo", langs); got != "en-IN" {
 		t.Errorf("explicit English request = %q", got)
 	}
+	if got := desk.LanguageSwitchRequest("कैन वी प्लीज टॉक इन इंग्लिश?", langs); got != "en-IN" {
+		t.Errorf("Devanagari STT English request = %q", got)
+	}
 	if got := desk.LanguageSwitchRequest("हिंदी में बात कीजिए", langs); got != "hi-IN" {
 		t.Errorf("explicit Hindi request = %q", got)
 	}

@@ -246,6 +246,8 @@ func (r *SessionRuntime) FailCall(ctx context.Context, sessionID string, sc fall
 		}
 		if err := cc.Hangup(ctx, hangupCauseFor(sc)); err != nil {
 			applog.Warn("fallback hangup", "session", sessionID, "err", err)
+		} else {
+			r.waitCallControlGone(sessionID, 16*time.Second)
 		}
 	}
 
