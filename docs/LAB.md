@@ -29,7 +29,7 @@ copy ..\mod_audio_stream-1\fs\ai_voice_bot.lua \\sipserver\...\scripts\
 copy ..\mod_audio_stream-1\fs\ai_profiles.conf \\sipserver\...\scripts\
 ```
 
-See `../mod_audio_stream-1/fs/README.md` (or `fs/README.md` inside that repo) for sipserver install, DID map (`101=coral-tfn`), and `ai_orch_url` if the orchestrator IP differs from `192.168.25.130:8011`.
+See `../mod_audio_stream-1/fs/README.md` (or `fs/README.md` inside that repo) for sipserver install, DID map (`101=coral-xfer`), and `ai_orch_url` if the orchestrator IP differs from `192.168.25.130:8011`.
 
 Set `edge.base_url` in `conf/aiorchestrator.properties` to the **same host IP** FreeSWITCH uses for WSS (`ws://<ip>:8011/edge/fs`).
 
@@ -45,7 +45,7 @@ Boot applies **schema only**. Nothing is pre-seeded.
 1. **Admin** → Save tenant engines (fakes offline, or Sarvam + credential).
 2. **Admin → Contact desks** → **Install Coral TFN preset** → edit prompts in English/Hindi if needed → **Publish desk**.
 3. Confirm readiness checklist is green (`GET /v1/platform/status` → `ready_for_sessions: true`).
-4. **User → Text call** → pick `coral-tfn`, open in English or हिंदी, start a call. Voice call uses the published `coral-tfn` profile.
+4. **User → Text call** → pick `coral-xfer` (or legacy `coral-tfn`), open in English or हिंदी, start a call. Voice DID **101** uses published `coral-xfer`.
 5. **Supervisor** → Open session / inspect attributes, handoff, disposition.
 
 ## Platform status (abnormal conditions)

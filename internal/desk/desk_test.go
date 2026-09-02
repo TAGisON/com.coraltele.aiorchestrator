@@ -24,6 +24,35 @@ func TestPresetCoralTFNIsPublishable(t *testing.T) {
 	}
 }
 
+func TestPresetCoralXferIsPublishable(t *testing.T) {
+	d := desk.PresetCoralXfer("default")
+	if errs := desk.StructuralErrors(d); len(errs) > 0 {
+		t.Fatalf("coral-xfer structural: %v", errs)
+	}
+	res := desk.Validate(d)
+	if !res.Publishable {
+		for _, it := range res.Items {
+			if it.Blocker && !it.OK {
+				t.Errorf("blocker %s (%s): %s", it.ID, it.Label, it.Detail)
+			}
+		}
+		t.Fatal("coral-xfer preset must pass the publish checklist")
+	}
+	if d.DefaultLanguage != "hi-IN" {
+		t.Fatalf("default language want hi-IN got %q", d.DefaultLanguage)
+	}
+	if d.CX.WelcomeBargeAllowed == nil || *d.CX.WelcomeBargeAllowed {
+		t.Fatal("welcome barge must be off")
+	}
+	wantNum := map[string]string{"sales": "5002", "corporate": "5003", "support": "5004"}
+	for intent, num := range wantNum {
+		got := d.TransferNumberFor(intent, "")
+		if got != num {
+			t.Errorf("matrix %s want %s got %s", intent, num, got)
+		}
+	}
+}
+
 func TestPresetHasNoStructuralErrors(t *testing.T) {
 	if errs := desk.StructuralErrors(desk.PresetCoralTFN("default")); len(errs) > 0 {
 		t.Fatalf("preset paths must resolve: %v", errs)
@@ -344,8 +373,8 @@ func TestDispositionTaxonomyIsClosed(t *testing.T) {
 	}
 	for _, required := range []string{
 		desk.DispTicketCreated, desk.DispExistingTicket, desk.DispTransferredTech,
-		desk.DispTransferredSales, desk.DispTransferredService, desk.DispAbandonedSilence,
-		desk.DispSystemFailure,
+		desk.DispTransferredSales, desk.DispTransferredService, desk.DispTransferredCorporate,
+		desk.DispAbandonedSilence, desk.DispAbandonedAbuse, desk.DispSystemFailure,
 	} {
 		if !seen[required] {
 			t.Errorf("disposition taxonomy missing %s", required)

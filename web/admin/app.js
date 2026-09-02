@@ -512,6 +512,16 @@ CoralUI.onReady(function () {
     });
   }
 
+  function installCoralXfer() {
+    return api("POST", "/v1/desk-presets/coral-xfer", { tenant_id: "default" }).then(function (data) {
+      selectedDesk = data.desk.id;
+      renderChecklist(data.checklist);
+      showBanner(el("banner"), "ok",
+        "Installed <code>" + esc(data.desk.id) + "</code> as a draft. Review the checklist, then Publish desk.");
+      return listDesks();
+    });
+  }
+
   function publishDesk() {
     var id = el("deskId").value.trim();
     if (!id) {
@@ -673,6 +683,7 @@ CoralUI.onReady(function () {
 
   try {
     bindClick("btnInstallCoral", installCoral);
+    bindClick("btnInstallXfer", installCoralXfer);
     bindClick("btnListDesks", listDesks);
     bindClick("btnChecklist", runChecklist);
     bindClick("btnPublishDesk", publishDesk);

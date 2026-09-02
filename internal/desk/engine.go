@@ -67,21 +67,24 @@ const (
 	DispResolvedInfo       = "resolved_info"
 	DispTicketCreated      = "ticket_created"
 	DispExistingTicket     = "existing_ticket"
-	DispTransferredSales   = "transferred_sales"
-	DispTransferredTech    = "transferred_tech"
-	DispTransferredService = "transferred_service"
-	DispCallbackScheduled  = "callback_scheduled"
-	DispAbandonedSilence   = "abandoned_silence"
-	DispCallerHungUp       = "caller_hung_up"
-	DispSystemFailure      = "system_failure"
-	DispOutOfScope         = "out_of_scope"
-	DispUnresolvedNoTicket = "unresolved_no_ticket"
+	DispTransferredSales     = "transferred_sales"
+	DispTransferredTech      = "transferred_tech"
+	DispTransferredService   = "transferred_service"
+	DispTransferredCorporate = "transferred_corporate"
+	DispCallbackScheduled    = "callback_scheduled"
+	DispAbandonedSilence     = "abandoned_silence"
+	DispAbandonedAbuse       = "abandoned_abuse"
+	DispCallerHungUp         = "caller_hung_up"
+	DispSystemFailure        = "system_failure"
+	DispOutOfScope           = "out_of_scope"
+	DispUnresolvedNoTicket   = "unresolved_no_ticket"
 )
 
 // Dispositions is the closed taxonomy shown in the Supervisor console (§6.6).
 var Dispositions = []string{
 	DispResolvedInfo, DispTicketCreated, DispExistingTicket, DispTransferredSales,
-	DispTransferredTech, DispTransferredService, DispCallbackScheduled, DispAbandonedSilence,
+	DispTransferredTech, DispTransferredService, DispTransferredCorporate,
+	DispCallbackScheduled, DispAbandonedSilence, DispAbandonedAbuse,
 	DispCallerHungUp, DispSystemFailure, DispOutOfScope, DispUnresolvedNoTicket,
 }
 
@@ -105,11 +108,13 @@ type Engine struct {
 	attrs             map[string]string
 	ended             bool
 	disposition       string
-	askedAnythingElse bool
-	silenceLevel      int
-	greeted           bool
-	languageLocked    bool
-	visited           []string
+	askedAnythingElse  bool
+	silenceLevel       int
+	greeted            bool
+	languageLocked     bool
+	awaitingLanguage   bool
+	languageAskTries   int
+	visited            []string
 }
 
 // detectLanguage uses the loose detector for the caller's first words and the
@@ -241,10 +246,25 @@ func (e *Engine) Welcome() Outcome {
 
 // ServicesMenu is the post-welcome capability line. Spoken after welcome completes
 // so STT/barge are armed (welcome itself is non-bargeable).
+//
+// New callers (language not yet locked from ANI preference) hear ask_language when
+// that prompt exists; returning callers hear a short confirm + department menu.
 func (e *Engine) ServicesMenu() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.prompt(PromptClarify)
+	ask := strings.TrimSpace(e.prompt("ask_language"))
+	if ask != "" && !e.languageLocked {
+		e.awaitingLanguage = true
+		e.languageAskTries = 0
+		return ask
+	}
+	menu := e.prompt(PromptClarify)
+	if e.languageLocked {
+		if confirm := strings.TrimSpace(e.prompt("language_confirmed")); confirm != "" {
+			return strings.TrimSpace(confirm + " " + menu)
+		}
+	}
+	return menu
 }
 
 // Turn advances the desk with one caller utterance.
@@ -271,6 +291,17 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 		return e.silenceLocked(&out)
 	}
 
+	if AbusiveSpeech(text) {
+		out.Text = e.prompt("abuse_hangup")
+		if out.Text == "" {
+			out.Text = e.prompt(PromptClosing)
+		}
+		e.endLocked(DispAbandonedAbuse)
+		out.End = true
+		out.Tier = TierRefuse
+		return e.finish(&out)
+	}
+
 	// Language hard-lock (call-center rule):
 	//  1) Explicit "speak Hindi/Punjabi/…" request may switch at any time.
 	//  2) First non-switch utterance locks starting language (STT/script detect).
@@ -282,6 +313,14 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 			e.attrs[AttrLanguage] = req
 		}
 		e.languageLocked = true
+		if e.awaitingLanguage {
+			e.awaitingLanguage = false
+			e.languageAskTries = 0
+			confirm := e.prompt("language_confirmed")
+			menu := e.prompt(PromptClarify)
+			out.Text = strings.TrimSpace(strings.TrimSpace(confirm) + " " + menu)
+			return e.finish(&out)
+		}
 		if isBareLanguageRequest(text) {
 			out.Text = e.currentPromptText()
 			if out.Text == "" {
@@ -289,6 +328,8 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 			}
 			return e.finish(&out)
 		}
+	} else if e.awaitingLanguage {
+		return e.handleLanguageAskLocked(text, allow, &out)
 	} else if !e.languageLocked {
 		if det := DetectLanguage(text, allow); det != "" && e.allowedLanguage(det) {
 			e.language = det
@@ -406,6 +447,55 @@ func isBareLanguageRequest(text string) bool {
 	return len(tokens(text)) <= 6
 }
 
+func (e *Engine) handleLanguageAskLocked(text string, allow []string, out *Outcome) Outcome {
+	if det := DetectLanguage(text, allow); det != "" && e.allowedLanguage(det) {
+		e.language = det
+		e.attrs[AttrLanguage] = det
+		e.languageLocked = true
+		e.awaitingLanguage = false
+		e.languageAskTries = 0
+		confirm := e.prompt("language_confirmed")
+		menu := e.prompt(PromptClarify)
+		out.Text = strings.TrimSpace(strings.TrimSpace(confirm) + " " + menu)
+		return e.finish(out)
+	}
+	// Named language without switch phrasing ("Hindi", "English", …).
+	if named := namedLanguageOnly(text, allow); named != "" && e.allowedLanguage(named) {
+		e.language = named
+		e.attrs[AttrLanguage] = named
+		e.languageLocked = true
+		e.awaitingLanguage = false
+		e.languageAskTries = 0
+		confirm := e.prompt("language_confirmed")
+		menu := e.prompt(PromptClarify)
+		out.Text = strings.TrimSpace(strings.TrimSpace(confirm) + " " + menu)
+		return e.finish(out)
+	}
+	e.languageAskTries++
+	if e.languageAskTries >= 3 {
+		out.Text = e.prompt("ood_hangup")
+		if out.Text == "" {
+			out.Text = e.prompt(PromptClosing)
+		}
+		e.endLocked(DispOutOfScope)
+		out.End = true
+		return e.finish(out)
+	}
+	out.Text = e.prompt("ask_language")
+	if out.Text == "" {
+		out.Text = e.prompt(PromptClarify)
+	}
+	return e.finish(out)
+}
+
+func namedLanguageOnly(text string, allowed []string) string {
+	n := normalize(text)
+	if n == "" || len(tokens(text)) > 4 {
+		return ""
+	}
+	return LanguageSwitchRequest("please speak in "+n, allowed)
+}
+
 func (e *Engine) shouldRouteHuman(text string, step Step, waiting bool) bool {
 	if !HumanRequest(text) {
 		return false
@@ -493,6 +583,12 @@ func (e *Engine) selectIntentLocked(ctx context.Context, text string, out *Outco
 	e.attempts++
 	e.failures++
 	if e.attempts >= 3 || e.failures >= e.doc.CX.MaxTurnFailures {
+		if hang := strings.TrimSpace(e.prompt("ood_hangup")); hang != "" {
+			out.Text = hang
+			e.endLocked(DispOutOfScope)
+			out.End = true
+			return
+		}
 		out.Text = e.prompt(PromptClarify)
 		if t := e.prompt("clarify_2"); t != "" && e.attempts >= 3 {
 			out.Text = t
@@ -969,10 +1065,14 @@ func (e *Engine) inferDisposition() string {
 		return DispTicketCreated
 	case e.attrs[AttrTransferTarget] != "" && e.attrs[AttrTransferNumber] != "":
 		switch e.attrs[AttrIntent] {
-		case "sales_enquiry", "product_information":
+		case "sales_enquiry", "product_information", "sales":
 			return DispTransferredSales
-		case "service_complaint":
+		case "service_complaint", "service":
 			return DispTransferredService
+		case "corporate":
+			return DispTransferredCorporate
+		case "support", "technical_support":
+			return DispTransferredTech
 		default:
 			return DispTransferredTech
 		}

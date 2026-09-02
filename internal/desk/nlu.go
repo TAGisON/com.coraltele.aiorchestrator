@@ -444,6 +444,27 @@ func CriticalRequest(text string) bool {
 	return false
 }
 
+// AbusiveSpeech detects clear verbal abuse / threats that must end the call.
+var abusePhrases = []string{
+	"fuck you", "fucking", "motherfucker", "asshole", "bastard", "son of a bitch",
+	"shut up bitch", "kill you", "i will kill", "rape",
+	"mc ", " bc ", "bhenchod", "madarchod", "chutiya", "harami", "randi",
+	"भोसड़ी", "मादरचोद", "बहनचोद", "चूतिया", "हरामी",
+}
+
+func AbusiveSpeech(text string) bool {
+	n := " " + normalize(text) + " "
+	if strings.TrimSpace(n) == "" {
+		return false
+	}
+	for _, p := range abusePhrases {
+		if strings.Contains(n, normalize(p)) {
+			return true
+		}
+	}
+	return false
+}
+
 // ProductVocabulary maps caller words to the closed product catalog (§6.4).
 var ProductVocabulary = map[string][]string{
 	"ip_phone":      {"ip phone", "ipphone", "phone", "handset", "desk phone", "आईपी फोन", "फोन", "telephone"},

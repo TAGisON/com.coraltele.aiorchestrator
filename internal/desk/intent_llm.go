@@ -117,6 +117,10 @@ func NewThinkLocaleSynthesizer(th port.Think, sessionID port.SessionID) LocaleSy
 		}
 		sys := "You render contact-center spoken prompts. Return only the final spoken text in " +
 			activeLang + ", preserving meaning. No JSON, no explanation."
+		if strings.EqualFold(activeLang, "hi-IN") || strings.EqualFold(activeLang, "hi") {
+			sys += " For hi-IN use Hindi or Hinglish (Hindi mixed with English product terms)." +
+				" Do not use Marathi, Bengali, or any other language."
+		}
 		res, err := th.Complete(ctx, port.ThinkRequest{
 			SessionID: sessionID,
 			Messages: []port.ChatMessage{

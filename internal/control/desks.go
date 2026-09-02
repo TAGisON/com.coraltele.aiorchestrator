@@ -96,6 +96,13 @@ func (s *Server) handleCreateDesk(w http.ResponseWriter, r *http.Request) {
 			doc.Name = req.Name
 		}
 	}
+	if req.Preset == "coral-xfer" {
+		doc = desk.PresetCoralXfer(tenantID)
+		doc.ID = id
+		if strings.TrimSpace(req.Name) != "" {
+			doc.Name = req.Name
+		}
+	}
 	doc.Normalize()
 	saved, err := s.saveDesk(r.Context(), doc, store.DeskStatusDraft)
 	if err != nil {
@@ -472,6 +479,8 @@ func (s *Server) handleInstallPreset(w http.ResponseWriter, r *http.Request) {
 	switch name {
 	case "coral-tfn":
 		doc = desk.PresetCoralTFN(tenantID)
+	case "coral-xfer":
+		doc = desk.PresetCoralXfer(tenantID)
 	default:
 		writeError(w, http.StatusNotFound, CodeNotFound, "unknown preset", map[string]any{"preset": name})
 		return
@@ -485,7 +494,7 @@ func (s *Server) handleInstallPreset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "install preset failed: "+err.Error(), nil)
 		return
 	}
-	if name == "coral-tfn" {
+	if name == "coral-tfn" || name == "coral-xfer" {
 		if err := s.seedCoralProductKB(r.Context(), tenantID); err != nil {
 			applog.Warn("coral product kb seed failed", "err", err)
 		}

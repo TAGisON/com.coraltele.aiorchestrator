@@ -90,9 +90,9 @@ type Talk struct {
 	// closing line is spoken). Control uses it to stop the session.
 	OnDeskEnd func(disposition string)
 
-	// OnDeskTransfer fires when a guided path blind-transfers the caller, after
-	// the "connecting you now" line is spoken. Control moves the leg
-	// (uuid_transfer). When set and a transfer is due, OnDeskEnd is NOT fired for
+	// OnDeskTransfer fires when a guided path blind-transfers the caller after the
+	// connect line. Still fires if the caller barged that TTS — dialable destination
+	// was already decided. When set and a transfer is due, OnDeskEnd is NOT fired for
 	// that turn — the leg leaving ends the session on its own.
 	OnDeskTransfer func(ctx context.Context, t thinkpath.TransferIntent)
 
@@ -485,9 +485,10 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Unlock()
 	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
 	// A transfer moves the leg away; do not also stop the session for this turn.
-	// The connect line has now been spoken, so it is safe to move the leg.
+	// The connect line has now been spoken (or barge cut it short). If a dialable
+	// destination was already decided, still transfer — barge must not drop the handoff.
 	switch {
-	case res.DeskTransfer != nil && t.OnDeskTransfer != nil && !barge:
+	case res.DeskTransfer != nil && t.OnDeskTransfer != nil:
 		ti := *res.DeskTransfer
 		go t.OnDeskTransfer(context.WithoutCancel(ctx), ti)
 	case res.DeskEnd && t.OnDeskEnd != nil:
