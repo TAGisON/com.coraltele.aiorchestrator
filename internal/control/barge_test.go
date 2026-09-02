@@ -6,10 +6,11 @@ import (
 
 func TestBargePolicyTextCommitDefault(t *testing.T) {
 	p := defaultBargePolicy()
-	if !p.textCommit("hi") {
-		t.Fatal("hi should commit")
+	// Default MinBargeChars is 3; the energy-VAD path handles shorter interrupts.
+	if !p.textCommit("stop") {
+		t.Fatal("a real word should commit")
 	}
-	if p.textCommit("a") {
-		t.Fatal("single char should not commit")
+	if p.textCommit("hi") {
+		t.Fatal("two chars should not commit at min 3")
 	}
 }

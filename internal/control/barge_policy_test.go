@@ -10,8 +10,14 @@ import (
 
 func TestBargePolicyTextCommit(t *testing.T) {
 	p := defaultBargePolicy()
-	if !p.textCommit("hi") {
-		t.Fatal("hi should commit")
+	// Final-text barge requires >= MinBargeChars (default 3). Mid-utterance
+	// interrupts are caught by the energy-VAD path regardless of length, so the
+	// text path can stay strict and ignore 1-2 char STT noise.
+	if !p.textCommit("stop") {
+		t.Fatal("a real word should commit")
+	}
+	if p.textCommit("hi") {
+		t.Fatal("two chars should not commit at min 3")
 	}
 	if p.textCommit("a") {
 		t.Fatal("single char should not commit")
