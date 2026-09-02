@@ -184,10 +184,18 @@ type Option struct {
 }
 
 // MatrixRow is one routing matrix entry (§14.2).
+//
+// Number is the extension/DID the caller's leg is transferred to when Action
+// includes transfer — this is the <number> in
+// `uuid_transfer <call-id> <number> XML calltransfer`. Owner is the human name
+// announced to the caller and shown on the agent screen-pop; Target is the
+// queue label. A row with an empty Number cannot complete a blind transfer and
+// falls back to callback/ticket handling.
 type MatrixRow struct {
 	Intent string `json:"intent"`
 	Owner  string `json:"owner"`
 	Target string `json:"target"`
+	Number string `json:"number,omitempty"`
 	Action string `json:"action"` // transfer | ticket | both
 }
 
@@ -249,21 +257,27 @@ type ConsentConfig struct {
 
 // DefaultCX returns product defaults (§6.12).
 func DefaultCX() CXPolicy {
+	welcomeBarge := true
 	return CXPolicy{
-		BargeIn:            true,
-		ListenWhileSpeak:   true,
-		SilenceNudge1Ms:    6000,
-		SilenceNudge2Ms:    6000,
-		SilenceHangupMs:    8000,
-		AskTimeoutMs:       8000,
+		BargeIn:          true,
+		ListenWhileSpeak: true,
+		// A caller needs a beat to think after "how may I help you" — nudging at
+		// 6s felt like an interruption. 9s then a menu, then a longer wait.
+		SilenceNudge1Ms:    9000,
+		SilenceNudge2Ms:    10000,
+		SilenceHangupMs:    12000,
+		AskTimeoutMs:       9000,
 		MaxRetries:         2,
 		MaxTurnFailures:    3,
 		IntentAcceptScore:  0.60,
 		IntentConfirmScore: 0.40,
-		MinBargeChars:      2,
-		MinBargeMs:         280,
-		BargePartialConfidence: 0.70,
-		RTPSettleMs:        500,
+		// The caller must be able to cut in over any prompt, including the
+		// greeting — modern IVRs never trap a caller behind their own audio.
+		WelcomeBargeAllowed:    &welcomeBarge,
+		MinBargeChars:          2,
+		MinBargeMs:             220,
+		BargePartialConfidence: 0.60,
+		RTPSettleMs:            500,
 	}
 }
 
@@ -440,6 +454,25 @@ func (d *Doc) MatrixFor(intent string) (MatrixRow, bool) {
 		}
 	}
 	return MatrixRow{}, false
+}
+
+// TransferNumberFor resolves the extension/DID to dial for an intent, following
+// the routing matrix. Returns "" when the intent has no transfer number, in
+// which case the caller cannot be blind-transferred.
+func (d *Doc) TransferNumberFor(intent, target string) string {
+	if row, ok := d.MatrixFor(intent); ok && strings.TrimSpace(row.Number) != "" {
+		return strings.TrimSpace(row.Number)
+	}
+	// Fall back to any row that serves the same queue target (e.g. sales_enquiry
+	// and product_information both route to the sales queue).
+	if target != "" {
+		for _, m := range d.Matrix {
+			if m.Target == target && strings.TrimSpace(m.Number) != "" {
+				return strings.TrimSpace(m.Number)
+			}
+		}
+	}
+	return ""
 }
 
 // EnabledSkills returns sorted enabled skill names.

@@ -416,6 +416,9 @@ func TestCriticalOutageEscalates(t *testing.T) {
 // §19: the silence ladder nudges twice then says goodbye.
 func TestSilenceLadderEndsCall(t *testing.T) {
 	c := newCall(t)
+	// The desk now defaults to Hindi; this test asserts the English ladder text,
+	// so pin the call to English. It exercises ladder mechanics, not language.
+	c.eng.SetLanguage("en-IN")
 	c.wantSaid(c.silence(), "still on the call")
 	c.wantSaid(c.silence(), "Sales, Product Information")
 	last := c.silence()

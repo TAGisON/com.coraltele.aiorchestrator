@@ -104,7 +104,7 @@ func TestCompileEmbedsDeskAndLanguages(t *testing.T) {
 	if doc.ID != "coral-tfn" {
 		t.Errorf("profile id = %q", doc.ID)
 	}
-	if doc.Language.Primary != "en-IN" || len(doc.Language.Allowed) != 2 {
+	if doc.Language.Primary != "hi-IN" || len(doc.Language.Allowed) != 2 {
 		t.Errorf("language block = %+v", doc.Language)
 	}
 	if !doc.Language.AutoDetect || !doc.Language.MidCallSwitch {

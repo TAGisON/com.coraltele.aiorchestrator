@@ -13,8 +13,13 @@ func PresetCoralTFN(tenantID string) Doc {
 		Name:            "Coral Telecom Toll-Free Desk",
 		Direction:       DirectionInbound,
 		Purpose:         "support",
-		Languages:       []string{"en-IN", "hi-IN"},
-		DefaultLanguage: "en-IN",
+		// hi-IN first = the canonical authoring locale and the call-center default:
+		// natural Hindi with embedded English product terms (IP Phone, Media
+		// Gateway) — i.e. Hinglish, how Indian support desks actually speak.
+		// English remains available; callers who speak English still get true
+		// multilingual handling (the bot does not force them onto English).
+		Languages:       []string{"hi-IN", "en-IN"},
+		DefaultLanguage: "hi-IN",
 		Tone:            "professional",
 		VoiceID:         "priya",
 		Voice:           map[string]string{"sarvam-tts": "priya"},
@@ -44,9 +49,12 @@ func prompt(id, label, en, hi string) Prompt {
 
 func coralPrompts() map[string]Prompt {
 	list := []Prompt{
+		// A greeting is a greeting — short, warm, and it hands the turn straight
+		// back to the caller. The capability menu and the "English or Hindi" line
+		// live in the clarify prompt, said only if the caller needs steering.
 		prompt(PromptWelcome, "Welcome",
-			"Thank you for calling Coral Telecom Limited. Welcome to Coral Telecom, your trusted partner for telecom and communication solutions. I am Coral Telecom's AI-powered virtual assistant. I can help you with a sales enquiry, product information, technical support, or a service complaint. You can speak with me in English or Hindi. How may I help you today?",
-			"धन्यवाद, आपने Coral Telecom Limited को कॉल किया है। मैं Coral Telecom की AI-powered virtual assistant हूँ। मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में सहायता कर सकती हूँ। आप मुझसे अंग्रेज़ी या हिंदी में बात कर सकते हैं। कृपया बताइए, मैं आपकी किस प्रकार सहायता कर सकती हूँ?"),
+			"Thank you for calling Coral Telecom. How may I help you today?",
+			"नमस्ते! Coral Telecom में आपका स्वागत है। मैं आपकी कैसे सहायता कर सकती हूँ?"),
 		prompt(PromptClarify, "Clarify menu",
 			"I can help you with Sales Enquiry, Product Information, Technical Support, or Service Complaint. Please tell me what you need help with.",
 			"मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में मदद कर सकती हूँ। कृपया बताइए आपको किसमें सहायता चाहिए।"),
@@ -360,11 +368,16 @@ func coralIntents() []Intent {
 }
 
 func coralMatrix() []MatrixRow {
+	// Number is the extension the caller is blind-transferred to:
+	//   uuid_transfer <call-id> <number> XML calltransfer
+	// These are lab placeholders — set the real queue extensions per deployment
+	// (Admin → desk draft, or PUT the desk doc). Both sales intents route to the
+	// same sales extension, matching how a real ACD fans an intent onto a queue.
 	return []MatrixRow{
-		{Intent: "sales_enquiry", Owner: "Rahul Gupta", Target: "sales", Action: "transfer"},
-		{Intent: "product_information", Owner: "Rahul Gupta", Target: "sales", Action: "transfer"},
-		{Intent: "technical_support", Owner: "Arjun Singh Topwal", Target: "technical_support", Action: "transfer"},
-		{Intent: "service_complaint", Owner: "Ritu", Target: "service", Action: "both"},
+		{Intent: "sales_enquiry", Owner: "Rahul Gupta", Target: "sales", Number: "1001", Action: "transfer"},
+		{Intent: "product_information", Owner: "Rahul Gupta", Target: "sales", Number: "1001", Action: "transfer"},
+		{Intent: "technical_support", Owner: "Arjun Singh Topwal", Target: "technical_support", Number: "1002", Action: "transfer"},
+		{Intent: "service_complaint", Owner: "Ritu", Target: "service", Number: "1003", Action: "both"},
 	}
 }
 
