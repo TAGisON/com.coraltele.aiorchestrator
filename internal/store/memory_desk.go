@@ -19,6 +19,7 @@ type deskMemory struct {
 	pii       []PIIAccess
 	erasures  map[string]ErasureRequest
 	consents  map[string]ConsentRecord
+	prefs     map[string]CallerPreference
 }
 
 func (m *Memory) deskState() *deskMemory {
@@ -30,7 +31,11 @@ func (m *Memory) deskState() *deskMemory {
 			attrs:    map[string]map[string]SessionAttribute{},
 			erasures: map[string]ErasureRequest{},
 			consents: map[string]ConsentRecord{},
+			prefs:    map[string]CallerPreference{},
 		}
+	}
+	if m.desk.prefs == nil {
+		m.desk.prefs = map[string]CallerPreference{}
 	}
 	return m.desk
 }
@@ -287,6 +292,24 @@ func (m *Memory) GetConsent(ctx context.Context, tenantID, phone string) (Consen
 		return ConsentRecord{}, ErrNotFound
 	}
 	return c, nil
+}
+
+func (m *Memory) UpsertCallerPreference(ctx context.Context, p CallerPreference) (CallerPreference, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p.UpdatedAt = time.Now().UTC()
+	m.deskState().prefs[p.TenantID+"\x00"+p.ANI] = p
+	return p, nil
+}
+
+func (m *Memory) GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.deskState().prefs[tenantID+"\x00"+ani]
+	if !ok {
+		return CallerPreference{}, ErrNotFound
+	}
+	return p, nil
 }
 
 func (m *Memory) CountActiveSessions(ctx context.Context, tenantID string) (int, error) {

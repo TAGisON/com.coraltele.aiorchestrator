@@ -99,3 +99,14 @@ type ConsentRecord struct {
 	Source    string
 	UpdatedAt time.Time
 }
+
+// CallerPreference remembers per-ANI product prefs across calls (language first).
+// Keyed by tenant + normalised ANI — extension of the caller's channel id, not a
+// Coral user directory row (SOLUTION §16.3).
+type CallerPreference struct {
+	TenantID          string
+	ANI               string
+	PreferredLanguage string
+	Source            string // stt_lock | operator | desk_default
+	UpdatedAt         time.Time
+}

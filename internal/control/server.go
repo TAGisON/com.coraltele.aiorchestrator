@@ -48,6 +48,9 @@ type RuntimeStart struct {
 	Profile        profile.Document
 	Document       json.RawMessage
 	GatewayBinding *store.GatewayBinding
+	// Caller is the optional create-time caller JSON (ANI etc.) used to restore
+	// per-ANI preferences before Listen opens.
+	Caller json.RawMessage
 }
 
 // Config for the control HTTP server.
@@ -420,6 +423,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			Profile:        doc,
 			Document:       pv.Document,
 			GatewayBinding: sess.GatewayBinding,
+			Caller:         sess.Caller,
 		}); err != nil {
 			_, _ = s.repo.UpdateSessionState(r.Context(), sess.ID, store.StateFailed)
 			ge, ok := port.AsGatewayError(err)

@@ -103,6 +103,20 @@ func TestMigrationSQL_HasGatewayCredentials(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasCallerPreference(t *testing.T) {
+	body, err := os.ReadFile("migrations/009_caller_preference.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS caller_preference") {
+		t.Fatal("migration missing caller_preference")
+	}
+	if !strings.Contains(s, "preferred_language") {
+		t.Fatal("migration missing preferred_language column")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

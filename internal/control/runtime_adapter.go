@@ -63,11 +63,26 @@ func (r *SessionRuntime) StartSession(ctx context.Context, p RuntimeStart) error
 	if err != nil {
 		return err
 	}
+	ani := callerANIFromJSON(p.Caller)
 	if r.Repo != nil && a != nil {
 		sid := a.ID
+		tenantID := a.TenantID
 		repo := r.Repo
 		a.LanguagePersist = func(detected, active string) {
 			_, _ = repo.UpdateSessionLanguages(context.Background(), sid, detected, active)
+			src := prefSourceSTTLock
+			if strings.TrimSpace(detected) == "" || detected != active {
+				src = prefSourceOperator
+			}
+			r.saveCallerPreference(tenantID, ani, active, src)
+		}
+	}
+	// Returning caller: pin language before Listen opens so STT is not wild auto-detect.
+	if a != nil {
+		if pref, ok := r.loadCallerPreference(ctx, p.TenantID, ani); ok {
+			a.SwitchActiveLanguage(pref.PreferredLanguage)
+			applog.Info("caller preference restored",
+				"session", a.ID, "ani", ani, "lang", pref.PreferredLanguage, "source", pref.Source)
 		}
 	}
 	return nil
@@ -439,11 +454,15 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 		talk.Interrupt()
 	}
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
-	if ctrl, ok := r.DeskController(string(talk.Session)); ok && strings.TrimSpace(final.Language) != "" {
-		ctrl.Engine().SetLanguage(final.Language)
-	}
+	// Actor locks language once on the first confident final. Do not flip the desk
+	// engine to every ambient STT language guess (Phase C / #2/#3/#10).
 	if err := talk.OnListenFinal(context.Background(), final); err != nil {
 		applog.Warn("OnListenFinal", "session", string(talk.Session), "err", err)
+	}
+	if ctrl, ok := r.DeskController(string(talk.Session)); ok && talk.Actor != nil {
+		if act := strings.TrimSpace(talk.Actor.ActiveLanguage()); act != "" {
+			ctrl.Engine().SetLanguage(act)
+		}
 	}
 }
 
@@ -505,6 +524,12 @@ func (r *SessionRuntime) SwitchLanguage(sessionID, primary string) error {
 		ctrl.Engine().SetLanguage(primary)
 	}
 	_ = a.ConsumeListenFlush() // mark flush for edge/Listen restart consumers
+	// Persist preference for returning ANI when we know the caller id.
+	if r.Repo != nil {
+		if sess, err := r.Repo.GetSession(context.Background(), sessionID); err == nil {
+			r.saveCallerPreference(sess.TenantID, callerANIFromJSON(sess.Caller), primary, prefSourceOperator)
+		}
+	}
 	return nil
 }
 

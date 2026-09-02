@@ -82,6 +82,9 @@ type Repository interface {
 	UpsertConsent(ctx context.Context, c ConsentRecord) (ConsentRecord, error)
 	GetConsent(ctx context.Context, tenantID, phone string) (ConsentRecord, error)
 
+	UpsertCallerPreference(ctx context.Context, p CallerPreference) (CallerPreference, error)
+	GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error)
+
 	CountActiveSessions(ctx context.Context, tenantID string) (int, error)
 	PurgeSessionData(ctx context.Context, sessionID string) error
 }

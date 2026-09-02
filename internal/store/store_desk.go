@@ -354,6 +354,33 @@ SELECT tenant_id, phone, state, source, updated_at FROM consent_record WHERE ten
 	return out, err
 }
 
+func (s *Store) UpsertCallerPreference(ctx context.Context, p CallerPreference) (CallerPreference, error) {
+	var out CallerPreference
+	err := s.pool.QueryRow(ctx, `
+INSERT INTO caller_preference (tenant_id, ani, preferred_language, source, updated_at)
+VALUES ($1,$2,$3,$4, now())
+ON CONFLICT (tenant_id, ani) DO UPDATE SET
+  preferred_language=EXCLUDED.preferred_language,
+  source=EXCLUDED.source,
+  updated_at=now()
+RETURNING tenant_id, ani, preferred_language, source, updated_at`,
+		p.TenantID, p.ANI, p.PreferredLanguage, p.Source).
+		Scan(&out.TenantID, &out.ANI, &out.PreferredLanguage, &out.Source, &out.UpdatedAt)
+	return out, err
+}
+
+func (s *Store) GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error) {
+	var out CallerPreference
+	err := s.pool.QueryRow(ctx, `
+SELECT tenant_id, ani, preferred_language, source, updated_at
+FROM caller_preference WHERE tenant_id=$1 AND ani=$2`,
+		tenantID, ani).Scan(&out.TenantID, &out.ANI, &out.PreferredLanguage, &out.Source, &out.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CallerPreference{}, ErrNotFound
+	}
+	return out, err
+}
+
 func (s *Store) CountActiveSessions(ctx context.Context, tenantID string) (int, error) {
 	var n int
 	err := s.pool.QueryRow(ctx, `
