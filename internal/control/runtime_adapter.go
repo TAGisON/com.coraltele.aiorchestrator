@@ -713,10 +713,18 @@ func (r *SessionRuntime) DeskController(sessionID string) (*deskController, bool
 }
 
 // deskEndHandler stops the session once the desk speaks its closing line.
+// It must Hangup the telephony leg: StopSession alone closes the WebSocket and
+// leaves the SIP call up until the caller hangs up (dead air).
 func (r *SessionRuntime) deskEndHandler(sessionID string) func(string) {
 	return func(disposition string) {
 		ctx := context.Background()
 		applog.Info("desk ended call", "session", sessionID, "disposition", disposition)
+		r.waitPlayout(ctx, sessionID, 15*time.Second)
+		if cc, _, ok := r.callControl(sessionID); ok && cc != nil {
+			if err := cc.Hangup(ctx, "NORMAL_CLEARING"); err != nil {
+				applog.Warn("desk end hangup", "session", sessionID, "err", err)
+			}
+		}
 		if r.OnSessionEnd != nil {
 			r.OnSessionEnd(ctx, sessionID, disposition)
 		}

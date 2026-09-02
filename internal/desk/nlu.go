@@ -306,7 +306,8 @@ func LanguageSwitchRequest(text string, allowed []string) string {
 		strings.Contains(n, "baat") || strings.Contains(n, "bolo") ||
 		strings.Contains(n, "please") || strings.Contains(n, "mein") ||
 		strings.Contains(n, "in ") || strings.Contains(n, "करो") ||
-		strings.Contains(n, "करो") || strings.Contains(n, "बात")
+		strings.Contains(n, "बात") || strings.Contains(n, "change") ||
+		strings.Contains(n, "switch") || strings.Contains(n, "language")
 	for _, c := range candidates {
 		tag, ok := byBase[c.base]
 		if !ok {
@@ -325,6 +326,18 @@ func LanguageSwitchRequest(text string, allowed []string) string {
 		}
 	}
 	return ""
+}
+
+// IncompleteLanguageChange is "change/switch language" without naming the target.
+func IncompleteLanguageChange(text string) bool {
+	n := normalize(text)
+	if n == "" {
+		return false
+	}
+	asksLang := strings.Contains(n, "language") || strings.Contains(n, "bhasha") || strings.Contains(n, "भाषा")
+	asksChange := strings.Contains(n, "change") || strings.Contains(n, "switch") ||
+		strings.Contains(n, "speak in") || strings.Contains(n, "talk in")
+	return asksLang && asksChange
 }
 
 var yesWords = []string{"yes", "yeah", "yep", "correct", "right", "sure", "ok", "okay", "confirm", "please do",

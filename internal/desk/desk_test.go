@@ -41,6 +41,9 @@ func TestPresetCoralXferIsPublishable(t *testing.T) {
 	if d.DefaultLanguage != "hi-IN" {
 		t.Fatalf("default language want hi-IN got %q", d.DefaultLanguage)
 	}
+	if d.VoiceID != "ritu" && d.Voice["sarvam-tts"] != "ritu" {
+		t.Fatalf("want ritu voice, got voice_id=%q voice=%v", d.VoiceID, d.Voice)
+	}
 	if d.CX.WelcomeBargeAllowed == nil || *d.CX.WelcomeBargeAllowed {
 		t.Fatal("welcome barge must be off")
 	}

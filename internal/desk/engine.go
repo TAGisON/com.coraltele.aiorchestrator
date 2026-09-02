@@ -248,7 +248,8 @@ func (e *Engine) Welcome() Outcome {
 // so STT/barge are armed (welcome itself is non-bargeable).
 //
 // New callers (language not yet locked from ANI preference) hear ask_language when
-// that prompt exists; returning callers hear a short confirm + department menu.
+// that prompt exists; returning callers hear the department menu only (no long
+// confirm+menu mash that overflows inject and drops agent audio).
 func (e *Engine) ServicesMenu() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -258,13 +259,7 @@ func (e *Engine) ServicesMenu() string {
 		e.languageAskTries = 0
 		return ask
 	}
-	menu := e.prompt(PromptClarify)
-	if e.languageLocked {
-		if confirm := strings.TrimSpace(e.prompt("language_confirmed")); confirm != "" {
-			return strings.TrimSpace(confirm + " " + menu)
-		}
-	}
-	return menu
+	return e.prompt(PromptClarify)
 }
 
 // Turn advances the desk with one caller utterance.
@@ -313,24 +308,42 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 			e.attrs[AttrLanguage] = req
 		}
 		e.languageLocked = true
-		if e.awaitingLanguage {
-			e.awaitingLanguage = false
-			e.languageAskTries = 0
-			confirm := e.prompt("language_confirmed")
-			menu := e.prompt(PromptClarify)
-			out.Text = strings.TrimSpace(strings.TrimSpace(confirm) + " " + menu)
-			return e.finish(&out)
-		}
-		if isBareLanguageRequest(text) {
-			out.Text = e.currentPromptText()
-			if out.Text == "" {
-				out.Text = e.prompt(PromptClarify)
+		wasAsk := e.awaitingLanguage
+		e.awaitingLanguage = false
+		e.languageAskTries = 0
+		// Explicit language change never classifies intent / transfers in the same turn.
+		confirm := strings.TrimSpace(e.prompt("language_confirmed"))
+		menu := e.prompt(PromptClarify)
+		switch {
+		case wasAsk:
+			out.Text = strings.TrimSpace(confirm + " " + menu)
+		case e.pathID != "":
+			// Mid-path: re-ask the current step in the new language.
+			cur := e.currentPromptText()
+			if confirm != "" && isBareLanguageRequest(text) {
+				out.Text = strings.TrimSpace(confirm + " " + cur)
+			} else {
+				out.Text = cur
 			}
-			return e.finish(&out)
+		default:
+			out.Text = strings.TrimSpace(confirm + " " + menu)
+			if strings.TrimSpace(out.Text) == "" {
+				out.Text = menu
+			}
 		}
-	} else if e.awaitingLanguage {
+		return e.finish(&out)
+	}
+	if IncompleteLanguageChange(text) {
+		out.Text = e.prompt("ask_language")
+		if out.Text == "" {
+			out.Text = "Which language would you prefer?"
+		}
+		return e.finish(&out)
+	}
+	if e.awaitingLanguage {
 		return e.handleLanguageAskLocked(text, allow, &out)
-	} else if !e.languageLocked {
+	}
+	if !e.languageLocked {
 		if det := DetectLanguage(text, allow); det != "" && e.allowedLanguage(det) {
 			e.language = det
 			e.attrs[AttrLanguage] = det
@@ -448,19 +461,10 @@ func isBareLanguageRequest(text string) bool {
 }
 
 func (e *Engine) handleLanguageAskLocked(text string, allow []string, out *Outcome) Outcome {
-	if det := DetectLanguage(text, allow); det != "" && e.allowedLanguage(det) {
-		e.language = det
-		e.attrs[AttrLanguage] = det
-		e.languageLocked = true
-		e.awaitingLanguage = false
-		e.languageAskTries = 0
-		confirm := e.prompt("language_confirmed")
-		menu := e.prompt(PromptClarify)
-		out.Text = strings.TrimSpace(strings.TrimSpace(confirm) + " " + menu)
-		return e.finish(out)
-	}
-	// Named language without switch phrasing ("Hindi", "English", …).
-	if named := namedLanguageOnly(text, allow); named != "" && e.allowedLanguage(named) {
+	// Only accept an explicit language name / switch phrase — never ambient
+	// DetectLanguage (echo of the Hindi welcome would falsely "choose" Hindi).
+	named := firstNonEmpty(LanguageSwitchRequest(text, allow), namedLanguageOnly(text, allow))
+	if named != "" && e.allowedLanguage(named) {
 		e.language = named
 		e.attrs[AttrLanguage] = named
 		e.languageLocked = true
@@ -486,6 +490,15 @@ func (e *Engine) handleLanguageAskLocked(text string, allow []string, out *Outco
 		out.Text = e.prompt(PromptClarify)
 	}
 	return e.finish(out)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func namedLanguageOnly(text string, allowed []string) string {

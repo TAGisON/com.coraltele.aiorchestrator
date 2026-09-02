@@ -56,6 +56,35 @@ func TestCoralXferReturningANISkipsLanguageAsk(t *testing.T) {
 	if !strings.Contains(strings.ToLower(menu), "sales") {
 		c.fail("expect department menu, got %q", menu)
 	}
+	if strings.Contains(strings.ToLower(menu), "understood") {
+		c.fail("returning menu must not mash language confirm: %q", menu)
+	}
+}
+
+func TestCoralXferLanguageSwitchDoesNotTransfer(t *testing.T) {
+	c := newXferCall(t)
+	c.eng.SetLanguage("en-IN")
+	_ = c.eng.ServicesMenu()
+	out := c.say("Can you please change my language to Punjabi?")
+	if out.Transfer != nil || out.End {
+		c.fail("language switch must not transfer/end: %+v", out)
+	}
+	if c.eng.Language() != "pa-IN" {
+		c.fail("want pa-IN, got %q", c.eng.Language())
+	}
+}
+
+func TestCoralXferLanguageAskIgnoresEcho(t *testing.T) {
+	c := newXferCall(t)
+	_ = c.eng.ServicesMenu()
+	out := c.say("कोरल टेलीकॉम में कॉल करने के लिए धन्यवाद")
+	if c.eng.Language() == "hi-IN" && !strings.Contains(strings.ToLower(out.Text), "language") {
+		// Echo must not lock Hindi; should re-ask language.
+		c.fail("welcome echo must not lock language, got lang=%q text=%q", c.eng.Language(), out.Text)
+	}
+	if !strings.Contains(strings.ToLower(out.Text), "language") {
+		c.fail("expect re-ask language after echo, got %q", out.Text)
+	}
 }
 
 func TestCoralXferAbuseHangup(t *testing.T) {
