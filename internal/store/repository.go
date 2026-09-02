@@ -20,6 +20,8 @@ type Repository interface {
 	ListSessions(ctx context.Context, limit int) ([]Session, error)
 	UpdateSessionState(ctx context.Context, id, state string) (Session, error)
 	UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error)
+	// UpdateSessionRecordingRef stores the on-disk path of the call recording.
+	UpdateSessionRecordingRef(ctx context.Context, id, ref string) (Session, error)
 
 	GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error)
 	UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error)

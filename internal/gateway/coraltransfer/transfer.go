@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
@@ -13,10 +14,34 @@ import (
 
 const ID port.GatewayID = "coral-transfer"
 
-// Gateway POSTs warm-transfer payload to Coral base URL when set; else stub success.
+// TransferFunc performs the telephony transfer for a live session. It is
+// injected by control at boot so this gateway never imports the runtime.
+type TransferFunc func(ctx context.Context, sessionID string, req port.TransferRequest) error
+
+// Gateway executes a warm transfer: it notifies Coral (when BaseURL is set) and
+// then moves the caller's leg to the destination extension.
+//
+// Notification and the leg move are separate concerns — a Coral outage must not
+// strand a caller who was promised a human, so the leg is transferred whether or
+// not the notification succeeds, and the notification result is reported in the
+// skill output for the audit trail.
 type Gateway struct {
 	BaseURL    string
 	HTTPClient *http.Client
+
+	// Transfer moves the caller leg. When nil the gateway only notifies Coral
+	// and reports transferred=false — used by playback//lab clocks that have no
+	// telephony leg.
+	Transfer TransferFunc
+
+	// DefaultDialplan / DefaultContext feed
+	// `uuid_transfer <uuid> <dest> <dialplan> <context>` when the caller does not
+	// specify them. Empty values fall back to "XML" / "calltransfer" at the edge.
+	DefaultDialplan string
+	DefaultContext  string
+	// DefaultDestination is used when the skill args carry no destination, e.g. a
+	// desk-wide "human agent" queue number.
+	DefaultDestination string
 }
 
 func (g *Gateway) ID() port.GatewayID { return ID }
@@ -72,28 +97,112 @@ func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.Skil
 			p.ProfileVersion = int(v)
 		}
 	}
-	body, _ := json.Marshal(p)
-	if g.BaseURL == "" {
-		out, _ := json.Marshal(map[string]any{"ok": true, "stub": true, "payload": json.RawMessage(body)})
+	dest := g.resolveDestination(args)
+
+	result := map[string]any{
+		"destination": dest,
+		"transferred": false,
+		"notified":    false,
+	}
+
+	// 1. Best-effort notification to Coral so the receiving agent has context.
+	if g.BaseURL != "" {
+		body, _ := json.Marshal(p)
+		status, err := g.notify(ctx, body)
+		result["notify_status"] = status
+		result["notified"] = err == nil && status >= 200 && status < 300
+		if err != nil {
+			// Log-and-continue: the caller still needs to reach a human.
+			result["notify_error"] = err.Error()
+		}
+	} else {
+		result["notify_skipped"] = "coral base url not configured"
+	}
+
+	// 2. Move the leg. This is the part the caller actually experiences.
+	if g.Transfer == nil {
+		result["transfer_skipped"] = "no telephony leg bound to this session"
+		out, _ := json.Marshal(result)
+		// Not an error: playback and lab clocks legitimately have no leg.
 		return port.SkillResult{OK: true, Output: out}, nil
 	}
+	if dest == "" {
+		result["error"] = "no transfer destination configured"
+		out, _ := json.Marshal(result)
+		return port.SkillResult{OK: false, Output: out}, &port.GatewayError{
+			Code:    port.CodeBadRequest,
+			Message: "coral-transfer: destination required (skill arg \"destination\" or a configured default)",
+		}
+	}
+
+	err := g.Transfer(ctx, string(req.SessionID), port.TransferRequest{
+		Destination: dest,
+		Dialplan:    stringArg(args, "dialplan", g.DefaultDialplan),
+		Context:     stringArg(args, "context", g.DefaultContext),
+		Reason:      firstNonEmpty(p.EscalationReason, p.Intent, "warm_transfer"),
+	})
+	if err != nil {
+		result["error"] = err.Error()
+		out, _ := json.Marshal(result)
+		return port.SkillResult{OK: false, Output: out}, &port.GatewayError{
+			Code:    port.CodeUnavailable,
+			Message: "coral-transfer: " + err.Error(),
+			Cause:   err,
+		}
+	}
+
+	result["transferred"] = true
+	out, _ := json.Marshal(result)
+	return port.SkillResult{OK: true, Output: out}, nil
+}
+
+func (g *Gateway) notify(ctx context.Context, body []byte) (int, error) {
 	client := g.HTTPClient
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: 5 * time.Second}
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, g.BaseURL+"/skills/warm-transfer", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		g.BaseURL+"/skills/warm-transfer", bytes.NewReader(body))
 	if err != nil {
-		return port.SkillResult{}, err
+		return 0, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return port.SkillResult{}, &port.GatewayError{Code: port.CodeUnavailable, Message: err.Error(), Retryable: true, Cause: err}
+		return 0, err
 	}
 	defer resp.Body.Close()
-	ok := resp.StatusCode >= 200 && resp.StatusCode < 300
-	out, _ := json.Marshal(map[string]any{"ok": ok, "status": resp.StatusCode})
-	return port.SkillResult{OK: ok, Output: out}, nil
+	return resp.StatusCode, nil
+}
+
+// resolveDestination accepts the aliases desks and LLM tool calls actually emit.
+func (g *Gateway) resolveDestination(args map[string]any) string {
+	for _, key := range []string{"destination", "number", "extension", "dest", "transfer_to"} {
+		if v := stringArg(args, key, ""); v != "" {
+			return v
+		}
+	}
+	return strings.TrimSpace(g.DefaultDestination)
+}
+
+func stringArg(args map[string]any, key, fallback string) string {
+	if args != nil {
+		if v, ok := args[key].(string); ok {
+			if s := strings.TrimSpace(v); s != "" {
+				return s
+			}
+		}
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // Register adds coral-transfer to the registry.

@@ -4,6 +4,7 @@ package composer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -89,6 +90,17 @@ type Talk struct {
 	// closing line is spoken). Control uses it to stop the session.
 	OnDeskEnd func(disposition string)
 
+	// RecordAgent receives every canonical Speak frame that reaches the edge, so
+	// the call recorder captures the agent leg exactly as it was played out.
+	// Optional; must not block.
+	RecordAgent func(pcm []byte)
+
+	// OnFailure fires when the Think/Speak pipeline cannot serve the turn —
+	// engine down, credits exhausted, timeout, or an unclassified error. Control
+	// plays the operator's fallback prompt and releases the call. It is invoked
+	// at most once per session; a call is only failed out one time.
+	OnFailure func(ctx context.Context, err error)
+
 	mu              sync.Mutex
 	state           TurnState
 	speakStream     port.SpeakStream
@@ -102,6 +114,22 @@ type Talk struct {
 	welcomeReadyAt  time.Time
 	welcomeFirstPCM bool
 	lastActivity    time.Time
+	failureOnce     sync.Once
+}
+
+// failPipeline routes a pipeline error to OnFailure exactly once. Later failures
+// are logged by the caller but must not re-enter the fallback/hangup path: the
+// call is already being released.
+func (t *Talk) failPipeline(ctx context.Context, err error) {
+	if err == nil || t.OnFailure == nil {
+		return
+	}
+	t.failureOnce.Do(func() {
+		// Detach from the caller's context: the turn context is usually already
+		// cancelled by the time we get here, and the fallback prompt still has
+		// to reach the caller.
+		go t.OnFailure(context.WithoutCancel(ctx), err)
+	})
 }
 
 // NewTalk builds a composer. VAD may be nil (defaults to energy VAD when clock enables it).
@@ -294,6 +322,11 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 		t.Mem.Append("assistant", spoken)
 	}
 	if err := t.speak(ctx, spoken); err != nil {
+		// The welcome is the caller's first impression: if TTS cannot serve it,
+		// the call is not viable and must be failed out rather than left silent.
+		if !errors.Is(err, context.Canceled) {
+			t.failPipeline(ctx, err)
+		}
 		return spoken, fmt.Errorf("answer speak: %w", err)
 	}
 	t.mu.Lock()
@@ -353,6 +386,10 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	if err != nil {
 		t.setState(Listening)
 		t.emitTurn(ctx, userText, "", res, false, "error", started)
+		// A barge-in cancels Think deliberately; that is not a pipeline failure.
+		if !errors.Is(err, context.Canceled) {
+			t.failPipeline(ctx, err)
+		}
 		return err
 	}
 	if res.BlockedThink || res.Action == "refuse" || res.Action == "escalate" || res.Action == "block_think" {
@@ -369,6 +406,9 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 		return nil
 	}
 	err = t.speak(ctx, res.ResponseText)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.failPipeline(ctx, err)
+	}
 	barge := t.LastBargeIn()
 	outcome := res.Action
 	if outcome == "" {
@@ -535,6 +575,9 @@ func (t *Talk) noteWelcomeFirstPCM(ctx context.Context) {
 func (t *Talk) writeSinks(ctx context.Context, frame port.PCMFrame) {
 	if t.Actor == nil {
 		return
+	}
+	if t.RecordAgent != nil && len(frame.Data) > 0 {
+		t.RecordAgent(frame.Data)
 	}
 	for _, s := range t.Actor.Sinks() {
 		if err := s.WritePCM(ctx, frame); err != nil {

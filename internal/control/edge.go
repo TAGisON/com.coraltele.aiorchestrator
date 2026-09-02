@@ -7,6 +7,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/modaudiostream"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
@@ -67,11 +68,23 @@ func (b *EdgeBinder) AttachConn(sessionID string, conn *modaudiostream.Conn) err
 	}
 	if b.Live != nil {
 		if err := b.Live.StartLiveTalk(ctx, sessionID); err != nil {
-			// Keep edge attached so Speak can still reach the sink; Listen may recover on retry.
-			applog.Warn("start live talk", "session", sessionID, "err", err)
+			applog.Error("start live talk failed", "session", sessionID, "err", err)
+			// Listen is what makes this a conversation. Without it the caller
+			// would sit in silence, so play the operator's prompt and release
+			// rather than leaving a dead leg up. The sink is already attached,
+			// which is exactly what the fallback path needs.
+			if f, ok := b.Live.(CallFailer); ok {
+				f.FailCall(ctx, sessionID, fallback.Classify(err), err)
+			}
 		}
 	}
 	return nil
+}
+
+// CallFailer plays the operator fallback prompt and releases the call.
+// Implemented by *SessionRuntime.
+type CallFailer interface {
+	FailCall(ctx context.Context, sessionID string, sc fallback.Scenario, cause error)
 }
 
 // NewEdgeBinder returns an EdgeBinder that routes feeder-gone Terminal through onSessionTerminal.

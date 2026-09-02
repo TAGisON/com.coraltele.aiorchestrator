@@ -193,6 +193,19 @@ func (m *Memory) UpdateSessionState(ctx context.Context, id, state string) (Sess
 	return s, nil
 }
 
+func (m *Memory) UpdateSessionRecordingRef(ctx context.Context, id, ref string) (Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	s.RecordingRef = ref
+	s.UpdatedAt = time.Now().UTC()
+	m.sessions[id] = s
+	return s, nil
+}
+
 func (m *Memory) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

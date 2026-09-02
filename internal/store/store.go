@@ -287,6 +287,47 @@ RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instan
 	return sess, nil
 }
 
+// UpdateSessionRecordingRef stores the on-disk path of the call recording.
+func (s *Store) UpdateSessionRecordingRef(ctx context.Context, id, ref string) (Session, error) {
+	var sess Session
+	var tenant, owner, coral, rec *string
+	var caller, meta, binding []byte
+	err := s.pool.QueryRow(ctx, `
+UPDATE session SET recording_ref=NULLIF($2,''), updated_at=now() WHERE id=$1
+RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
+          canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
+          COALESCE(detected_language,''), COALESCE(active_language,''),
+          created_at, updated_at
+`, id, ref).Scan(
+		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
+		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
+		&sess.DetectedLanguage, &sess.ActiveLanguage,
+		&sess.CreatedAt, &sess.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	if err != nil {
+		return Session{}, err
+	}
+	if tenant != nil {
+		sess.TenantID = *tenant
+	}
+	if owner != nil {
+		sess.OwnerInstance = *owner
+	}
+	if coral != nil {
+		sess.CoralUserID = *coral
+	}
+	if rec != nil {
+		sess.RecordingRef = *rec
+	}
+	sess.Caller = caller
+	sess.Metadata = meta
+	sess.GatewayBinding = scanGatewayBinding(binding)
+	return sess, nil
+}
+
 func (s *Store) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
 	var sess Session
 	var tenant, owner, coral, rec *string

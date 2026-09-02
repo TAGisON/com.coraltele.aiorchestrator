@@ -18,6 +18,7 @@ import (
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
@@ -74,7 +75,20 @@ type Server struct {
 	ui   UIExtras
 	uiFS fs.FS
 
+	// fallback holds the operator prompts played when the pipeline fails.
+	// Nil disables the fallback API (and silent release on failure).
+	fallback *fallback.Store
+
 	sandboxes *sandboxRegistry
+}
+
+// SetFallbackStore installs the fallback prompt store and shares it with the
+// session runtime so failures can play it.
+func (s *Server) SetFallbackStore(store *fallback.Store) {
+	s.fallback = store
+	if sr, ok := s.rt.(*SessionRuntime); ok && sr != nil {
+		sr.Fallback = store
+	}
 }
 
 func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
@@ -121,6 +135,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/tenant/credentials", s.handleListGatewayCredentials)
 	s.mux.HandleFunc("GET /v1/tenant/credentials/{gateway_id}", s.handleGetGatewayCredential)
 	s.mux.HandleFunc("PUT /v1/tenant/credentials/{gateway_id}", s.handlePutGatewayCredential)
+	s.mux.HandleFunc("GET /v1/tenant/fallback", s.handleListFallback)
+	s.mux.HandleFunc("GET /v1/tenant/fallback/{scenario}", s.handleGetFallback)
+	s.mux.HandleFunc("PUT /v1/tenant/fallback/{scenario}", s.handlePutFallback)
+	s.mux.HandleFunc("DELETE /v1/tenant/fallback/{scenario}", s.handleDeleteFallback)
 	s.mux.HandleFunc("GET /v1/tenant/settings", s.handleListSystemSettings)
 	s.mux.HandleFunc("GET /v1/tenant/settings/{key}", s.handleGetSystemSetting)
 	s.mux.HandleFunc("PUT /v1/tenant/settings/{key}", s.handlePutSystemSetting)

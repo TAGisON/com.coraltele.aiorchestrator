@@ -14,6 +14,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/bootconfig"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/control"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coralcrm"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/coraltransfer"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/deskskills"
@@ -25,6 +26,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/gateway/sarvamtts"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 	"github.com/coraltele/com.coraltele.aiorchestrator/web"
@@ -94,7 +96,10 @@ func main() {
 	if st, err := repo.GetSystemSetting(ctx, "default", "coral.base_url"); err == nil {
 		coralBase = st.Value
 	}
-	if err := coraltransfer.Register(reg, &coraltransfer.Gateway{BaseURL: coralBase}); err != nil {
+	// Transfer needs the runtime to move the caller's leg; the runtime does not
+	// exist yet, so keep the handle and inject it below.
+	transferGW := &coraltransfer.Gateway{BaseURL: coralBase}
+	if err := coraltransfer.Register(reg, transferGW); err != nil {
 		applog.Error("register coral-transfer failed", "err", err)
 		os.Exit(1)
 	}
@@ -140,8 +145,38 @@ func main() {
 		EdgeTokenSecret: []byte(boot.EdgeTokenSecret),
 	}
 	mgr := session.NewManager(reg)
-	rt := &control.SessionRuntime{Mgr: mgr, Repo: repo}
+	rt := &control.SessionRuntime{
+		Mgr:  mgr,
+		Repo: repo,
+		RecordCfg: record.Config{
+			Enabled:       boot.RecordingEnabled,
+			Root:          boot.RecordingRoot,
+			RetentionDays: boot.RecordingRetentionDays,
+		},
+	}
 	srv := control.NewWithRuntime(repo, reg, rt, cfg, web.UIFS)
+
+	// Fallback prompts: a failure to open the store must not stop the process —
+	// calls still work, they just release without an announcement.
+	if fbStore, err := fallback.NewStore(boot.FallbackRoot); err != nil {
+		applog.Error("fallback prompt store unavailable; failures will release calls silently",
+			"root", boot.FallbackRoot, "err", err)
+	} else {
+		srv.SetFallbackStore(fbStore)
+		applog.Info("fallback prompt store ready", "root", fbStore.Root(),
+			"prompts", len(fbStore.List("default")))
+	}
+
+	// The transfer skill needs a way to move the caller's leg; give it one now
+	// that the runtime exists.
+	transferGW.Transfer = rt.Transfer
+	transferGW.DefaultDialplan = boot.TransferDialplan
+	transferGW.DefaultContext = boot.TransferContext
+
+	if boot.RecordingEnabled {
+		applog.Info("call recording enabled", "root", boot.RecordingRoot,
+			"retention_days", boot.RecordingRetentionDays)
+	}
 	srv.SetUIExtras(control.UIExtras{
 		StoreBackend: storeBackend,
 		HTTPAddr:     boot.HTTPAddr,
@@ -151,6 +186,7 @@ func main() {
 	defer workerCancel()
 	_ = srv.StartPlaybackWorker(workerCtx, mgr)
 	_ = srv.StartPostcallWorker(workerCtx)
+	startRecordingRetention(workerCtx, boot.RecordingRoot, boot.RecordingRetentionDays)
 
 	addr := boot.HTTPAddr
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
@@ -184,6 +220,35 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(shutdownCtx)
+}
+
+// startRecordingRetention prunes recording day-directories older than the
+// configured window. Recordings are call audio: unbounded growth fills the disk
+// and eventually takes the switch down with it, so this runs unattended.
+func startRecordingRetention(ctx context.Context, root string, days int) {
+	if days <= 0 {
+		applog.Info("recording retention disabled — recordings are kept forever", "root", root)
+		return
+	}
+	go func() {
+		// Sweep at boot, then daily. A missed sweep is harmless; the next one
+		// removes everything that has since aged out.
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			removed, err := record.Sweep(root, days)
+			if err != nil {
+				applog.Warn("recording retention sweep failed", "root", root, "err", err)
+			} else if removed > 0 {
+				applog.Info("recording retention sweep", "root", root, "removed_days", removed)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 }
 
 func lookupSarvamKey(ctx context.Context, repo store.Repository, tenantID string) (string, error) {

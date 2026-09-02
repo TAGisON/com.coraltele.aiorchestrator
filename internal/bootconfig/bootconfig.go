@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 )
 
 // Config is process bootstrap configuration (not vendor secrets or tenant engines).
@@ -24,6 +27,21 @@ type Config struct {
 	EdgeBaseURL     string
 	EdgeTokenSecret string
 	PropertiesPath  string
+
+	// RecordingEnabled turns per-session call recording on.
+	RecordingEnabled bool
+	// RecordingRoot is the recordings root. A leading "/" resolves against the
+	// current drive on Windows, so the same value works on every OS.
+	RecordingRoot string
+	// RecordingRetentionDays removes recording day-directories older than this.
+	// Zero keeps recordings forever.
+	RecordingRetentionDays int
+	// FallbackRoot holds operator-uploaded failure prompts.
+	FallbackRoot string
+	// TransferDialplan / TransferContext are the defaults handed to the edge for
+	// `uuid_transfer <uuid> <dest> <dialplan> <context>`.
+	TransferDialplan string
+	TransferContext  string
 }
 
 // Default returns process defaults (port 8011). No vendor or engine presets.
@@ -41,6 +59,13 @@ func Default() Config {
 		OwnerInstance:   "local",
 		EdgeBaseURL:     "wss://localhost/edge/fs",
 		EdgeTokenSecret: "lab-edge-hmac-change-me",
+
+		RecordingEnabled:       true,
+		RecordingRoot:          record.DefaultRoot,
+		RecordingRetentionDays: 30,
+		FallbackRoot:           fallback.DefaultRoot,
+		TransferDialplan:       "XML",
+		TransferContext:        "calltransfer",
 	}
 }
 
@@ -138,6 +163,20 @@ func mergeFile(cfg *Config, path string) error {
 			cfg.EdgeBaseURL = v
 		case "edge.token_secret":
 			cfg.EdgeTokenSecret = v
+		case "recording.enabled":
+			cfg.RecordingEnabled = truthy(v)
+		case "recording.root":
+			cfg.RecordingRoot = v
+		case "recording.retention_days":
+			if n, err := parseInt(v); err == nil {
+				cfg.RecordingRetentionDays = n
+			}
+		case "fallback.root":
+			cfg.FallbackRoot = v
+		case "transfer.dialplan":
+			cfg.TransferDialplan = v
+		case "transfer.context":
+			cfg.TransferContext = v
 		}
 	}
 	return sc.Err()
@@ -167,6 +206,26 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("EDGE_TOKEN_SECRET"); v != "" {
 		cfg.EdgeTokenSecret = v
+	}
+	if v := os.Getenv("RECORDING_ENABLED"); v != "" {
+		cfg.RecordingEnabled = truthy(v)
+	}
+	if v := os.Getenv("RECORDING_ROOT"); v != "" {
+		cfg.RecordingRoot = v
+	}
+	if v := os.Getenv("RECORDING_RETENTION_DAYS"); v != "" {
+		if n, err := parseInt(v); err == nil {
+			cfg.RecordingRetentionDays = n
+		}
+	}
+	if v := os.Getenv("FALLBACK_ROOT"); v != "" {
+		cfg.FallbackRoot = v
+	}
+	if v := os.Getenv("TRANSFER_DIALPLAN"); v != "" {
+		cfg.TransferDialplan = v
+	}
+	if v := os.Getenv("TRANSFER_CONTEXT"); v != "" {
+		cfg.TransferContext = v
 	}
 }
 

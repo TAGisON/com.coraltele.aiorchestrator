@@ -31,6 +31,36 @@ func encodeFlush() []byte {
 	return []byte(`{"type":"flush"}`)
 }
 
+// hangupMsg / transferMsg are the call-control verbs added in module 2.1.0.
+// The module arms them and acts only after queued playout drains (or drainMs).
+type hangupMsg struct {
+	Type    string `json:"type"`
+	Cause   string `json:"cause,omitempty"`
+	DrainMs int    `json:"drainMs,omitempty"`
+}
+
+type transferMsg struct {
+	Type     string `json:"type"`
+	Dest     string `json:"dest"`
+	Dialplan string `json:"dialplan,omitempty"`
+	Context  string `json:"context,omitempty"`
+	DrainMs  int    `json:"drainMs,omitempty"`
+}
+
+func encodeHangup(cause string, drainMs int) ([]byte, error) {
+	return json.Marshal(hangupMsg{Type: "hangup", Cause: cause, DrainMs: drainMs})
+}
+
+func encodeTransfer(dest, dialplan, context string, drainMs int) ([]byte, error) {
+	return json.Marshal(transferMsg{
+		Type:     "transfer",
+		Dest:     dest,
+		Dialplan: dialplan,
+		Context:  context,
+		DrainMs:  drainMs,
+	})
+}
+
 // inboundEvent is optional JSON from FS (DTMF/stop/error).
 type inboundEvent struct {
 	Type  string `json:"type"`

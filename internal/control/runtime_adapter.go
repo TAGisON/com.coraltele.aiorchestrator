@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
@@ -25,11 +27,19 @@ type SessionRuntime struct {
 	// Control sets it to the server stop path so state + postcall run normally.
 	OnSessionEnd func(ctx context.Context, sessionID, disposition string)
 
-	mu    sync.Mutex
-	talks map[string]*composer.Talk
-	lives map[string]*liveTalk
-	desks map[string]*deskController
-	media map[string]*sessionMedia
+	// RecordCfg controls per-session call recording. Disabled by default.
+	RecordCfg record.Config
+	// Fallback holds the operator prompts played when the pipeline fails.
+	// Nil means failures release the call without an announcement.
+	Fallback *fallback.Store
+
+	mu           sync.Mutex
+	talks        map[string]*composer.Talk
+	lives        map[string]*liveTalk
+	desks        map[string]*deskController
+	media        map[string]*sessionMedia
+	recorders    map[string]*record.Recorder
+	failScenario map[string]string // session → first failure scenario
 }
 
 type liveTalk struct {
@@ -64,6 +74,9 @@ func (r *SessionRuntime) StartSession(ctx context.Context, p RuntimeStart) error
 
 func (r *SessionRuntime) StopSession(ctx context.Context, sessionID, reason string) (string, error) {
 	r.stopLiveTalk(sessionID)
+	// Finalise the recording before the actor goes away, so trailing audio that
+	// is still buffered makes it into the file.
+	r.stopRecorder(sessionID, reason)
 	r.mu.Lock()
 	delete(r.talks, sessionID)
 	r.mu.Unlock()
@@ -181,9 +194,14 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 	applog.Info("live talk started", "session", sessionID, "listen", string(listenGW.ID()), "media_phase", MediaEstablishing)
 	// Direct feeder→Listen tap (bus SubscribeAudio alone dropped/blocked under STT write latency).
 	// Also feed OnPCM here — bus PublishAudio includes TTS frames and must not drive barge-in VAD.
+	// Recording starts at edge attach: that is the first moment we know the leg
+	// is real and can name the file after the telephony call id.
+	rec := r.startRecorder(sessionID, a)
+
 	queue := make(chan port.PCMFrame, 128)
 	var dropped atomic.Int64
 	a.SetPCMTap(func(frame port.PCMFrame) {
+		rec.WriteCaller(frame.Data)
 		talk.OnPCM(frame)
 		select {
 		case queue <- frame:
@@ -575,6 +593,15 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 	talk.BindActor(a)
 	if err := bindThinkFromGateway(talk, a); err != nil {
 		return nil, err
+	}
+	sessionID := a.ID
+	// Agent leg of the call recording: every Speak frame that reaches the edge.
+	talk.RecordAgent = func(pcm []byte) {
+		r.recorderFor(sessionID).WriteAgent(pcm)
+	}
+	// Unrecoverable pipeline errors play the operator prompt and release the call.
+	talk.OnFailure = func(ctx context.Context, err error) {
+		r.FailCall(ctx, sessionID, fallback.Classify(err), err)
 	}
 	profileVersion := 0
 	if r.Repo != nil {
