@@ -9,7 +9,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 )
 
-const defaultMinBargeChars = 2
+const defaultMinBargeChars = 3
 
 type bargePolicy struct {
 	Allowed              bool

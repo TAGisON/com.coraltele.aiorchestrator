@@ -27,6 +27,18 @@ func newCall(t *testing.T, opts ...func(*deskskills.Gateway)) *call {
 		o(gw)
 	}
 	doc := desk.PresetCoralTFN("default")
+	// Preset leaves Extension empty (Configurator owns real numbers). Tests stamp
+	// lab dial destinations so transfer outcomes stay assertable.
+	for i := range doc.Matrix {
+		switch doc.Matrix[i].Target {
+		case "sales":
+			doc.Matrix[i].Number = "1001"
+		case "technical_support":
+			doc.Matrix[i].Number = "1002"
+		case "service":
+			doc.Matrix[i].Number = "1003"
+		}
+	}
 	eng := desk.NewEngine(doc, runner(gw, "test-session", "default"))
 	eng.SetAttribute(desk.AttrANI, "919812345678")
 	c := &call{t: t, eng: eng, gw: gw}
@@ -168,18 +180,19 @@ func TestComplaintEnglishCreatesTicketAndEmail(t *testing.T) {
 	}
 }
 
-// §17: the same journey entirely in Hindi.
+// Same journey in Hindi speech: language locks to hi-IN; prompts are EN-canonical
+// (synthesis runs only when Think is wired on a live session).
 func TestComplaintHindiCreatesTicket(t *testing.T) {
 	c := newCall(t)
 	first := c.say("मुझे शिकायत दर्ज करानी है")
 	c.wantLanguage("hi-IN")
-	c.wantSaid(first, "किस Coral Telecom उत्पाद")
+	c.wantSaid(first, "Which Coral Telecom product")
 
 	c.say("मीडिया गेटवे")
 	c.say("हाँ चालू है")
 	c.say("नहीं, कॉल सर्वर से नहीं जुड़ रहा")
 	c.say("incoming और outgoing दोनों")
-	c.wantSaid(c.say("सभी कॉल्स"), "Media Gateway में")
+	c.wantSaid(c.say("सभी कॉल्स"), "Media Gateway")
 
 	c.say("शिकायत दर्ज करें")
 	c.say("सुरेश शर्मा")
@@ -187,20 +200,20 @@ func TestComplaintHindiCreatesTicket(t *testing.T) {
 	// An email address is ASCII but must not flip the call back to English.
 	emailTurn := c.say("suresh@coral.com")
 	c.wantLanguage("hi-IN")
-	c.wantSaid(emailTurn, "क्या यह सही है")
+	c.wantSaid(emailTurn, "Is that correct")
 
-	c.wantSaid(c.say("हाँ सही है"), "क्या यह सारी जानकारी सही है")
+	c.wantSaid(c.say("हाँ सही है"), "Is all this information correct")
 	created := c.say("हाँ बिल्कुल सही")
 	ticket := c.wantAttrSet(desk.AttrTicketID)
 	c.wantSaid(created, ticket)
-	c.wantSaid(created, "दर्ज कर ली गई है")
+	c.wantSaid(created, "registered")
 
 	c.say("नहीं धन्यवाद")
 	c.wantDisposition(desk.DispTicketCreated)
 	c.wantLanguage("hi-IN")
 }
 
-// §17: the caller may switch language at any time and the desk keeps its place.
+// Explicit language switch only — ambient script change must not flip the call.
 func TestMidCallLanguageSwitch(t *testing.T) {
 	c := newCall(t)
 	c.say("I need technical support")
@@ -208,15 +221,23 @@ func TestMidCallLanguageSwitch(t *testing.T) {
 
 	switched := c.say("Hindi mein baat kijiye")
 	c.wantLanguage("hi-IN")
-	c.wantSaid(switched, "किस Coral Telecom उत्पाद")
+	// Without a live Think synthesizer, canonical English prompts are spoken.
+	c.wantSaid(switched, "Which Coral Telecom product")
 
 	c.say("कॉल सर्वर")
 	back := c.say("please continue in English")
 	c.wantLanguage("en-IN")
 	c.wantSaid(back, "describe the problem")
 
-	// The product answered in Hindi survives the switch — no repeated question.
 	c.wantAttr(desk.AttrProduct, "call_server")
+}
+
+func TestLanguageDoesNotFlipOnScriptDrift(t *testing.T) {
+	c := newCall(t)
+	c.say("I need technical support")
+	c.wantLanguage("en-IN")
+	c.say("मुझे IP Phone में समस्या है") // Devanagari content, not an explicit switch
+	c.wantLanguage("en-IN")
 }
 
 // §5 + §21: technical support collects the three levels then warm-transfers.
@@ -459,7 +480,7 @@ func TestHinglishProductInformationIntent(t *testing.T) {
 	if c.eng.Attributes()[desk.AttrIntent] != "product_information" {
 		c.fail("intent=%q want product_information", c.eng.Attributes()[desk.AttrIntent])
 	}
-	c.wantSaid(out, "उत्पाद")
+	c.wantSaid(out, "products and solutions")
 }
 
 // §20: after one request is closed the desk accepts a second one.

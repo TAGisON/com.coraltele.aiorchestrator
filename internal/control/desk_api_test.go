@@ -239,8 +239,8 @@ func TestDeskTextCallHindiEndToEnd(t *testing.T) {
 		raw, _ := json.Marshal(created)
 		t.Fatalf("Hindi journey should also create a ticket: %s", raw)
 	}
-	if !strings.Contains(lastReply(created), "दर्ज कर ली गई है") {
-		t.Fatalf("confirmation should be spoken in Hindi, said: %s", lastReply(created))
+	if !strings.Contains(lastReply(created), "successfully registered") {
+		t.Fatalf("confirmation should speak ticket registration (EN-authored), said: %s", lastReply(created))
 	}
 }
 

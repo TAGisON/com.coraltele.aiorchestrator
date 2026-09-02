@@ -69,10 +69,8 @@ func TestCoralProductKnowledgeIsBilingual(t *testing.T) {
 func TestPresetPromptsExistInBothLanguages(t *testing.T) {
 	d := desk.PresetCoralTFN("default")
 	for id := range d.Prompts {
-		for _, lang := range []string{"en-IN", "hi-IN"} {
-			if strings.TrimSpace(d.PromptText(id, lang)) == "" {
-				t.Errorf("prompt %s has no %s text", id, lang)
-			}
+		if strings.TrimSpace(d.PromptText(id, "en-IN")) == "" {
+			t.Errorf("prompt %s missing canonical en-IN text", id)
 		}
 	}
 }
@@ -99,13 +97,16 @@ func TestCompileEmbedsDeskAndLanguages(t *testing.T) {
 		XDesk json.RawMessage `json:"x_desk"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		t.Fatalf("compiled profile unreadable: %v", err)
+		t.Fatalf("compiled profile unreadable: %s", err)
 	}
 	if doc.ID != "coral-tfn" {
 		t.Errorf("profile id = %q", doc.ID)
 	}
-	if doc.Language.Primary != "hi-IN" || len(doc.Language.Allowed) != 2 {
-		t.Errorf("language block = %+v", doc.Language)
+	if doc.Language.Primary != "en-IN" {
+		t.Errorf("language primary = %q, want en-IN", doc.Language.Primary)
+	}
+	if len(doc.Language.Allowed) < 2 {
+		t.Errorf("compiled profile should expose multilingual allowlist, got %+v", doc.Language)
 	}
 	if !doc.Language.AutoDetect || !doc.Language.MidCallSwitch {
 		t.Error("Indian multilingual requires auto-detect and mid-call switching")
@@ -349,5 +350,42 @@ func TestDispositionTaxonomyIsClosed(t *testing.T) {
 		if !seen[required] {
 			t.Errorf("disposition taxonomy missing %s", required)
 		}
+	}
+}
+
+func TestTransferNumberFor(t *testing.T) {
+	d := desk.Doc{Matrix: []desk.MatrixRow{
+		{Intent: "sales_enquiry", Target: "sales", Number: "5002"},
+		{Intent: "technical_support", Target: "5004"}, // legacy digits-in-queue
+		{Intent: "service_complaint", Target: "service"},
+	}}
+	if got := d.TransferNumberFor("sales_enquiry", "sales"); got != "5002" {
+		t.Fatalf("number column: got %q", got)
+	}
+	if got := d.TransferNumberFor("technical_support", "5004"); got != "5004" {
+		t.Fatalf("dialable target: got %q", got)
+	}
+	if got := d.TransferNumberFor("service_complaint", "service"); got != "" {
+		t.Fatalf("queue label alone must not dial, got %q", got)
+	}
+	if got := d.TransferNumberFor("product_information", "sales"); got != "5002" {
+		t.Fatalf("same-target fallback: got %q", got)
+	}
+}
+
+func TestNormalizeSetsWelcomeBargeDefault(t *testing.T) {
+	d := desk.Doc{
+		ID: "x", Languages: []string{"en-IN"}, DefaultLanguage: "en-IN",
+		CX: desk.CXPolicy{SilenceNudge1Ms: 9000, AskTimeoutMs: 9000},
+	}
+	d.Normalize()
+	if d.CX.WelcomeBargeAllowed == nil || *d.CX.WelcomeBargeAllowed {
+		t.Fatal("Normalize must default welcome_barge_allowed=false")
+	}
+	if d.CX.PrimaryLocale != "en-IN" {
+		t.Fatalf("primary_locale=%q", d.CX.PrimaryLocale)
+	}
+	if d.CX.LocaleSynthesis == nil || !*d.CX.LocaleSynthesis {
+		t.Fatal("Normalize must default locale_synthesis=true")
 	}
 }

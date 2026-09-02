@@ -375,9 +375,13 @@ CoralUI.onReady(function () {
         "</textarea></td></tr>";
     }).join("");
     el("edMatrixBody").innerHTML = (deskDoc.matrix || []).map(function (row, i) {
+      // Queue = ACD/queue label (target). Extension = dial destination (number)
+      // used by uuid_transfer. Older drafts that put digits only in Queue still
+      // transfer via TransferNumberFor's numeric-target fallback.
       return "<tr><td>" + esc(row.intent) + "</td>" +
         "<td><input data-mx=\"" + i + "\" data-field=\"owner\" value=\"" + esc(row.owner || "") + "\" /></td>" +
-        "<td><input data-mx=\"" + i + "\" data-field=\"target\" value=\"" + esc(row.target || "") + "\" /></td>" +
+        "<td><input data-mx=\"" + i + "\" data-field=\"target\" value=\"" + esc(row.target || "") + "\" placeholder=\"sales\" /></td>" +
+        "<td><input data-mx=\"" + i + "\" data-field=\"number\" value=\"" + esc(row.number || "") + "\" placeholder=\"extension\" /></td>" +
         "<td><select data-mx=\"" + i + "\" data-field=\"action\">" +
         ["transfer", "ticket", "both"].map(function (a) {
           return "<option value=\"" + a + "\"" + (row.action === a ? " selected" : "") + ">" + a + "</option>";

@@ -566,6 +566,25 @@ func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thin
 	}
 }
 
+// SpeakLine plays assistant text without Think (post-welcome menu, soft offers).
+func (t *Talk) SpeakLine(ctx context.Context, text string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	if t.Mem != nil {
+		t.Mem.Append("assistant", text)
+	}
+	if err := t.speak(ctx, text); err != nil {
+		return err
+	}
+	if t.Obs != nil {
+		t.Obs.AppendAssistantOnly(ctx, text)
+	}
+	t.MarkActivity()
+	return nil
+}
+
 func (t *Talk) speak(ctx context.Context, text string) error {
 	speakGW, speakID, err := t.selectSpeak()
 	if err != nil {

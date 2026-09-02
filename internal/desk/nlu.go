@@ -161,10 +161,57 @@ func DetectLanguage(text string, allowed []string) string {
 	if strings.TrimSpace(text) == "" {
 		return ""
 	}
-	hi, en := langPair(allowed)
-	if HasDevanagari(text) {
-		return hi
+	byBase := map[string]string{}
+	for _, l := range allowed {
+		if b := baseLang(l); b != "" {
+			byBase[b] = l
+		}
 	}
+	// Prefer script evidence (first strong signal wins).
+	for _, r := range text {
+		switch {
+		case r >= 0x0A00 && r <= 0x0A7F: // Gurmukhi
+			if t := byBase["pa"]; t != "" {
+				return t
+			}
+		case r >= 0x0B80 && r <= 0x0BFF: // Tamil
+			if t := byBase["ta"]; t != "" {
+				return t
+			}
+		case r >= 0x0C00 && r <= 0x0C7F: // Telugu
+			if t := byBase["te"]; t != "" {
+				return t
+			}
+		case r >= 0x0C80 && r <= 0x0CFF: // Kannada
+			if t := byBase["kn"]; t != "" {
+				return t
+			}
+		case r >= 0x0D00 && r <= 0x0D7F: // Malayalam
+			if t := byBase["ml"]; t != "" {
+				return t
+			}
+		case r >= 0x0A80 && r <= 0x0AFF: // Gujarati
+			if t := byBase["gu"]; t != "" {
+				return t
+			}
+		case r >= 0x0980 && r <= 0x09FF: // Bengali
+			if t := byBase["bn"]; t != "" {
+				return t
+			}
+		case r >= 0x0B00 && r <= 0x0B7F: // Oriya
+			if t := byBase["or"]; t != "" {
+				return t
+			}
+		case r >= 0x0900 && r <= 0x097F: // Devanagari (Hindi / Marathi)
+			if t := byBase["hi"]; t != "" {
+				return t
+			}
+			if t := byBase["mr"]; t != "" {
+				return t
+			}
+		}
+	}
+	hi, en := langPair(allowed)
 	toks := tokens(text)
 	for _, t := range toks {
 		for _, m := range romanHindiMarkers {
@@ -224,27 +271,58 @@ func SwitchLanguageEvidence(text string, allowed []string, current string) strin
 }
 
 // LanguageSwitchRequest detects an explicit caller request to change language.
+// Script/ambient drift is NOT a switch — only clear "talk in X" asks.
 func LanguageSwitchRequest(text string, allowed []string) string {
 	n := normalize(text)
 	if n == "" {
 		return ""
 	}
-	hi, en := "", ""
+	byBase := map[string]string{}
 	for _, l := range allowed {
-		switch baseLang(l) {
-		case "hi":
-			hi = l
-		case "en":
-			en = l
+		if b := baseLang(l); b != "" {
+			byBase[b] = l
 		}
 	}
-	wantsEnglish := strings.Contains(n, "english") || strings.Contains(n, "angrezi") || strings.Contains(n, "अंग्रेज")
-	wantsHindi := strings.Contains(n, "hindi") || strings.Contains(n, "हिंदी") || strings.Contains(n, "हिन्दी")
-	if wantsEnglish && en != "" {
-		return en
+	type hit struct {
+		base string
+		keys []string
 	}
-	if wantsHindi && hi != "" {
-		return hi
+	// Order matters when phrases overlap; prefer specific language names.
+	candidates := []hit{
+		{"en", []string{"english", "angrezi", "angrezi mein", "अंग्रेज", "in english"}},
+		{"hi", []string{"hindi", "hindi mein", "हिंदी", "हिन्दी", "in hindi"}},
+		{"pa", []string{"punjabi", "panjabi", "ਪੰਜਾਬੀ", "पंजाबी", "in punjabi"}},
+		{"mr", []string{"marathi", "मराठी", "in marathi"}},
+		{"bn", []string{"bengali", "bangla", "বাংলা", "বাঙালি", "in bengali"}},
+		{"ta", []string{"tamil", "தமிழ்", "in tamil"}},
+		{"te", []string{"telugu", "తెలుగు", "in telugu"}},
+		{"gu", []string{"gujarati", "ગુજરાતી", "in gujarati"}},
+		{"kn", []string{"kannada", "ಕನ್ನಡ", "in kannada"}},
+		{"ml", []string{"malayalam", "മലയാളം", "in malayalam"}},
+		{"or", []string{"odia", "oriya", "ଓଡ଼ିଆ", "in odia"}},
+		{"as", []string{"assamese", "অসমীয়া", "in assamese"}},
+	}
+	explicit := strings.Contains(n, "speak") || strings.Contains(n, "talk") ||
+		strings.Contains(n, "baat") || strings.Contains(n, "bolo") ||
+		strings.Contains(n, "please") || strings.Contains(n, "mein") ||
+		strings.Contains(n, "in ") || strings.Contains(n, "करो") ||
+		strings.Contains(n, "करो") || strings.Contains(n, "बात")
+	for _, c := range candidates {
+		tag, ok := byBase[c.base]
+		if !ok {
+			continue
+		}
+		for _, k := range c.keys {
+			if !strings.Contains(n, k) {
+				continue
+			}
+			// Require an explicit switch cue, or a bare language name alone.
+			toks := tokens(text)
+			bare := len(toks) <= 3
+			if explicit || bare {
+				return tag
+			}
+		}
 	}
 	return ""
 }

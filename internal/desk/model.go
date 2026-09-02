@@ -257,7 +257,9 @@ type ConsentConfig struct {
 
 // DefaultCX returns product defaults (§6.12).
 func DefaultCX() CXPolicy {
-	welcomeBarge := true
+	// Welcome is exclusive playout (LIVE_TALK §7): no barge during greeting.
+	welcomeBarge := false
+	localeSynth := true
 	return CXPolicy{
 		BargeIn:          true,
 		ListenWhileSpeak: true,
@@ -271,13 +273,12 @@ func DefaultCX() CXPolicy {
 		MaxTurnFailures:    3,
 		IntentAcceptScore:  0.60,
 		IntentConfirmScore: 0.40,
-		// The caller must be able to cut in over any prompt, including the
-		// greeting — modern IVRs never trap a caller behind their own audio.
 		WelcomeBargeAllowed:    &welcomeBarge,
-		MinBargeChars:          2,
-		MinBargeMs:             220,
-		BargePartialConfidence: 0.60,
-		RTPSettleMs:            500,
+		MinBargeChars:          3,
+		MinBargeMs:             280,
+		BargePartialConfidence: 0.70,
+		RTPSettleMs:            400,
+		LocaleSynthesis:        &localeSynth,
 	}
 }
 
@@ -326,8 +327,29 @@ func (d *Doc) Normalize() {
 	if d.CX.PrimaryLocale == "" {
 		d.CX.PrimaryLocale = d.DefaultLanguage
 	}
+	if d.CX.WelcomeBargeAllowed == nil {
+		welcomeBarge := false
+		d.CX.WelcomeBargeAllowed = &welcomeBarge
+	}
+	if d.CX.LocaleSynthesis == nil {
+		localeSynth := true
+		d.CX.LocaleSynthesis = &localeSynth
+	}
 	if len(d.CX.RuntimeLanguages) == 0 {
-		d.CX.RuntimeLanguages = append([]string(nil), d.Languages...)
+		// Authoring Languages may be English-only; runtime still serves India.
+		d.CX.RuntimeLanguages = append([]string(nil), IndiaDefaultLanguages...)
+	}
+	if d.CX.RTPSettleMs == 0 {
+		d.CX.RTPSettleMs = DefaultCX().RTPSettleMs
+	}
+	if d.CX.MinBargeChars == 0 {
+		d.CX.MinBargeChars = DefaultCX().MinBargeChars
+	}
+	if d.CX.MinBargeMs == 0 {
+		d.CX.MinBargeMs = DefaultCX().MinBargeMs
+	}
+	if d.CX.BargePartialConfidence == 0 {
+		d.CX.BargePartialConfidence = DefaultCX().BargePartialConfidence
 	}
 	if d.Prompts == nil {
 		d.Prompts = map[string]Prompt{}
@@ -459,20 +481,59 @@ func (d *Doc) MatrixFor(intent string) (MatrixRow, bool) {
 // TransferNumberFor resolves the extension/DID to dial for an intent, following
 // the routing matrix. Returns "" when the intent has no transfer number, in
 // which case the caller cannot be blind-transferred.
+//
+// Resolution order:
+//  1. matrix.number (Admin "Extension" column — preferred)
+//  2. matrix.target when it is dialable digits (older drafts that put the
+//     extension in the "Queue" column before Extension existed)
+//  3. another row with the same queue target that has a number
 func (d *Doc) TransferNumberFor(intent, target string) string {
-	if row, ok := d.MatrixFor(intent); ok && strings.TrimSpace(row.Number) != "" {
-		return strings.TrimSpace(row.Number)
+	if row, ok := d.MatrixFor(intent); ok {
+		if n := strings.TrimSpace(row.Number); n != "" {
+			return n
+		}
+		if n := dialableExtension(row.Target); n != "" {
+			return n
+		}
 	}
-	// Fall back to any row that serves the same queue target (e.g. sales_enquiry
-	// and product_information both route to the sales queue).
 	if target != "" {
 		for _, m := range d.Matrix {
-			if m.Target == target && strings.TrimSpace(m.Number) != "" {
-				return strings.TrimSpace(m.Number)
+			if m.Target != target {
+				continue
+			}
+			if n := strings.TrimSpace(m.Number); n != "" {
+				return n
+			}
+			if n := dialableExtension(m.Target); n != "" {
+				return n
 			}
 		}
 	}
 	return ""
+}
+
+// dialableExtension returns s when it looks like a FreeSWITCH dial string
+// (extension / DID), otherwise "". Queue labels like "sales" are rejected.
+func dialableExtension(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	digits := 0
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case r == '+' || r == '*' || r == '#' || r == '-':
+			// allowed in SIP/FS dial strings
+		default:
+			return ""
+		}
+	}
+	if digits == 0 {
+		return ""
+	}
+	return s
 }
 
 // EnabledSkills returns sorted enabled skill names.

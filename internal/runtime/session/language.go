@@ -2,11 +2,37 @@ package session
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 )
 
 const minLanguageConfidence float32 = 0.5
+
+// greetingOnly is normalized forms of pure openers that must not lock language.
+var greetingOnly = map[string]struct{}{
+	"hello": {}, "hi": {}, "hey": {}, "hii": {}, "hlo": {}, "helo": {},
+	"good morning": {}, "good afternoon": {}, "good evening": {},
+	"namaste": {}, "namaskar": {}, "namaskaram": {},
+	"नमस्ते": {}, "नमस्कार": {},
+	"hola": {}, "hai": {},
+}
+
+// IsGreetingOnly reports whether text is only a call opener (no intent content).
+// Used so "Hello" / "Namaste" cannot lock STT/prefs to English on a bilingual desk.
+func IsGreetingOnly(text string) bool {
+	s := strings.ToLower(strings.TrimSpace(text))
+	if s == "" {
+		return false
+	}
+	// Strip common trailing punctuation.
+	s = strings.TrimRightFunc(s, func(r rune) bool {
+		return unicode.IsPunct(r) || unicode.IsSpace(r)
+	})
+	s = strings.Join(strings.Fields(s), " ")
+	_, ok := greetingOnly[s]
+	return ok
+}
 
 // ConfidentListenFinal reports whether a Listen final may lock session language
 // (LANGUAGE_POLICY.md).

@@ -67,12 +67,12 @@ func TestEffectiveRuntimeLanguages(t *testing.T) {
 }
 
 func TestLanguageAllowed(t *testing.T) {
-	d := Doc{Languages: []string{"en-IN", "hi-IN"}}
+	d := Doc{Languages: []string{"en-IN"}, CX: CXPolicy{RuntimeLanguages: []string{"en-IN", "hi-IN"}}}
 	d.Normalize()
 	if !d.LanguageAllowed("hi-IN") {
-		t.Fatal("hi-IN should be allowed")
+		t.Fatal("hi-IN should be allowed via runtime_languages")
 	}
-	if d.LanguageAllowed("ta-IN") {
-		t.Fatal("ta-IN not in coral default runtime allowlist")
+	if d.LanguageAllowed("fr-FR") {
+		t.Fatal("fr-FR must stay outside the India allowlist")
 	}
 }

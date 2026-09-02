@@ -7,6 +7,19 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 )
 
+func TestIsGreetingOnly(t *testing.T) {
+	for _, s := range []string{"Hello", "hi!", "Namaste", "नमस्ते", "good morning"} {
+		if !session.IsGreetingOnly(s) {
+			t.Fatalf("%q should be greeting-only", s)
+		}
+	}
+	for _, s := range []string{"I need technical support", "sales enquiry", "मुझे शिकायत है"} {
+		if session.IsGreetingOnly(s) {
+			t.Fatalf("%q must not be greeting-only", s)
+		}
+	}
+}
+
 func TestLanguageLock_FirstConfidentFinal(t *testing.T) {
 	a := &session.Actor{}
 	locked := a.OnListenFinal(port.ListenFinal{Text: "namaste", Language: "hi-IN", Confidence: 0.9})

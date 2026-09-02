@@ -192,6 +192,7 @@ func (e *Engine) SetLanguage(lang string) {
 	}
 	e.language = lang
 	e.attrs[AttrLanguage] = lang
+	e.languageLocked = true
 }
 
 func (e *Engine) allowedLanguage(lang string) bool {
@@ -238,6 +239,14 @@ func (e *Engine) Welcome() Outcome {
 	return Outcome{Text: text, Tier: TierClip, Language: e.language, Attributes: copyMap(e.attrs)}
 }
 
+// ServicesMenu is the post-welcome capability line. Spoken after welcome completes
+// so STT/barge are armed (welcome itself is non-bargeable).
+func (e *Engine) ServicesMenu() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.prompt(PromptClarify)
+}
+
 // Turn advances the desk with one caller utterance.
 func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 	e.mu.Lock()
@@ -262,10 +271,17 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 		return e.silenceLocked(&out)
 	}
 
-	// Language: explicit request wins, else auto-detect (§17).
-	if req := LanguageSwitchRequest(text, e.doc.Languages); req != "" && req != e.language {
-		e.language = req
-		e.attrs[AttrLanguage] = req
+	// Language hard-lock (call-center rule):
+	//  1) Explicit "speak Hindi/Punjabi/…" request may switch at any time.
+	//  2) First non-switch utterance locks starting language (STT/script detect).
+	//  3) Ambient script drift never flips the call after lock.
+	allow := e.doc.RuntimeAllowlist()
+	if req := LanguageSwitchRequest(text, allow); req != "" {
+		if req != e.language && e.allowedLanguage(req) {
+			e.language = req
+			e.attrs[AttrLanguage] = req
+		}
+		e.languageLocked = true
 		if isBareLanguageRequest(text) {
 			out.Text = e.currentPromptText()
 			if out.Text == "" {
@@ -273,11 +289,13 @@ func (e *Engine) Turn(ctx context.Context, userText string) Outcome {
 			}
 			return e.finish(&out)
 		}
-	} else if det := e.detectLanguage(text); det != "" && det != e.language && e.allowedLanguage(det) {
-		e.language = det
-		e.attrs[AttrLanguage] = det
+	} else if !e.languageLocked {
+		if det := DetectLanguage(text, allow); det != "" && e.allowedLanguage(det) {
+			e.language = det
+			e.attrs[AttrLanguage] = det
+		}
+		e.languageLocked = true
 	}
-	e.languageLocked = true
 
 	if CriticalRequest(text) && e.attrs[AttrPriority] == "" {
 		e.attrs[AttrPriority] = "critical"
@@ -870,20 +888,32 @@ func (e *Engine) runActionLocked(ctx context.Context, step Step, out *Outcome) (
 	if step.Skill == "transfer_to_queue" && status == BranchOK {
 		target, _ := args["target"].(string)
 		owner, _ := args["owner"].(string)
-		e.attrs[AttrTransferTarget] = target
 		number := e.doc.TransferNumberFor(e.attrs[AttrIntent], target)
-		if number != "" {
+		if number == "" {
+			// Screen-pop alone is not a transfer. Without a dialable extension the
+			// path must take the fail/unavailable branch — never transferred_*.
+			status = BranchUnavailable
+			call.Status = status
+			call.Error = "no dialable transfer number in routing matrix"
+			out.SkillOK = false
+			out.SkillCalls[len(out.SkillCalls)-1] = call
+			delete(e.attrs, "transfer_target")
+			delete(e.attrs, "transfer_owner")
+			delete(e.attrs, AttrTransferTarget)
+			delete(e.attrs, AttrTransferNumber)
+		} else {
+			e.attrs[AttrTransferTarget] = target
 			e.attrs[AttrTransferNumber] = number
-		}
-		out.Transfer = &Handoff{
-			Target:     target,
-			Owner:      owner,
-			Number:     number,
-			Priority:   pick(e.attrs[AttrPriority], "normal"),
-			Language:   e.language,
-			Summary:    e.summaryLine(),
-			Attributes: copyMap(e.attrs),
-			TicketID:   e.attrs[AttrTicketID],
+			out.Transfer = &Handoff{
+				Target:     target,
+				Owner:      owner,
+				Number:     number,
+				Priority:   pick(e.attrs[AttrPriority], "normal"),
+				Language:   e.language,
+				Summary:    e.summaryLine(),
+				Attributes: copyMap(e.attrs),
+				TicketID:   e.attrs[AttrTicketID],
+			}
 		}
 	}
 
@@ -937,7 +967,7 @@ func (e *Engine) inferDisposition() string {
 	switch {
 	case e.attrs[AttrTicketID] != "":
 		return DispTicketCreated
-	case e.attrs[AttrTransferTarget] != "":
+	case e.attrs[AttrTransferTarget] != "" && e.attrs[AttrTransferNumber] != "":
 		switch e.attrs[AttrIntent] {
 		case "sales_enquiry", "product_information":
 			return DispTransferredSales

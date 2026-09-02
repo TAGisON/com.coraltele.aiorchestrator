@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/desk"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
@@ -437,6 +438,10 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 	if text == "" {
 		return
 	}
+	if ctrl, ok := r.DeskController(sessionID); ok && ctrl.Engine().Ended() {
+		applog.Info("live listen final ignored (desk ended)", "session", sessionID, "chars", len(text))
+		return
+	}
 	st := talk.State()
 	if st == composer.Thinking || st == composer.Speaking {
 		if !policy.Allowed {
@@ -456,7 +461,15 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
 	// Actor locks language once on the first confident final. Do not flip the desk
 	// engine to every ambient STT language guess (Phase C / #2/#3/#10).
-	if err := talk.OnListenFinal(context.Background(), final); err != nil {
+	// Pure greetings ("Hello" / "Namaste") must not lock or persist preferred
+	// language — they are too weak to choose EN vs HI for an Indian CC desk.
+	var err error
+	if session.IsGreetingOnly(text) {
+		err = talk.InjectFinal(context.Background(), text)
+	} else {
+		err = talk.OnListenFinal(context.Background(), final)
+	}
+	if err != nil {
 		applog.Warn("OnListenFinal", "session", string(talk.Session), "err", err)
 	}
 	if ctrl, ok := r.DeskController(string(talk.Session)); ok && talk.Actor != nil {
@@ -602,6 +615,18 @@ func (r *SessionRuntime) AnswerCall(ctx context.Context, sessionID string) (stri
 	if live {
 		r.sessionMedia(sessionID).completeWelcome()
 		r.armSilenceWatch(sessionID)
+		// Post-welcome services menu: conversing phase, barge + continuous STT on.
+		if ctrl, ok := r.DeskController(sessionID); ok {
+			if menu := strings.TrimSpace(ctrl.Engine().ServicesMenu()); menu != "" {
+				if err := talk.SpeakLine(ctx, menu); err != nil {
+					applog.Warn("post-welcome menu speak", "session", sessionID, "err", err)
+				} else if spoken == "" {
+					spoken = menu
+				} else {
+					spoken = spoken + " " + menu
+				}
+			}
+		}
 		r.drainQueuedFinals(ctx, sessionID, talk)
 	}
 	return spoken, nil
@@ -698,27 +723,13 @@ func (r *SessionRuntime) deskEndHandler(sessionID string) func(string) {
 	}
 }
 
-// initialListenLanguage is the concrete language STT is pinned to at call start.
-// Order: an already-active session language (e.g. a returning caller's saved
-// preference), else the desk's canonical/default locale, else the profile's, and
-// only "" (Sarvam auto-detect) as a last resort when nothing is configured.
+// initialListenLanguage is the Listen LanguageHint at call start.
+// Per LANGUAGE_POLICY: empty until lock (vendor auto-detect), except when a
+// returning caller's preference (or mid-call switch) already set active_language.
+// Desk canonical/default is for prompt lookup and Welcome() — not an STT pin.
 func (r *SessionRuntime) initialListenLanguage(sessionID string, a *session.Actor) string {
 	if a != nil {
 		if l := strings.TrimSpace(a.ActiveLanguage()); l != "" {
-			return l
-		}
-	}
-	if ctrl, ok := r.DeskController(sessionID); ok {
-		doc := ctrl.Engine().Doc()
-		if l := strings.TrimSpace(doc.CanonicalLocale()); l != "" {
-			return l
-		}
-		if l := strings.TrimSpace(doc.DefaultLanguage); l != "" {
-			return l
-		}
-	}
-	if a != nil {
-		if l := strings.TrimSpace(a.Profile.Language.Primary); l != "" {
 			return l
 		}
 	}
@@ -741,19 +752,44 @@ func pickNonEmpty(a, b string) string {
 // edge, and records the disposition; the session ends when the leg leaves.
 func (r *SessionRuntime) deskTransferHandler(sessionID string) func(context.Context, thinkpath.TransferIntent) {
 	return func(ctx context.Context, ti thinkpath.TransferIntent) {
+		// Always resolve dial destination from the live desk matrix for the
+		// current intent — never trust a stale/hardcoded number on the intent.
+		if ctrl, ok := r.DeskController(sessionID); ok {
+			eng := ctrl.Engine()
+			attrs := eng.Attributes()
+			intent := attrs[desk.AttrIntent]
+			target := ti.Target
+			if target == "" {
+				target = attrs[desk.AttrTransferTarget]
+			}
+			doc := eng.Doc()
+			if n := doc.TransferNumberFor(intent, target); n != "" {
+				ti.Number = n
+			}
+			if ti.Owner == "" {
+				if row, ok := doc.MatrixFor(intent); ok {
+					ti.Owner = row.Owner
+					if ti.Target == "" {
+						ti.Target = row.Target
+					}
+				}
+			}
+		}
 		applog.Info("desk transfer requested", "session", sessionID,
 			"number", ti.Number, "owner", ti.Owner, "target", ti.Target)
 		reason := strings.TrimSpace(ti.Reason)
 		if reason == "" {
 			reason = "desk_transfer_" + ti.Target
 		}
+		if strings.TrimSpace(ti.Number) == "" {
+			applog.Error("desk transfer aborted: no dialable number", "session", sessionID, "target", ti.Target)
+			r.FailCall(ctx, sessionID, fallback.ScenarioSystemBusy, fmt.Errorf("no dialable transfer number"))
+			return
+		}
 		if err := r.Transfer(ctx, sessionID, port.TransferRequest{
 			Destination: ti.Number,
 			Reason:      reason,
 		}); err != nil {
-			// The caller has already heard "connecting you now"; a failure here
-			// means the leg did not move. Surface it and fail the call over to the
-			// operator fallback so the caller is not left on a dead leg.
 			applog.Error("desk transfer failed", "session", sessionID,
 				"number", ti.Number, "err", err)
 			r.FailCall(ctx, sessionID, fallback.ScenarioSystemBusy, err)

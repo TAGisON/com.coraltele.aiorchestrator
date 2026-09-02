@@ -1,25 +1,23 @@
 package desk
 
-// Coral Telecom toll-free desk preset — the full TFN script (§1–22) as a desk
-// document: EN + HI prompts, four intents, guided troubleshooting trees,
-// ticket + email actions, routing matrix and call behaviour.
+// Coral Telecom toll-free desk preset — English-authored TFN script as a desk
+// document: canonical EN prompts, India runtime languages via synthesis, four
+// intents, guided troubleshooting trees, ticket + email actions, routing matrix.
 
 // PresetCoralTFN builds the Coral Telecom TFN desk for a tenant.
 func PresetCoralTFN(tenantID string) Doc {
 	d := Doc{
-		SchemaVersion:   SchemaVersion,
-		ID:              "coral-tfn",
-		TenantID:        tenantID,
-		Name:            "Coral Telecom Toll-Free Desk",
-		Direction:       DirectionInbound,
-		Purpose:         "support",
-		// hi-IN first = the canonical authoring locale and the call-center default:
-		// natural Hindi with embedded English product terms (IP Phone, Media
-		// Gateway) — i.e. Hinglish, how Indian support desks actually speak.
-		// English remains available; callers who speak English still get true
-		// multilingual handling (the bot does not force them onto English).
-		Languages:       []string{"hi-IN", "en-IN"},
-		DefaultLanguage: "hi-IN",
+		SchemaVersion: SchemaVersion,
+		ID:            "coral-tfn",
+		TenantID:      tenantID,
+		Name:          "Coral Telecom Toll-Free Desk",
+		Direction:     DirectionInbound,
+		Purpose:       "support",
+		// Canonical authoring locale is English. Callers are served in any allowlisted
+		// Indian language via STT lock + locale synthesis (not duplicated HI tabs).
+		// Author in English only; CX.runtime_languages = India set below.
+		Languages:       []string{"en-IN"},
+		DefaultLanguage: "en-IN",
 		Tone:            "professional",
 		VoiceID:         "priya",
 		Voice:           map[string]string{"sarvam-tts": "priya"},
@@ -35,15 +33,29 @@ func PresetCoralTFN(tenantID string) Doc {
 		Retention: &RetentionOverride{TranscriptDays: 90, AttributesDays: 90, AuditDays: 365, RecordingDays: 30},
 	}
 	d.Normalize()
+	// True multilingual runtime: English assets + India allowlist + synthesis.
+	welcomeBarge := false
+	localeSynth := true
+	d.CX.WelcomeBargeAllowed = &welcomeBarge
+	d.CX.LocaleSynthesis = &localeSynth
+	d.CX.PrimaryLocale = "en-IN"
+	d.CX.RuntimeLanguages = append([]string(nil), IndiaDefaultLanguages...)
+	d.CX.RTPSettleMs = 400
+	d.CX.ListenWhileSpeak = true
+	d.CX.BargeIn = true
+	d.CX.MinBargeChars = 3
+	d.CX.MinBargeMs = 280
+	d.CX.BargePartialConfidence = 0.70
 	return d
 }
 
-func prompt(id, label, en, hi string) Prompt {
+func prompt(id, label, en string) Prompt {
+	// Canonical English only — runtime synthesizes to active_language (LIVE_TALK §6.3).
 	return Prompt{
 		ID:    id,
 		Label: label,
 		Media: "text_tts",
-		Text:  map[string]string{"en-IN": en, "hi-IN": hi},
+		Text:  map[string]string{"en-IN": en},
 	}
 }
 
@@ -52,271 +64,111 @@ func coralPrompts() map[string]Prompt {
 		// A greeting is a greeting — short, warm, and it hands the turn straight
 		// back to the caller. The capability menu and the "English or Hindi" line
 		// live in the clarify prompt, said only if the caller needs steering.
-		prompt(PromptWelcome, "Welcome",
-			"Thank you for calling Coral Telecom. How may I help you today?",
-			"नमस्ते! Coral Telecom में आपका स्वागत है। मैं आपकी कैसे सहायता कर सकती हूँ?"),
-		prompt(PromptClarify, "Clarify menu",
-			"I can help you with Sales Enquiry, Product Information, Technical Support, or Service Complaint. Please tell me what you need help with.",
-			"मैं आपकी Sales Enquiry, Product Information, Technical Support या Service Complaint में मदद कर सकती हूँ। कृपया बताइए आपको किसमें सहायता चाहिए।"),
-		prompt("clarify_2", "Clarify open",
-			"No problem. Please briefly describe what you need help with, and I will direct your call to the right team.",
-			"कोई बात नहीं। कृपया संक्षेप में बताइए आपको किस चीज़ में सहायता चाहिए, मैं आपकी कॉल सही टीम को भेज दूँगी।"),
-		prompt(PromptSilence1, "Silence nudge 1",
-			"Are you still on the call? I am here to help.",
-			"क्या आप अभी भी कॉल पर हैं? मैं आपकी सहायता के लिए यहाँ हूँ।"),
-		prompt(PromptSilence2, "Silence nudge 2",
-			"I can assist you with Sales, Product Information, Technical Support, or Service Complaint. Please tell me what you need.",
-			"मैं Sales, Product Information, Technical Support या Service Complaint में सहायता कर सकती हूँ। कृपया बताइए आपको क्या चाहिए।"),
-		prompt(PromptSilenceGoodbye, "Silence goodbye",
-			"I am unable to hear a response from you. Thank you for calling Coral Telecom Limited. Goodbye.",
-			"मुझे आपकी ओर से कोई उत्तर नहीं मिल रहा है। Coral Telecom Limited को कॉल करने के लिए धन्यवाद। नमस्कार।"),
-		prompt(PromptClosing, "Closing",
-			"Thank you for calling Coral Telecom Limited. We appreciate your call and look forward to serving you. Have a great day. Goodbye.",
-			"Coral Telecom Limited को कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो। नमस्कार।"),
-		prompt(PromptAnythingElse, "Anything else",
-			"Is there anything else I can help you with today?",
-			"क्या मैं आपकी और किसी चीज़ में सहायता कर सकती हूँ?"),
-		prompt(PromptSystemDown, "System down",
-			"I am sorry, I am unable to complete that right now due to a temporary system issue. I can connect you with our team so your issue is addressed.",
-			"क्षमा कीजिए, एक अस्थायी सिस्टम समस्या के कारण मैं अभी यह पूरा नहीं कर पा रही हूँ। मैं आपको हमारी टीम से जोड़ सकती हूँ ताकि आपकी समस्या हल हो सके।"),
-		prompt(PromptHold, "Hold",
-			"Please hold while I transfer your call.",
-			"कृपया लाइन पर बने रहिए, मैं आपकी कॉल ट्रांसफर कर रही हूँ।"),
+		prompt(PromptWelcome, "Welcome", "Thank you for calling Coral Telecom. How may I help you today?"),
+		prompt(PromptClarify, "Clarify menu", "I can help you with Sales Enquiry, Product Information, Technical Support, or Service Complaint. Please tell me what you need help with."),
+		prompt("clarify_2", "Clarify open", "No problem. Please briefly describe what you need help with, and I will direct your call to the right team."),
+		prompt(PromptSilence1, "Silence nudge 1", "Are you still on the call? I am here to help."),
+		prompt(PromptSilence2, "Silence nudge 2", "I can assist you with Sales, Product Information, Technical Support, or Service Complaint. Please tell me what you need."),
+		prompt(PromptSilenceGoodbye, "Silence goodbye", "I am unable to hear a response from you. Thank you for calling Coral Telecom Limited. Goodbye."),
+		prompt(PromptClosing, "Closing", "Thank you for calling Coral Telecom Limited. We appreciate your call and look forward to serving you. Have a great day. Goodbye."),
+		prompt(PromptAnythingElse, "Anything else", "Is there anything else I can help you with today?"),
+		prompt(PromptSystemDown, "System down", "I am sorry, I am unable to complete that right now due to a temporary system issue. I can connect you with our team so your issue is addressed."),
+		prompt(PromptHold, "Hold", "Please hold while I transfer your call."),
 
 		// Sales (§3)
-		prompt("sales_intro", "Sales intro",
-			"Certainly. I understand that you have a sales enquiry. I will connect you with our Sales team. Rahul Gupta will assist you with your requirement.",
-			"ज़रूर। मैं समझ गई कि आपकी Sales Enquiry है। मैं आपको हमारी Sales टीम से जोड़ रही हूँ। Rahul Gupta आपकी सहायता करेंगे।"),
-		prompt("sales_requirement", "Sales requirement",
-			"Could you briefly tell me your requirement, including the product and quantity if known?",
-			"कृपया संक्षेप में अपनी आवश्यकता बताइए, उत्पाद और मात्रा भी बता दीजिए अगर पता हो।"),
-		prompt("sales_unavailable", "Sales unavailable",
-			"Our Sales representative is currently unavailable.",
-			"हमारे Sales प्रतिनिधि इस समय उपलब्ध नहीं हैं।"),
-		prompt("sales_callback_offer", "Sales callback offer",
-			"Would you like me to register your enquiry and arrange a callback?",
-			"क्या मैं आपकी enquiry दर्ज करके callback की व्यवस्था कर दूँ?"),
-		prompt("ask_name", "Ask name",
-			"May I have your name, please?",
-			"कृपया अपना नाम बताइए।"),
-		prompt("ask_email", "Ask email",
-			"Please provide your email address so that we can send you the confirmation details.",
-			"कृपया अपना ईमेल पता बताइए ताकि हम आपको पुष्टि विवरण भेज सकें।"),
-		prompt("sales_registered", "Sales enquiry registered",
-			"Thank you. Your enquiry has been registered with reference number {{enquiry_id}}. Our Sales team will call you back.",
-			"धन्यवाद। आपकी enquiry reference number {{enquiry_id}} के साथ दर्ज कर ली गई है। हमारी Sales टीम आपको कॉल करेगी।"),
-		prompt("sales_no_callback", "Sales no callback",
-			"Understood. You can reach our Sales team any time on this number.",
-			"ठीक है। आप हमारी Sales टीम से इसी नंबर पर कभी भी संपर्क कर सकते हैं।"),
+		prompt("sales_intro", "Sales intro", "Certainly. I understand that you have a sales enquiry. I will connect you with our Sales team. Rahul Gupta will assist you with your requirement."),
+		prompt("sales_requirement", "Sales requirement", "Could you briefly tell me your requirement, including the product and quantity if known?"),
+		prompt("sales_unavailable", "Sales unavailable", "Our Sales representative is currently unavailable."),
+		prompt("sales_callback_offer", "Sales callback offer", "Would you like me to register your enquiry and arrange a callback?"),
+		prompt("ask_name", "Ask name", "May I have your name, please?"),
+		prompt("ask_email", "Ask email", "Please provide your email address so that we can send you the confirmation details."),
+		prompt("sales_registered", "Sales enquiry registered", "Thank you. Your enquiry has been registered with reference number {{enquiry_id}}. Our Sales team will call you back."),
+		prompt("sales_no_callback", "Sales no callback", "Understood. You can reach our Sales team any time on this number."),
 
 		// Product information (§4)
-		prompt("product_which", "Which product",
-			"Certainly. I can help you with information about Coral Telecom products and solutions. Could you please tell me which product or solution you are interested in? For example IP Phones, Media Gateway, Call Server, Call Center, Cloud Box, or VMS.",
-			"ज़रूर। मैं Coral Telecom के उत्पादों और समाधानों की जानकारी दे सकती हूँ। कृपया बताइए आप किस उत्पाद में रुचि रखते हैं? जैसे IP Phone, Media Gateway, Call Server, Call Center, Cloud Box या VMS।"),
-		prompt("product_info_answer", "Product info answer",
-			"{{kb_answer}}",
-			"{{kb_answer}}"),
-		prompt("product_no_info", "Product info unavailable",
-			"I do not have approved details for that product with me right now.",
-			"इस उत्पाद की स्वीकृत जानकारी अभी मेरे पास उपलब्ध नहीं है।"),
-		prompt("product_connect_offer", "Offer sales connect",
-			"For detailed product information, pricing, configuration, or deployment requirements, I can connect you with our Sales team. Would you like me to connect you with Rahul Gupta?",
-			"विस्तृत जानकारी, कीमत, configuration या deployment के लिए मैं आपको हमारी Sales टीम से जोड़ सकती हूँ। क्या मैं आपको Rahul Gupta से जोड़ दूँ?"),
+		prompt("product_which", "Which product", "Certainly. I can help you with information about Coral Telecom products and solutions. Could you please tell me which product or solution you are interested in? For example IP Phones, Media Gateway, Call Server, Call Center, Cloud Box, or VMS."),
+		prompt("product_info_answer", "Product info answer", "{{kb_answer}}"),
+		prompt("product_no_info", "Product info unavailable", "I do not have approved details for that product with me right now."),
+		prompt("product_connect_offer", "Offer sales connect", "For detailed product information, pricing, configuration, or deployment requirements, I can connect you with our Sales team. Would you like me to connect you with Rahul Gupta?"),
 
 		// Technical support (§5)
-		prompt("tech_intro", "Tech intro",
-			"I understand that you require technical support. Before I transfer your call, may I ask a few questions so that our technical team can assist you faster?",
-			"मैं समझ गई कि आपको technical support चाहिए। कॉल ट्रांसफर करने से पहले क्या मैं कुछ प्रश्न पूछ सकती हूँ ताकि हमारी तकनीकी टीम आपकी तेज़ी से सहायता कर सके?"),
-		prompt("tech_q_product", "Tech product",
-			"Which Coral Telecom product or system are you facing the problem with?",
-			"आपको किस Coral Telecom उत्पाद या सिस्टम में समस्या आ रही है?"),
-		prompt("tech_q_problem", "Tech problem",
-			"Could you briefly describe the problem you are experiencing?",
-			"कृपया संक्षेप में बताइए आपको क्या समस्या आ रही है?"),
-		prompt("tech_q_impact", "Tech impact",
-			"Is the issue affecting a single user or device, multiple users, or the entire system?",
-			"क्या यह समस्या केवल एक उपयोगकर्ता को, कई उपयोगकर्ताओं को, या पूरे सिस्टम को प्रभावित कर रही है?"),
-		prompt("tech_q_error", "Tech error",
-			"If you are seeing any error message, alarm, or specific indication, could you please tell me what it says? If not, please say none.",
-			"अगर कोई error message, alarm या संकेत दिख रहा है तो कृपया बताइए। अगर नहीं है तो कहिए none।"),
-		prompt("tech_summary", "Tech summary",
-			"Thank you. Let me summarize. You are facing a problem with {{product}}. The issue is {{problem}}. It is affecting {{impact}}. Is that correct?",
-			"धन्यवाद। मैं सारांश बताती हूँ। आपको {{product}} में समस्या आ रही है। समस्या है {{problem}}। यह {{impact}} को प्रभावित कर रही है। क्या यह सही है?"),
-		prompt("tech_transfer_intro", "Tech transfer intro",
-			"Thank you. I will now connect you with Arjun Singh Topwal and share the information you have provided so you do not have to repeat it. Please hold while I transfer your call.",
-			"धन्यवाद। अब मैं आपको Arjun Singh Topwal से जोड़ रही हूँ और आपकी दी गई जानकारी उन्हें भेज रही हूँ ताकि आपको दोहराना न पड़े। कृपया लाइन पर बने रहिए।"),
-		prompt("tech_unavailable_offer", "Tech unavailable",
-			"Our technical support engineer is not available at this moment. Would you like me to register a service complaint instead?",
-			"हमारे technical support इंजीनियर इस समय उपलब्ध नहीं हैं। क्या मैं इसके बदले service complaint दर्ज कर दूँ?"),
+		prompt("tech_intro", "Tech intro", "I understand that you require technical support. Before I transfer your call, may I ask a few questions so that our technical team can assist you faster?"),
+		prompt("tech_q_product", "Tech product", "Which Coral Telecom product or system are you facing the problem with?"),
+		prompt("tech_q_problem", "Tech problem", "Could you briefly describe the problem you are experiencing?"),
+		prompt("tech_q_impact", "Tech impact", "Is the issue affecting a single user or device, multiple users, or the entire system?"),
+		prompt("tech_q_error", "Tech error", "If you are seeing any error message, alarm, or specific indication, could you please tell me what it says? If not, please say none."),
+		prompt("tech_summary", "Tech summary", "Thank you. Let me summarize. You are facing a problem with {{product}}. The issue is {{problem}}. It is affecting {{impact}}. Is that correct?"),
+		prompt("tech_transfer_intro", "Tech transfer intro", "Thank you. I will now connect you with Arjun Singh Topwal and share the information you have provided so you do not have to repeat it. Please hold while I transfer your call."),
+		prompt("tech_unavailable_offer", "Tech unavailable", "Our technical support engineer is not available at this moment. Would you like me to register a service complaint instead?"),
 
 		// Service complaint (§6)
-		prompt("complaint_intro", "Complaint intro",
-			"I am sorry to hear that you are facing a service issue. I will first understand the problem and try some basic troubleshooting. If the issue is still not resolved, you can speak with our technical support team or register a formal service complaint.",
-			"मुझे खेद है कि आपको सेवा में समस्या आ रही है। पहले मैं समस्या समझती हूँ और कुछ बुनियादी troubleshooting करती हूँ। अगर समस्या फिर भी हल न हो तो आप हमारी technical support टीम से बात कर सकते हैं या औपचारिक service complaint दर्ज करा सकते हैं।"),
-		prompt("complaint_q_product", "Complaint product",
-			"Which Coral Telecom product or service do you need assistance with? IP Phone, Media Gateway, Call Center, Call Server, Cloud Box, VMS, or another product?",
-			"आपको किस Coral Telecom उत्पाद या सेवा में सहायता चाहिए? IP Phone, Media Gateway, Call Center, Call Server, Cloud Box, VMS या कोई अन्य उत्पाद?"),
+		prompt("complaint_intro", "Complaint intro", "I am sorry to hear that you are facing a service issue. I will first understand the problem and try some basic troubleshooting. If the issue is still not resolved, you can speak with our technical support team or register a formal service complaint."),
+		prompt("complaint_q_product", "Complaint product", "Which Coral Telecom product or service do you need assistance with? IP Phone, Media Gateway, Call Center, Call Server, Cloud Box, VMS, or another product?"),
 
 		// IP Phone tree (§6.2)
-		prompt("ipp_l1_power", "IP phone power",
-			"Thank you. You are facing an issue with an IP Phone. Is the phone powered on, and is the display working?",
-			"धन्यवाद। आपको IP Phone में समस्या आ रही है। क्या फोन चालू है और डिस्प्ले काम कर रहा है?"),
-		prompt("ipp_l1_retry", "IP phone power retry",
-			"Please check the power adapter, or the network cable if the phone receives power through PoE. After checking, is the phone powering on now?",
-			"कृपया power adapter जाँचिए, या network cable अगर फोन PoE से पावर लेता है। जाँचने के बाद बताइए, क्या फोन अब चालू हो रहा है?"),
-		prompt("ipp_l2_network", "IP phone network",
-			"Does the phone show a network connection, or does it display any network related error?",
-			"क्या फोन में network connection दिख रहा है, या कोई network से जुड़ी error दिख रही है?"),
-		prompt("ipp_l3_calling", "IP phone calling",
-			"Are you able to make or receive calls from this phone?",
-			"क्या आप इस फोन से कॉल कर या प्राप्त कर पा रहे हैं?"),
-		prompt("ipp_scope", "IP phone scope",
-			"Is the problem affecting only this IP Phone, or are multiple IP Phones experiencing the same issue?",
-			"क्या समस्या केवल इसी IP Phone में है, या कई IP Phones में यही समस्या है?"),
-		prompt("ipp_summary", "IP phone summary",
-			"Based on what you shared, I understand that {{problem}} is occurring on the IP Phone, affecting {{impact}}.",
-			"आपकी दी गई जानकारी के अनुसार, IP Phone में {{problem}} हो रहा है, जो {{impact}} को प्रभावित कर रहा है।"),
+		prompt("ipp_l1_power", "IP phone power", "Thank you. You are facing an issue with an IP Phone. Is the phone powered on, and is the display working?"),
+		prompt("ipp_l1_retry", "IP phone power retry", "Please check the power adapter, or the network cable if the phone receives power through PoE. After checking, is the phone powering on now?"),
+		prompt("ipp_l2_network", "IP phone network", "Does the phone show a network connection, or does it display any network related error?"),
+		prompt("ipp_l3_calling", "IP phone calling", "Are you able to make or receive calls from this phone?"),
+		prompt("ipp_scope", "IP phone scope", "Is the problem affecting only this IP Phone, or are multiple IP Phones experiencing the same issue?"),
+		prompt("ipp_summary", "IP phone summary", "Based on what you shared, I understand that {{problem}} is occurring on the IP Phone, affecting {{impact}}."),
 
 		// Media gateway tree (§6.3)
-		prompt("mg_l1_status", "Gateway status",
-			"Thank you. You are facing an issue with the Media Gateway. Is the gateway powered on, and are the status indicators showing normally?",
-			"धन्यवाद। आपको Media Gateway में समस्या आ रही है। क्या gateway चालू है और status indicators सामान्य दिख रहे हैं?"),
-		prompt("mg_l2_network", "Gateway network",
-			"Is the Media Gateway reachable from the Call Server or the network?",
-			"क्या Media Gateway, Call Server या network से पहुँच में है?"),
-		prompt("mg_l3_service", "Gateway service",
-			"Is the problem related to incoming calls, outgoing calls, or both?",
-			"क्या समस्या incoming calls में है, outgoing calls में है, या दोनों में?"),
-		prompt("mg_extra", "Gateway scope",
-			"Is the problem affecting all calls, or only specific numbers or channels?",
-			"क्या समस्या सभी कॉल्स में है, या केवल कुछ नंबरों या channels में?"),
-		prompt("mg_summary", "Gateway summary",
-			"Thank you. I understand that the Media Gateway is experiencing {{problem}}, affecting {{impact}}.",
-			"धन्यवाद। मैं समझ गई कि Media Gateway में {{problem}} है, जो {{impact}} को प्रभावित कर रहा है।"),
+		prompt("mg_l1_status", "Gateway status", "Thank you. You are facing an issue with the Media Gateway. Is the gateway powered on, and are the status indicators showing normally?"),
+		prompt("mg_l2_network", "Gateway network", "Is the Media Gateway reachable from the Call Server or the network?"),
+		prompt("mg_l3_service", "Gateway service", "Is the problem related to incoming calls, outgoing calls, or both?"),
+		prompt("mg_extra", "Gateway scope", "Is the problem affecting all calls, or only specific numbers or channels?"),
+		prompt("mg_summary", "Gateway summary", "Thank you. I understand that the Media Gateway is experiencing {{problem}}, affecting {{impact}}."),
 
 		// Call center tree (§6.4)
-		prompt("cc_l1_login", "Call center login",
-			"Thank you. You are facing an issue with the Call Center. Are the agents able to log in to the Call Center application?",
-			"धन्यवाद। आपको Call Center में समस्या आ रही है। क्या agents, Call Center application में login कर पा रहे हैं?"),
-		prompt("cc_l2_calls", "Call center calls",
-			"If agents are logged in, are calls reaching the agents?",
-			"अगर agents logged in हैं, तो क्या कॉल agents तक पहुँच रही हैं?"),
-		prompt("cc_l3_scope", "Call center scope",
-			"Is the problem affecting all agents or only a specific agent?",
-			"क्या समस्या सभी agents को प्रभावित कर रही है या केवल किसी एक agent को?"),
-		prompt("cc_extra", "Call center symptom",
-			"Are calls getting disconnected, remaining in the queue, or not reaching the Call Center at all?",
-			"क्या कॉल disconnect हो रही हैं, queue में रह रही हैं, या Call Center तक पहुँच ही नहीं रही हैं?"),
-		prompt("cc_summary", "Call center summary",
-			"Thank you. I understand that the Call Center is experiencing {{problem}}, affecting {{impact}}.",
-			"धन्यवाद। मैं समझ गई कि Call Center में {{problem}} है, जो {{impact}} को प्रभावित कर रहा है।"),
+		prompt("cc_l1_login", "Call center login", "Thank you. You are facing an issue with the Call Center. Are the agents able to log in to the Call Center application?"),
+		prompt("cc_l2_calls", "Call center calls", "If agents are logged in, are calls reaching the agents?"),
+		prompt("cc_l3_scope", "Call center scope", "Is the problem affecting all agents or only a specific agent?"),
+		prompt("cc_extra", "Call center symptom", "Are calls getting disconnected, remaining in the queue, or not reaching the Call Center at all?"),
+		prompt("cc_summary", "Call center summary", "Thank you. I understand that the Call Center is experiencing {{problem}}, affecting {{impact}}."),
 
 		// Call server / cloud box / VMS tree (§6.5)
-		prompt("sys_l1_status", "System status",
-			"Thank you. I will help you troubleshoot. Is the system powered on and is the application or service running normally?",
-			"धन्यवाद। मैं troubleshooting में मदद करती हूँ। क्या सिस्टम चालू है और application या service सामान्य रूप से चल रही है?"),
-		prompt("sys_l2_conn", "System connectivity",
-			"Are users or connected devices able to communicate with the system?",
-			"क्या उपयोगकर्ता या जुड़े हुए devices सिस्टम से संपर्क कर पा रहे हैं?"),
-		prompt("sys_l3_impact", "System impact",
-			"Is this problem affecting a single user, multiple users, or the entire system?",
-			"क्या यह समस्या एक उपयोगकर्ता को, कई उपयोगकर्ताओं को, या पूरे सिस्टम को प्रभावित कर रही है?"),
-		prompt("sys_extra", "System alarm",
-			"Are you seeing any alarm, error message, or service failure indication? If not, please say none.",
-			"क्या कोई alarm, error message या service failure संकेत दिख रहा है? अगर नहीं तो कहिए none।"),
-		prompt("sys_summary", "System summary",
-			"Thank you. I understand that {{product}} is experiencing {{problem}}, affecting {{impact}}.",
-			"धन्यवाद। मैं समझ गई कि {{product}} में {{problem}} है, जो {{impact}} को प्रभावित कर रहा है।"),
+		prompt("sys_l1_status", "System status", "Thank you. I will help you troubleshoot. Is the system powered on and is the application or service running normally?"),
+		prompt("sys_l2_conn", "System connectivity", "Are users or connected devices able to communicate with the system?"),
+		prompt("sys_l3_impact", "System impact", "Is this problem affecting a single user, multiple users, or the entire system?"),
+		prompt("sys_extra", "System alarm", "Are you seeing any alarm, error message, or service failure indication? If not, please say none."),
+		prompt("sys_summary", "System summary", "Thank you. I understand that {{product}} is experiencing {{problem}}, affecting {{impact}}."),
 
 		// Other product (§6.6)
-		prompt("other_describe", "Other product name",
-			"Please tell me the name of the product or service.",
-			"कृपया उत्पाद या सेवा का नाम बताइए।"),
-		prompt("other_q1", "Other problem",
-			"Please briefly describe the issue you are experiencing.",
-			"कृपया संक्षेप में बताइए आपको क्या समस्या आ रही है।"),
-		prompt("other_q2", "Other start",
-			"When did the problem start?",
-			"समस्या कब से शुरू हुई?"),
-		prompt("other_q3", "Other scope",
-			"Is the problem affecting one user or multiple users?",
-			"क्या समस्या एक उपयोगकर्ता को प्रभावित कर रही है या कई उपयोगकर्ताओं को?"),
-		prompt("other_summary", "Other summary",
-			"Thank you. I understand that {{product}} is experiencing {{problem}}, affecting {{impact}}.",
-			"धन्यवाद। मैं समझ गई कि {{product}} में {{problem}} है, जो {{impact}} को प्रभावित कर रहा है।"),
+		prompt("other_describe", "Other product name", "Please tell me the name of the product or service."),
+		prompt("other_q1", "Other problem", "Please briefly describe the issue you are experiencing."),
+		prompt("other_q2", "Other start", "When did the problem start?"),
+		prompt("other_q3", "Other scope", "Is the problem affecting one user or multiple users?"),
+		prompt("other_summary", "Other summary", "Thank you. I understand that {{product}} is experiencing {{problem}}, affecting {{impact}}."),
 
-		prompt("offer_tech_or_complaint", "Offer tech or complaint",
-			"Would you like me to connect you with Arjun Singh Topwal for technical assistance, or would you like to register a service complaint?",
-			"क्या मैं आपको तकनीकी सहायता के लिए Arjun Singh Topwal से जोड़ूँ, या आप service complaint दर्ज कराना चाहेंगे?"),
+		prompt("offer_tech_or_complaint", "Offer tech or complaint", "Would you like me to connect you with Arjun Singh Topwal for technical assistance, or would you like to register a service complaint?"),
 
 		// Complaint registration (§8–§14)
-		prompt("complaint_register_intro", "Complaint register intro",
-			"Certainly. I can register a service complaint for you. Before I create the complaint, I need a few details.",
-			"ज़रूर। मैं आपके लिए service complaint दर्ज कर सकती हूँ। complaint बनाने से पहले मुझे कुछ विवरण चाहिए।"),
-		prompt("email_confirm", "Email confirm",
-			"Let me confirm your email address. I have {{customer_email}}. Is that correct?",
-			"मैं आपका ईमेल पता दोहराती हूँ। मेरे पास {{customer_email}} है। क्या यह सही है?"),
-		prompt("complaint_summary", "Complaint summary",
-			"Let me confirm your complaint details. Customer name {{customer_name}}. Product {{product}}. Problem {{problem}}. Impact {{impact}}. Email {{customer_email}}. Is all this information correct?",
-			"मैं आपकी complaint का विवरण दोहराती हूँ। नाम {{customer_name}}। उत्पाद {{product}}। समस्या {{problem}}। प्रभाव {{impact}}। ईमेल {{customer_email}}। क्या यह सारी जानकारी सही है?"),
-		prompt("complaint_correction_choice", "Correction choice",
-			"Which information would you like to correct? Name, email, or the problem description?",
-			"आप कौन सी जानकारी ठीक कराना चाहेंगे? नाम, ईमेल, या समस्या का विवरण?"),
-		prompt("complaint_fix_problem", "Fix problem",
-			"Please describe the problem again.",
-			"कृपया समस्या फिर से बताइए।"),
-		prompt("ticket_created", "Ticket created",
-			"Thank you. Your service complaint has been successfully registered. Your complaint ticket number is {{ticket_id}}. Please keep this ticket number for future reference.",
-			"धन्यवाद। आपकी service complaint सफलतापूर्वक दर्ज कर ली गई है। आपका complaint ticket number है {{ticket_id}}। कृपया इसे भविष्य के संदर्भ के लिए रखिए।"),
-		prompt("email_sent", "Email sent",
-			"I have also sent the complaint details and ticket number to your email address {{customer_email}}.",
-			"मैंने complaint का विवरण और ticket number आपके ईमेल {{customer_email}} पर भी भेज दिया है।"),
-		prompt("email_failed", "Email failed",
-			"Your complaint has been registered and your ticket number is {{ticket_id}}. However, I was unable to send the confirmation email at this time. Please keep your ticket number for future reference.",
-			"आपकी complaint दर्ज हो चुकी है और आपका ticket number है {{ticket_id}}। लेकिन इस समय मैं पुष्टि ईमेल नहीं भेज पाई। कृपया अपना ticket number सुरक्षित रखिए।"),
-		prompt("ticket_failed", "Ticket failed",
-			"I am sorry, I am currently unable to register the complaint due to a temporary system issue. I have not created any ticket.",
-			"क्षमा कीजिए, एक अस्थायी सिस्टम समस्या के कारण मैं अभी complaint दर्ज नहीं कर पा रही हूँ। मैंने कोई ticket नहीं बनाया है।"),
-		prompt("connect_tech_offer", "Connect tech offer",
-			"I can connect you directly with our technical support team so that your issue is addressed. Would you like me to connect you with Arjun Singh Topwal?",
-			"मैं आपको सीधे हमारी technical support टीम से जोड़ सकती हूँ ताकि आपकी समस्या हल हो सके। क्या मैं आपको Arjun Singh Topwal से जोड़ दूँ?"),
-		prompt("duplicate_found", "Duplicate found",
-			"I found an existing complaint for this issue with ticket number {{existing_ticket_id}}.",
-			"मुझे इस समस्या के लिए एक मौजूदा complaint मिली है, ticket number {{existing_ticket_id}}।"),
-		prompt("duplicate_choice", "Duplicate choice",
-			"Would you like me to connect you with technical support regarding this existing complaint, or would you like to provide additional information?",
-			"क्या मैं आपको इस मौजूदा complaint के लिए technical support से जोड़ूँ, या आप अतिरिक्त जानकारी देना चाहेंगे?"),
-		prompt("duplicate_info", "Duplicate info",
-			"Please tell me the additional information you would like to add to the existing complaint.",
-			"कृपया बताइए आप मौजूदा complaint में कौन सी अतिरिक्त जानकारी जोड़ना चाहते हैं।"),
-		prompt("duplicate_ack", "Duplicate ack",
-			"Thank you. I have added your update to ticket {{existing_ticket_id}}. Our support team will review it.",
-			"धन्यवाद। मैंने आपकी जानकारी ticket {{existing_ticket_id}} में जोड़ दी है। हमारी support टीम इसकी समीक्षा करेगी।"),
+		prompt("complaint_register_intro", "Complaint register intro", "Certainly. I can register a service complaint for you. Before I create the complaint, I need a few details."),
+		prompt("email_confirm", "Email confirm", "Let me confirm your email address. I have {{customer_email}}. Is that correct?"),
+		prompt("complaint_summary", "Complaint summary", "Let me confirm your complaint details. Customer name {{customer_name}}. Product {{product}}. Problem {{problem}}. Impact {{impact}}. Email {{customer_email}}. Is all this information correct?"),
+		prompt("complaint_correction_choice", "Correction choice", "Which information would you like to correct? Name, email, or the problem description?"),
+		prompt("complaint_fix_problem", "Fix problem", "Please describe the problem again."),
+		prompt("ticket_created", "Ticket created", "Thank you. Your service complaint has been successfully registered. Your complaint ticket number is {{ticket_id}}. Please keep this ticket number for future reference."),
+		prompt("email_sent", "Email sent", "I have also sent the complaint details and ticket number to your email address {{customer_email}}."),
+		prompt("email_failed", "Email failed", "Your complaint has been registered and your ticket number is {{ticket_id}}. However, I was unable to send the confirmation email at this time. Please keep your ticket number for future reference."),
+		prompt("ticket_failed", "Ticket failed", "I am sorry, I am currently unable to register the complaint due to a temporary system issue. I have not created any ticket."),
+		prompt("connect_tech_offer", "Connect tech offer", "I can connect you directly with our technical support team so that your issue is addressed. Would you like me to connect you with Arjun Singh Topwal?"),
+		prompt("duplicate_found", "Duplicate found", "I found an existing complaint for this issue with ticket number {{existing_ticket_id}}."),
+		prompt("duplicate_choice", "Duplicate choice", "Would you like me to connect you with technical support regarding this existing complaint, or would you like to provide additional information?"),
+		prompt("duplicate_info", "Duplicate info", "Please tell me the additional information you would like to add to the existing complaint."),
+		prompt("duplicate_ack", "Duplicate ack", "Thank you. I have added your update to ticket {{existing_ticket_id}}. Our support team will review it."),
 
 		// Critical (§15)
-		prompt("critical_ack", "Critical ack",
-			"I understand that this appears to be a critical service issue. I will prioritize this for technical support.",
-			"मैं समझ गई कि यह एक गंभीर सेवा समस्या है। मैं इसे technical support के लिए प्राथमिकता दे रही हूँ।"),
-		prompt("critical_connect_offer", "Critical connect offer",
-			"Would you like me to connect you immediately with Arjun Singh Topwal?",
-			"क्या मैं आपको तुरंत Arjun Singh Topwal से जोड़ दूँ?"),
+		prompt("critical_ack", "Critical ack", "I understand that this appears to be a critical service issue. I will prioritize this for technical support."),
+		prompt("critical_connect_offer", "Critical connect offer", "Would you like me to connect you immediately with Arjun Singh Topwal?"),
 
 		// Transfers (§7, §21)
-		prompt("transfer_sales_intro", "Transfer sales",
-			"Certainly. I will connect you with Rahul Gupta from our Sales team. Please hold while I transfer your call.",
-			"ज़रूर। मैं आपको हमारी Sales टीम के Rahul Gupta से जोड़ रही हूँ। कृपया लाइन पर बने रहिए।"),
-		prompt("transfer_tech_intro", "Transfer tech",
-			"Certainly. I will connect you with Arjun Singh Topwal from our Technical Support team. I will also share the information you have already provided so you do not need to repeat the details. Please hold while I transfer your call.",
-			"ज़रूर। मैं आपको हमारी Technical Support टीम के Arjun Singh Topwal से जोड़ रही हूँ। आपकी दी गई जानकारी भी उन्हें भेज रही हूँ ताकि आपको दोहराना न पड़े। कृपया लाइन पर बने रहिए।"),
-		prompt("transfer_service_intro", "Transfer service",
-			"Certainly. I will connect you with Ritu from our Service team. Please hold while I transfer your call.",
-			"ज़रूर। मैं आपको हमारी Service टीम की Ritu से जोड़ रही हूँ। कृपया लाइन पर बने रहिए।"),
-		prompt("transfer_done", "Transfer done",
-			"You are being connected now. Thank you for calling Coral Telecom Limited.",
-			"आपकी कॉल जोड़ी जा रही है। Coral Telecom Limited को कॉल करने के लिए धन्यवाद।"),
-		prompt("transfer_failed", "Transfer failed",
-			"I am sorry, I could not reach the team right now.",
-			"क्षमा कीजिए, मैं अभी टीम से संपर्क नहीं कर पाई।"),
+		prompt("transfer_sales_intro", "Transfer sales", "Certainly. I will connect you with Rahul Gupta from our Sales team. Please hold while I transfer your call."),
+		prompt("transfer_tech_intro", "Transfer tech", "Certainly. I will connect you with Arjun Singh Topwal from our Technical Support team. I will also share the information you have already provided so you do not need to repeat the details. Please hold while I transfer your call."),
+		prompt("transfer_service_intro", "Transfer service", "Certainly. I will connect you with Ritu from our Service team. Please hold while I transfer your call."),
+		prompt("transfer_done", "Transfer done", "You are being connected now. Thank you for calling Coral Telecom Limited."),
+		prompt("transfer_failed", "Transfer failed", "I am sorry, I could not reach the team right now."),
 	}
 	out := make(map[string]Prompt, len(list))
 	for _, p := range list {
@@ -368,16 +220,14 @@ func coralIntents() []Intent {
 }
 
 func coralMatrix() []MatrixRow {
-	// Number is the extension the caller is blind-transferred to:
-	//   uuid_transfer <call-id> <number> XML calltransfer
-	// These are lab placeholders — set the real queue extensions per deployment
-	// (Admin → desk draft, or PUT the desk doc). Both sales intents route to the
-	// same sales extension, matching how a real ACD fans an intent onto a queue.
+	// Number (Admin → Routing → Extension) is the dial destination for
+	// uuid_transfer. It is NOT hardcoded here — Configurator owns the real
+	// queue/agent extensions. Target stays the ACD queue label.
 	return []MatrixRow{
-		{Intent: "sales_enquiry", Owner: "Rahul Gupta", Target: "sales", Number: "1001", Action: "transfer"},
-		{Intent: "product_information", Owner: "Rahul Gupta", Target: "sales", Number: "1001", Action: "transfer"},
-		{Intent: "technical_support", Owner: "Arjun Singh Topwal", Target: "technical_support", Number: "1002", Action: "transfer"},
-		{Intent: "service_complaint", Owner: "Ritu", Target: "service", Number: "1003", Action: "both"},
+		{Intent: "sales_enquiry", Owner: "Rahul Gupta", Target: "sales", Action: "transfer"},
+		{Intent: "product_information", Owner: "Rahul Gupta", Target: "sales", Action: "transfer"},
+		{Intent: "technical_support", Owner: "Arjun Singh Topwal", Target: "technical_support", Action: "transfer"},
+		{Intent: "service_complaint", Owner: "Ritu", Target: "service", Action: "both"},
 	}
 }
 
