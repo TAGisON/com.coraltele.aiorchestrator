@@ -291,7 +291,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 03 Tool params; 01 routing  
 - **Goal:** intent/target/owner/number storage per published flow version.  
 - **Depends on:** P2.7 Locked.  
-- **Exit:** Entity Locked.
+- **L3 file:** [phases/P2.9_routing_matrix.md](./phases/P2.9_routing_matrix.md) — **Planning Locked** 2026-09-04 (embedded `doc.matrix`; ARM from matrix only).  
+- **Exit:** Entity Locked — **met**.
 
 ### P2.10 — Bindings redesign (knowledge / future CRM)
 
