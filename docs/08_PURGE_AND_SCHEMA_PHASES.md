@@ -251,7 +251,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 04 tool.armed etc.  
 - **Existing:** `audit_event`  
 - **Goal:** Standardize `event_type` vocabulary for V1.  
-- **Exit:** Enum/list Locked.
+- **L3 file:** [phases/P2.4_audit_events.md](./phases/P2.4_audit_events.md) — **Planning Locked** 2026-09-04 (keep table; V1 allowlist + legacy inventory; DDL none).  
+- **Exit:** Enum/list Locked — **met**.
 
 ### P2.5 — Recording metadata
 
