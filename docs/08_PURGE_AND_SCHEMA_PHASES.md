@@ -311,7 +311,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 03 Entry / ListenLanguage  
 - **Existing:** `caller_preference`  
 - **Goal:** Keep/reshape for ANI → language.  
-- **Exit:** Field table Locked.
+- **L3 file:** [phases/P2.11_caller_preference.md](./phases/P2.11_caller_preference.md) — **Planning Locked** 2026-09-04 (keep-as-is; migration **none**).  
+- **Exit:** Field table Locked — **met**.
 
 ### P2.12 — Slots / session attributes
 
