@@ -303,7 +303,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Out:** Shipping a production FAQ product in this phase; porting old chunk schema “as-is.”  
 - **Depends on:** P2.7 Locked; architecture 03 bindings section unchanged or amended first if needed.  
 - **Forbidden:** “Keep kb_* and wire Inform to them for speed.”  
-- **Exit:** New entity(+fields) Locked; retirement note for `kb_*` ready for P2.13.
+- **L3 file:** [phases/P2.10_bindings_redesign.md](./phases/P2.10_bindings_redesign.md) — **Planning Locked** 2026-09-04 (`binding` table; `inline_faq`/`http_retrieve`; kb_* → P2.13 DROP).  
+- **Exit:** New entity(+fields) Locked; retirement note for `kb_*` ready for P2.13 — **met**.
 
 ### P2.11 — Caller language preference
 

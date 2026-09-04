@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.8 **Closed**; P2.9 Planning Locked.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.9 **Closed**; P2.10 Planning Locked.
 
 ## P1 — Purge
 
@@ -28,8 +28,9 @@ Evidence: `.agent/work/P1.*` (local)
 | P2.6 | [P2.6_disposition.md](./P2.6_disposition.md) | **Closed** (`cd81f37`) |
 | P2.7 | [P2.7_flow_publish_model.md](./P2.7_flow_publish_model.md) | **Closed** (`5c6e376`) |
 | P2.8 | [P2.8_prompts_locale.md](./P2.8_prompts_locale.md) | **Closed** (`d76f919`) |
-| P2.9 | [P2.9_routing_matrix.md](./P2.9_routing_matrix.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
-| P2.10–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.9 close |
+| P2.9 | [P2.9_routing_matrix.md](./P2.9_routing_matrix.md) | **Closed** (`b5a1bd9`) |
+| P2.10 | [P2.10_bindings_redesign.md](./P2.10_bindings_redesign.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
+| P2.11–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.10 close |
 
 ## Still later
 
