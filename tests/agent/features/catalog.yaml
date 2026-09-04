@@ -139,20 +139,6 @@ features:
     packages: [./internal/runtime/composer]
     evidence: [barge_in_optional]
 
-  - id: F-live-talk-cx
-    area: B-control
-    status: must_test
-    title: Live talk welcome phase and desk barge policy
-    packages: [./internal/control, ./internal/runtime/composer]
-    evidence: [live_talk_cx]
-
-  - id: F-live-talk-india
-    area: B-desk
-    status: must_test
-    title: WP4 India multilingual locale and classify bridge
-    packages: [./internal/desk, ./internal/runtime/session]
-    evidence: [live_talk_india]
-
   - id: F-runtime-thinkpath
     area: C-runtime
     status: must_test
