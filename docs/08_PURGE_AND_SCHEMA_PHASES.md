@@ -266,7 +266,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 01 V1 local disposition  
 - **Existing:** `session_disposition`  
 - **Goal:** Minimal V1 statuses aligned with tool outcomes (`transferred_*`, `out_of_scope`, …).  
-- **Exit:** Value list Locked.
+- **L3 file:** [phases/P2.6_disposition.md](./phases/P2.6_disposition.md) — **Planning Locked** 2026-09-04 (reuse table; CC codes; DDL none).  
+- **Exit:** Value list Locked — **met**.
 
 ### P2.7 — Flow graph publish model (replaces desk_*)
 
