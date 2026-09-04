@@ -333,7 +333,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 
 - **Refs:** [11_CI_AND_CD.md](./11_CI_AND_CD.md)  
 - **Goal:** Migration numbering, test DB apply, failure policy.  
-- **Exit:** Rules Locked for Implementer; Job B (migrate-empty) expands empty-Postgres CI.
+- **L3 file:** [phases/P2.14_migration_ci.md](./phases/P2.14_migration_ci.md) — **Planning Locked** 2026-09-05 (R1–R7; SoT `internal/store/migrations/`; next N=`010`; Job B / lab checklist).  
+- **Exit:** Rules Locked for Implementer; Job B (migrate-empty) expands empty-Postgres CI — **met** (rules Locked; workflow L4 still later).
 
 ### P2 anti-patterns
 
