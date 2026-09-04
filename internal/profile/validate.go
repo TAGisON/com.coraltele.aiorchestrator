@@ -74,8 +74,9 @@ type Document struct {
 	Analytics struct {
 		Emit []string `json:"emit"`
 	} `json:"analytics"`
-	// XDesk carries the compiled Contact Desk document for desk-driven profiles.
-	// Pinned with the profile version so the runtime needs no second lookup.
+	// XDesk is a legacy profile extension field. Ignored at runtime (P1.8);
+	// present so published docs with x_desk still parse without failing answer.
+	// Do not invent x_flow here (P2.7).
 	XDesk json.RawMessage `json:"x_desk,omitempty"`
 }
 

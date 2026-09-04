@@ -2,158 +2,42 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
-	"strings"
 	"time"
 )
 
-type deskMemory struct {
-	desks     map[string]Desk
-	drafts    map[string]DeskDraft
-	versions  map[string][]DeskVersion
-	attrs     map[string]map[string]SessionAttribute
-	skillSeq  int64
-	skills    []SkillInvocation
-	piiSeq    int64
-	pii       []PIIAccess
-	erasures  map[string]ErasureRequest
-	consents  map[string]ConsentRecord
-	prefs     map[string]CallerPreference
+// sessionAuxMemory holds session-adjacent durable maps (attrs, skills, prefs).
+// Not Contact Desk registry/draft/version storage (removed in P1.8).
+type sessionAuxMemory struct {
+	attrs    map[string]map[string]SessionAttribute
+	skillSeq int64
+	skills   []SkillInvocation
+	piiSeq   int64
+	pii      []PIIAccess
+	erasures map[string]ErasureRequest
+	consents map[string]ConsentRecord
+	prefs    map[string]CallerPreference
 }
 
-func (m *Memory) deskState() *deskMemory {
-	if m.desk == nil {
-		m.desk = &deskMemory{
-			desks:    map[string]Desk{},
-			drafts:   map[string]DeskDraft{},
-			versions: map[string][]DeskVersion{},
+func (m *Memory) sessionAux() *sessionAuxMemory {
+	if m.aux == nil {
+		m.aux = &sessionAuxMemory{
 			attrs:    map[string]map[string]SessionAttribute{},
 			erasures: map[string]ErasureRequest{},
 			consents: map[string]ConsentRecord{},
 			prefs:    map[string]CallerPreference{},
 		}
 	}
-	if m.desk.prefs == nil {
-		m.desk.prefs = map[string]CallerPreference{}
+	if m.aux.prefs == nil {
+		m.aux.prefs = map[string]CallerPreference{}
 	}
-	return m.desk
-}
-
-func (m *Memory) UpsertDesk(ctx context.Context, d Desk) (Desk, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	st := m.deskState()
-	now := time.Now().UTC()
-	prev, exists := st.desks[d.ID]
-	if exists {
-		d.CreatedAt = prev.CreatedAt
-		if d.CurrentVersion < prev.CurrentVersion {
-			d.CurrentVersion = prev.CurrentVersion
-		}
-		if d.ProfileID == "" {
-			d.ProfileID = prev.ProfileID
-		}
-	} else {
-		d.CreatedAt = now
-	}
-	d.UpdatedAt = now
-	st.desks[d.ID] = d
-	return d, nil
-}
-
-func (m *Memory) GetDesk(ctx context.Context, id string) (Desk, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	d, ok := m.deskState().desks[id]
-	if !ok {
-		return Desk{}, ErrNotFound
-	}
-	return d, nil
-}
-
-func (m *Memory) ListDesks(ctx context.Context, tenantID string) ([]Desk, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var out []Desk
-	for _, d := range m.deskState().desks {
-		if tenantID == "" || d.TenantID == tenantID {
-			out = append(out, d)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, nil
-}
-
-func (m *Memory) SaveDeskDraft(ctx context.Context, deskID string, doc json.RawMessage) (DeskDraft, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	st := m.deskState()
-	if _, ok := st.desks[deskID]; !ok {
-		return DeskDraft{}, ErrNotFound
-	}
-	d := DeskDraft{DeskID: deskID, Doc: append(json.RawMessage(nil), doc...), UpdatedAt: time.Now().UTC()}
-	st.drafts[deskID] = d
-	return d, nil
-}
-
-func (m *Memory) GetDeskDraft(ctx context.Context, deskID string) (DeskDraft, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	d, ok := m.deskState().drafts[deskID]
-	if !ok {
-		return DeskDraft{}, ErrNotFound
-	}
-	return d, nil
-}
-
-func (m *Memory) PublishDeskVersion(ctx context.Context, v DeskVersion) (DeskVersion, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	st := m.deskState()
-	d, ok := st.desks[v.DeskID]
-	if !ok {
-		return DeskVersion{}, ErrNotFound
-	}
-	v.Version = len(st.versions[v.DeskID]) + 1
-	v.Doc = append(json.RawMessage(nil), v.Doc...)
-	v.PublishedAt = time.Now().UTC()
-	st.versions[v.DeskID] = append(st.versions[v.DeskID], v)
-	d.CurrentVersion = v.Version
-	d.Status = DeskStatusPublished
-	if v.ProfileID != "" {
-		d.ProfileID = v.ProfileID
-	}
-	d.UpdatedAt = v.PublishedAt
-	st.desks[v.DeskID] = d
-	return v, nil
-}
-
-func (m *Memory) GetDeskVersion(ctx context.Context, deskID string, version int) (DeskVersion, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, v := range m.deskState().versions[deskID] {
-		if v.Version == version {
-			return v, nil
-		}
-	}
-	return DeskVersion{}, ErrNotFound
-}
-
-func (m *Memory) ListDeskVersions(ctx context.Context, deskID string) ([]DeskVersion, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	list := m.deskState().versions[deskID]
-	out := make([]DeskVersion, len(list))
-	copy(out, list)
-	sort.Slice(out, func(i, j int) bool { return out[i].Version > out[j].Version })
-	return out, nil
+	return m.aux
 }
 
 func (m *Memory) UpsertSessionAttributes(ctx context.Context, sessionID string, attrs []SessionAttribute) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := m.deskState()
+	st := m.sessionAux()
 	cur, ok := st.attrs[sessionID]
 	if !ok {
 		cur = map[string]SessionAttribute{}
@@ -171,7 +55,7 @@ func (m *Memory) UpsertSessionAttributes(ctx context.Context, sessionID string, 
 func (m *Memory) ListSessionAttributes(ctx context.Context, sessionID string) ([]SessionAttribute, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cur := m.deskState().attrs[sessionID]
+	cur := m.sessionAux().attrs[sessionID]
 	out := make([]SessionAttribute, 0, len(cur))
 	for _, a := range cur {
 		out = append(out, a)
@@ -183,7 +67,7 @@ func (m *Memory) ListSessionAttributes(ctx context.Context, sessionID string) ([
 func (m *Memory) AppendSkillInvocation(ctx context.Context, inv SkillInvocation) (SkillInvocation, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := m.deskState()
+	st := m.sessionAux()
 	if inv.IdempotencyKey != "" {
 		for _, e := range st.skills {
 			if e.IdempotencyKey == inv.IdempotencyKey {
@@ -202,7 +86,7 @@ func (m *Memory) ListSkillInvocations(ctx context.Context, sessionID string) ([]
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []SkillInvocation
-	for _, e := range m.deskState().skills {
+	for _, e := range m.sessionAux().skills {
 		if e.SessionID == sessionID {
 			out = append(out, e)
 		}
@@ -213,7 +97,7 @@ func (m *Memory) ListSkillInvocations(ctx context.Context, sessionID string) ([]
 func (m *Memory) AppendPIIAccess(ctx context.Context, ev PIIAccess) (PIIAccess, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := m.deskState()
+	st := m.sessionAux()
 	st.piiSeq++
 	ev.ID = st.piiSeq
 	ev.CreatedAt = time.Now().UTC()
@@ -228,7 +112,7 @@ func (m *Memory) ListPIIAccess(ctx context.Context, sessionID string, limit int)
 		limit = 100
 	}
 	var out []PIIAccess
-	list := m.deskState().pii
+	list := m.sessionAux().pii
 	for i := len(list) - 1; i >= 0 && len(out) < limit; i-- {
 		if sessionID == "" || list[i].SessionID == sessionID {
 			out = append(out, list[i])
@@ -244,7 +128,7 @@ func (m *Memory) CreateErasureRequest(ctx context.Context, r ErasureRequest) (Er
 	if r.Status == "" {
 		r.Status = "queued"
 	}
-	m.deskState().erasures[r.ID] = r
+	m.sessionAux().erasures[r.ID] = r
 	return r, nil
 }
 
@@ -252,7 +136,7 @@ func (m *Memory) ListErasureRequests(ctx context.Context, tenantID string) ([]Er
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []ErasureRequest
-	for _, r := range m.deskState().erasures {
+	for _, r := range m.sessionAux().erasures {
 		if tenantID == "" || r.TenantID == tenantID {
 			out = append(out, r)
 		}
@@ -264,7 +148,7 @@ func (m *Memory) ListErasureRequests(ctx context.Context, tenantID string) ([]Er
 func (m *Memory) CompleteErasureRequest(ctx context.Context, id string) (ErasureRequest, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := m.deskState()
+	st := m.sessionAux()
 	r, ok := st.erasures[id]
 	if !ok {
 		return ErasureRequest{}, ErrNotFound
@@ -280,14 +164,14 @@ func (m *Memory) UpsertConsent(ctx context.Context, c ConsentRecord) (ConsentRec
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	c.UpdatedAt = time.Now().UTC()
-	m.deskState().consents[c.TenantID+"\x00"+c.Phone] = c
+	m.sessionAux().consents[c.TenantID+"\x00"+c.Phone] = c
 	return c, nil
 }
 
 func (m *Memory) GetConsent(ctx context.Context, tenantID, phone string) (ConsentRecord, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c, ok := m.deskState().consents[tenantID+"\x00"+phone]
+	c, ok := m.sessionAux().consents[tenantID+"\x00"+phone]
 	if !ok {
 		return ConsentRecord{}, ErrNotFound
 	}
@@ -298,14 +182,14 @@ func (m *Memory) UpsertCallerPreference(ctx context.Context, p CallerPreference)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p.UpdatedAt = time.Now().UTC()
-	m.deskState().prefs[p.TenantID+"\x00"+p.ANI] = p
+	m.sessionAux().prefs[p.TenantID+"\x00"+p.ANI] = p
 	return p, nil
 }
 
 func (m *Memory) GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	p, ok := m.deskState().prefs[tenantID+"\x00"+ani]
+	p, ok := m.sessionAux().prefs[tenantID+"\x00"+ani]
 	if !ok {
 		return CallerPreference{}, ErrNotFound
 	}
@@ -331,7 +215,7 @@ func (m *Memory) CountActiveSessions(ctx context.Context, tenantID string) (int,
 func (m *Memory) PurgeSessionData(ctx context.Context, sessionID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := m.deskState()
+	st := m.sessionAux()
 	delete(st.attrs, sessionID)
 	delete(m.transcripts, sessionID)
 	kept := st.skills[:0]
@@ -343,5 +227,3 @@ func (m *Memory) PurgeSessionData(ctx context.Context, sessionID string) error {
 	st.skills = kept
 	return nil
 }
-
-var _ = strings.TrimSpace
