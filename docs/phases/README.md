@@ -39,7 +39,7 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| M-A | [M-A_create_flow.md](./M-A_create_flow.md) | **Closed** — `010_flow_registry.sql` |
+| M-A | [M-A_create_flow.md](./M-A_create_flow.md) | **Closed** (`78f57f7`) — `010_flow_registry.sql` |
 | M-B…M-H | per [P2.13](./P2.13_drop_obsolete.md) / [P2.14](./P2.14_migration_ci.md) | Not started |
 
 ## Still later
