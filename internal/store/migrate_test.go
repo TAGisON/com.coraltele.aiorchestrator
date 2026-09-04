@@ -156,6 +156,23 @@ func TestMigrationSQL_HasBinding(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasSessionFlowPin(t *testing.T) {
+	body, err := os.ReadFile("migrations/012_session_flow_pin.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "flow_id") || !strings.Contains(s, "flow_version") {
+		t.Fatal("migration missing flow_id/flow_version")
+	}
+	if strings.Contains(s, "recording_started_at") || strings.Contains(s, "recording_stopped_at") {
+		t.Fatal("M-C must not add recording cols (M-Cr)")
+	}
+	if strings.Contains(s, "DROP TABLE") {
+		t.Fatal("M-C must not DROP")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
