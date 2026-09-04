@@ -1,36 +1,27 @@
-# Speech-and-Agent Platform — agent notes
+# LLM Call Centre — agent notes
 
 ## Source of truth
 
-1. `docs/product/PRODUCT_DECISIONS.md` — product  
-2. `docs/SOLUTION.md` + `docs/architecture/*` — architecture  
-3. `docs/architecture/PLATFORM_FIRST.md` — build order  
-4. `docs/architecture/PORTS.md` — Go port freeze  
-5. `.agent/phases/*.yaml` — executable phase exit criteria  
+Read in order under `docs/`:
 
-## Agentic pipelines
+1. `docs/README.md` — index  
+2. `docs/01_VISION_AND_SCOPE.md` — V1 scope  
+3. `docs/02_CURRENT_STATE.md` — keep vs rebuild  
+4. `docs/03_BRAIN_AND_GRAPH.md` — graph brain (**locked**)  
+5. `docs/04_LIVE_TURN_MACHINE.md` — live states (**locked**)  
+6. `docs/05_MEDIA_AND_VENDORS.md` — STT/LLM/TTS  
+7. `docs/06_APPLICATION_FLOW.md` — **whole-application flowcharts**
 
-| Pipeline | Guide | Roles |
-|---|---|---|
-| `coral-phase` | `docs/AGENT_PIPELINE.md` | planner → coder → reviewer → summarizer |
-| `contact-agent-cc` | `docs/AGENT_PIPELINE.md` | planner → coder → reviewer → summarizer (CC vertical: tenant engines → language → voice → ladder → transcript → lab) |
-| `product-validation` | `docs/VALIDATION_PIPELINE.md` | scenario-planner → fixture-builder → test-runner → audit-validator → test-reviewer → test-summarizer |
-
-CLI: `tools/agent-runner/agent.ps1`  
-Defs: `.agent/pipelines/*.json`  
-Universal QA contract: `tests/agent/` (FEATURES + scenarios)  
-Evidence / summaries: sibling worktree `com.coraltele.aiorchestrator-validation-evidence` (branch `validation-evidence`)  
-Handoff via `.agent/work/<phase>/` + `# agent-approval`; trails archived out of this repo after each feature.  
-Validation pauses after each feature (`next-feature` to continue).
-
-## Lab
-
-Postgres DB `aiorchestrator` + consoles: `docs/LAB.md`  
-→ http://127.0.0.1:8011/ (Admin / Supervisor / User)
+Older product/architecture docs were removed on branch `docs/llm-callcentre-architecture`. Do not resurrect caption/translator/meeting platform scope into this programme.
 
 ## Hard rules
 
 - Go kernel; no Python/Java media kernel  
-- No Kafka/Redis for PCM  
-- No vendor SDKs in composer; fakes before Next AI  
+- No Kafka/Redis for live PCM  
+- Vendors behind ports/gateways; FS mod is dumb PCM pipe  
 - Never commit `.agent/secrets.local.json`  
+- Graph is law; LLM only allowlisted edges; tools arm→speak→exec  
+
+## Lab
+
+Orchestrator control UI typically http://127.0.0.1:8011/ when running.
