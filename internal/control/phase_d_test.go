@@ -42,35 +42,19 @@ func registerPhaseD(t *testing.T, reg *router.MemRegistry, repo store.Repository
 	}
 }
 
-func TestKB_UploadAndRetrieve(t *testing.T) {
+func TestKB_IndexLocalRetrieve(t *testing.T) {
 	reg := router.NewMemRegistry()
 	mem := store.NewMemory()
 	seedFakeTenantEngines(t, mem)
 	registerPhaseD(t, reg, mem)
-	srv := control.New(mem, reg, control.Config{})
-
-	rr := httptest.NewRecorder()
-	body := `{"collection":"faq","text":"Password reset requires identity verification.\n\nBilling cycles are monthly."}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/kb/documents", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("upload %d %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]any
-	_ = json.Unmarshal(rr.Body.Bytes(), &created)
-	if created["status"] != store.KBReady {
-		t.Fatalf("status %v", created["status"])
-	}
-	id := created["id"].(string)
-
-	rr = httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/kb/documents/"+id, nil))
-	if rr.Code != http.StatusOK {
-		t.Fatalf("get %d", rr.Code)
-	}
 
 	g := ingest.New(mem)
+	g.IndexLocal(store.KBChunk{
+		DocumentID: "local-1",
+		Collection: "faq",
+		Text:       "Password reset requires identity verification.",
+		Ordinal:    0,
+	})
 	res, err := g.Retrieve(context.Background(), port.KnowledgeQuery{
 		Query: "password reset", Collections: []string{"faq"}, TopK: 3,
 	})

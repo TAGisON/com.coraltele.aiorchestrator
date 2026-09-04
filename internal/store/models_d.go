@@ -4,26 +4,8 @@ import (
 	"time"
 )
 
-// KB document indexing states (CONTROL_API §5).
-const (
-	KBIndexing = "indexing"
-	KBReady    = "ready"
-	KBFailed   = "failed"
-)
-
-// KBDocument is an uploaded knowledge document.
-type KBDocument struct {
-	ID           string
-	TenantID     string
-	Collection   string
-	URI          string
-	Status       string
-	ErrorMessage string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-// KBChunk is one indexed text chunk.
+// KBChunk is an in-process knowledge snippet for lab ingest IndexLocal overlays.
+// Durable kb_document / kb_chunk tables are retired (M-E / OD-08-4); DROP in M-G.
 type KBChunk struct {
 	ID         int64
 	DocumentID string

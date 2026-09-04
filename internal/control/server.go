@@ -157,8 +157,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/sessions/{id}/disposition", s.handlePatchDisposition)
 	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
-	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
-	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
 	s.mountUIRoutes(s.uiFS)
 }
 

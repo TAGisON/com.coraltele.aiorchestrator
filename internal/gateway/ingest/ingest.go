@@ -108,18 +108,12 @@ func (g *Gateway) Retrieve(ctx context.Context, q port.KnowledgeQuery) (port.Kno
 }
 
 func (g *Gateway) load(ctx context.Context, q port.KnowledgeQuery) ([]store.KBChunk, error) {
+	_ = ctx
 	g.mu.RLock()
 	local := append([]store.KBChunk(nil), g.local...)
 	g.mu.RUnlock()
-	if g.repo == nil {
-		return filterCollections(local, q.Collections), nil
-	}
-	chunks, err := g.repo.ListKBChunks(ctx, "", q.Collections)
-	if err != nil {
-		return nil, &port.GatewayError{Code: port.CodeInternal, Message: err.Error(), Cause: err}
-	}
-	chunks = append(chunks, filterCollections(local, q.Collections)...)
-	return chunks, nil
+	// Durable kb_* store retired (M-E / OD-08-4). Lab/tests use IndexLocal only until binding Inform lands.
+	return filterCollections(local, q.Collections), nil
 }
 
 func filterCollections(chunks []store.KBChunk, collections []string) []store.KBChunk {

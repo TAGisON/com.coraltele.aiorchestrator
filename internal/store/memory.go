@@ -17,8 +17,6 @@ type Memory struct {
 	engines       map[string]TenantEngines
 	creds         map[string]GatewayCredential // tenantID\x00gatewayID
 	settings      map[string]SystemSetting     // tenantID\x00key
-	kbDocs        map[string]KBDocument
-	kbChunks      map[string][]KBChunk // document_id → chunks
 	playJobs      map[string]PlaybackJob
 	auditSeq      int64
 	audits        []AuditEvent
@@ -40,8 +38,6 @@ func NewMemory() *Memory {
 		engines:      make(map[string]TenantEngines),
 		creds:        make(map[string]GatewayCredential),
 		settings:     make(map[string]SystemSetting),
-		kbDocs:       make(map[string]KBDocument),
-		kbChunks:     make(map[string][]KBChunk),
 		playJobs:     make(map[string]PlaybackJob),
 		postJobs:     make(map[string]PostcallJob),
 		transcripts:  make(map[string][]TranscriptTurn),
@@ -299,79 +295,6 @@ func (m *Memory) ListSystemSettings(ctx context.Context, tenantID string) ([]Sys
 	for _, st := range m.settings {
 		if st.TenantID == tenantID {
 			out = append(out, st)
-		}
-	}
-	return out, nil
-}
-
-func (m *Memory) CreateKBDocument(ctx context.Context, doc KBDocument) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.kbDocs[doc.ID]; ok {
-		return ErrConflict
-	}
-	now := time.Now().UTC()
-	doc.CreatedAt = now
-	doc.UpdatedAt = now
-	m.kbDocs[doc.ID] = doc
-	return nil
-}
-
-func (m *Memory) GetKBDocument(ctx context.Context, id string) (KBDocument, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	d, ok := m.kbDocs[id]
-	if !ok {
-		return KBDocument{}, ErrNotFound
-	}
-	return d, nil
-}
-
-func (m *Memory) UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	d, ok := m.kbDocs[id]
-	if !ok {
-		return KBDocument{}, ErrNotFound
-	}
-	d.Status = status
-	d.ErrorMessage = errMsg
-	d.UpdatedAt = time.Now().UTC()
-	m.kbDocs[id] = d
-	return d, nil
-}
-
-func (m *Memory) ReplaceKBChunks(ctx context.Context, documentID string, chunks []KBChunk) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.kbDocs[documentID]; !ok {
-		return ErrNotFound
-	}
-	cp := make([]KBChunk, len(chunks))
-	copy(cp, chunks)
-	m.kbChunks[documentID] = cp
-	return nil
-}
-
-func (m *Memory) ListKBChunks(ctx context.Context, tenantID string, collections []string) ([]KBChunk, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	allow := map[string]struct{}{}
-	for _, c := range collections {
-		allow[c] = struct{}{}
-	}
-	var out []KBChunk
-	for _, chunks := range m.kbChunks {
-		for _, ch := range chunks {
-			if tenantID != "" && ch.TenantID != "" && ch.TenantID != tenantID {
-				continue
-			}
-			if len(allow) > 0 {
-				if _, ok := allow[ch.Collection]; !ok {
-					continue
-				}
-			}
-			out = append(out, ch)
 		}
 	}
 	return out, nil

@@ -33,12 +33,6 @@ type Repository interface {
 	UpsertSystemSetting(ctx context.Context, st SystemSetting) (SystemSetting, error)
 	ListSystemSettings(ctx context.Context, tenantID string) ([]SystemSetting, error)
 
-	CreateKBDocument(ctx context.Context, doc KBDocument) error
-	GetKBDocument(ctx context.Context, id string) (KBDocument, error)
-	UpdateKBDocumentStatus(ctx context.Context, id, status, errMsg string) (KBDocument, error)
-	ReplaceKBChunks(ctx context.Context, documentID string, chunks []KBChunk) error
-	ListKBChunks(ctx context.Context, tenantID string, collections []string) ([]KBChunk, error)
-
 	CreatePlaybackJob(ctx context.Context, job PlaybackJob) error
 	GetPlaybackJob(ctx context.Context, id string) (PlaybackJob, error)
 	UpdatePlaybackJob(ctx context.Context, job PlaybackJob) error
@@ -61,16 +55,6 @@ type Repository interface {
 
 	UpsertSessionAttributes(ctx context.Context, sessionID string, attrs []SessionAttribute) error
 	ListSessionAttributes(ctx context.Context, sessionID string) ([]SessionAttribute, error)
-	AppendSkillInvocation(ctx context.Context, inv SkillInvocation) (SkillInvocation, error)
-	ListSkillInvocations(ctx context.Context, sessionID string) ([]SkillInvocation, error)
-
-	AppendPIIAccess(ctx context.Context, ev PIIAccess) (PIIAccess, error)
-	ListPIIAccess(ctx context.Context, sessionID string, limit int) ([]PIIAccess, error)
-	CreateErasureRequest(ctx context.Context, r ErasureRequest) (ErasureRequest, error)
-	ListErasureRequests(ctx context.Context, tenantID string) ([]ErasureRequest, error)
-	CompleteErasureRequest(ctx context.Context, id string) (ErasureRequest, error)
-	UpsertConsent(ctx context.Context, c ConsentRecord) (ConsentRecord, error)
-	GetConsent(ctx context.Context, tenantID, phone string) (ConsentRecord, error)
 
 	UpsertCallerPreference(ctx context.Context, p CallerPreference) (CallerPreference, error)
 	GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error)
