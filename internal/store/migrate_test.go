@@ -265,6 +265,25 @@ func TestMigrationSQL_HasDropKB(t *testing.T) {
 	}
 }
 
+
+func TestMigrationSQL_HasDropCompliance(t *testing.T) {
+	body, err := os.ReadFile("migrations/017_drop_compliance.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, table := range []string{"skill_invocation", "pii_access_audit", "erasure_request", "consent_record"} {
+		if !strings.Contains(s, "DROP TABLE IF EXISTS "+table) {
+			t.Fatalf("migration missing DROP %s", table)
+		}
+	}
+	for _, banned := range []string{"desk_version", "desk_draft", "desk", "kb_chunk", "kb_document"} {
+		if strings.Contains(s, "DROP TABLE IF EXISTS "+banned) {
+			t.Fatalf("M-H must not DROP %s", banned)
+		}
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
