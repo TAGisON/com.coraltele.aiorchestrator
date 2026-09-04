@@ -86,20 +86,6 @@ type Talk struct {
 	Obs *observe.Observer
 	// ProfileVersion pinned at session create (for turn payload / Obs meta).
 	ProfileVersion int
-	// OnDeskHangupArm arms edge hangup (with drain) before the closing line is
-	// spoken, so a later WebSocket teardown cannot skip the control verb.
-	OnDeskHangupArm func(disposition string)
-
-	// OnDeskEnd fires when a Contact Desk guided path ends the call (after the
-	// closing line is spoken). Control waits for the armed hangup to settle, then
-	// stops the session. Prefer OnDeskHangupArm before Speak for hangup paths.
-	OnDeskEnd func(disposition string)
-
-	// OnDeskTransfer fires when a guided path blind-transfers the caller after the
-	// connect line. Still fires if the caller barged that TTS — dialable destination
-	// was already decided. When set and a transfer is due, OnDeskEnd is NOT fired for
-	// that turn — the leg leaving ends the session on its own.
-	OnDeskTransfer func(ctx context.Context, t thinkpath.TransferIntent)
 
 	// RecordAgent receives every canonical Speak frame that reaches the edge, so
 	// the call recorder captures the agent leg exactly as it was played out.
@@ -145,8 +131,8 @@ func (t *Talk) LastSpokenText() string {
 	return t.lastSpokenText
 }
 
-// ConfigureBarge sets the local energy-VAD barge policy (called by control from
-// the desk CX). minSpeech is how long sustained caller speech must last before
+// ConfigureBarge sets the local energy-VAD barge policy (called by control).
+// minSpeech is how long sustained caller speech must last before
 // it counts as a barge; <=0 keeps the default.
 func (t *Talk) ConfigureBarge(enabled bool, minSpeech time.Duration) {
 	t.mu.Lock()
@@ -370,22 +356,15 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	t.mu.Unlock()
 
 	var parts []string
-	if t.Path != nil && t.Path.Desk != nil {
-		if text, ok := t.Path.Desk.Welcome(); ok && strings.TrimSpace(text) != "" {
-			parts = append(parts, strings.TrimSpace(text))
-		}
-	}
-	if len(parts) == 0 {
-		for _, rule := range t.Doc.Rules {
-			if rule.Phase == "pre_speak_first" && rule.Action == "inject_text" {
-				if s := strings.TrimSpace(rule.Text); s != "" {
-					parts = append(parts, s)
-				}
+	for _, rule := range t.Doc.Rules {
+		if rule.Phase == "pre_speak_first" && rule.Action == "inject_text" {
+			if s := strings.TrimSpace(rule.Text); s != "" {
+				parts = append(parts, s)
 			}
 		}
-		if g := openingGreeting(t.Doc); g != "" {
-			parts = append(parts, g)
-		}
+	}
+	if g := openingGreeting(t.Doc); g != "" {
+		parts = append(parts, g)
 	}
 	spoken = strings.TrimSpace(strings.Join(parts, " "))
 	if spoken == "" {
@@ -479,23 +458,7 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	if res.ResponseText == "" {
 		t.setState(Listening)
 		t.emitTurn(ctx, userText, "", res, false, res.Action, started)
-		// Empty closing line still needs hangup/transfer when the desk decided.
-		switch {
-		case res.DeskTransfer != nil && t.OnDeskTransfer != nil:
-			ti := *res.DeskTransfer
-			go t.OnDeskTransfer(context.WithoutCancel(ctx), ti)
-		case res.DeskEnd && t.OnDeskEnd != nil:
-			if t.OnDeskHangupArm != nil {
-				t.OnDeskHangupArm(res.Disposition)
-			}
-			go t.OnDeskEnd(res.Disposition)
-		}
 		return nil
-	}
-	// Hangup must be armed before Speak: WaitMark can return because the WS died,
-	// and an async OnDeskEnd then finds no CallControl. Transfer never arms hangup.
-	if res.DeskTransfer == nil && res.DeskEnd && t.OnDeskHangupArm != nil {
-		t.OnDeskHangupArm(res.Disposition)
 	}
 	err = t.speak(ctx, res.ResponseText)
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -513,16 +476,6 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.lastActivity = time.Now()
 	t.mu.Unlock()
 	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
-	// A transfer moves the leg away; do not also stop the session for this turn.
-	// The connect line has now been spoken (or barge cut it short). If a dialable
-	// destination was already decided, still transfer — barge must not drop the handoff.
-	switch {
-	case res.DeskTransfer != nil && t.OnDeskTransfer != nil:
-		ti := *res.DeskTransfer
-		go t.OnDeskTransfer(context.WithoutCancel(ctx), ti)
-	case res.DeskEnd && t.OnDeskEnd != nil:
-		go t.OnDeskEnd(res.Disposition)
-	}
 	return err
 }
 

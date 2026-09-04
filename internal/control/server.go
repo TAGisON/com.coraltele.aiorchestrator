@@ -81,8 +81,6 @@ type Server struct {
 	// fallback holds the operator prompts played when the pipeline fails.
 	// Nil disables the fallback API (and silent release on failure).
 	fallback *fallback.Store
-
-	sandboxes *sandboxRegistry
 }
 
 // SetFallbackStore installs the fallback prompt store and shares it with the
@@ -117,10 +115,10 @@ func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Co
 	}
 	s := &Server{
 		repo: repo, reg: reg, rt: rt, cfg: cfg,
-		mux: http.NewServeMux(), uiFS: uiFS, sandboxes: newSandboxRegistry(),
+		mux: http.NewServeMux(), uiFS: uiFS,
 	}
 	if sr, ok := rt.(*SessionRuntime); ok && sr != nil && sr.OnSessionEnd == nil {
-		sr.OnSessionEnd = s.EndSessionFromDesk
+		sr.OnSessionEnd = s.EndSessionAfterTalk
 	}
 	s.routes()
 	return s
@@ -156,11 +154,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleSessionEvents)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/transcript", s.handleGetTranscript)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/disposition", s.handleGetDisposition)
+	s.mux.HandleFunc("PATCH /v1/sessions/{id}/disposition", s.handlePatchDisposition)
 	s.mux.HandleFunc("POST /v1/jobs/playback", s.handlePlaybackCreate)
 	s.mux.HandleFunc("GET /v1/jobs/{id}", s.handleJobGet)
 	s.mux.HandleFunc("POST /v1/kb/documents", s.handleKBUpload)
 	s.mux.HandleFunc("GET /v1/kb/documents/{id}", s.handleKBGet)
-	s.mountDeskRoutes()
 	s.mountUIRoutes(s.uiFS)
 }
 

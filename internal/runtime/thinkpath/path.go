@@ -36,13 +36,10 @@ type Result struct {
 	SkillOK       bool
 	PlaybookState string
 	BlockedThink  bool
-	// DeskEnd is set when a Contact Desk guided path finished the call.
+	// DeskEnd / DeskTransfer left for P1.12 rename; unset without desk controller.
 	DeskEnd     bool
 	Disposition string
 	DeskStepID  string
-	// DeskTransfer is set when the guided path decided to blind-transfer the
-	// caller. The runtime performs the actual leg move after this turn's line
-	// ("connecting you now") has been spoken.
 	DeskTransfer *TransferIntent
 }
 
@@ -127,8 +124,6 @@ type Path struct {
 	// PinnedEngines is true when session gateway_binding is set (CC) — no mid-session vendor hop;
 	// Think total failure uses profile.fallback.think_down.
 	PinnedEngines bool
-	// Desk owns the turn when the pinned profile carries a Contact Desk document.
-	Desk Controller
 }
 
 // Run executes the locked order for one inbound utterance (or playback transcript).
@@ -141,28 +136,6 @@ func (p *Path) Run(ctx context.Context, userText string) (Result, error) {
 	p.Mem.Append("user", userText)
 	// 2. redact stub (no-op)
 	redacted := userText
-
-	// 2b. Contact Desk guided path owns the turn when configured.
-	if p.Desk != nil {
-		if dr, handled := p.Desk.Turn(ctx, redacted); handled {
-			res.Action = "allow"
-			res.ResponseTier = dr.Tier
-			if res.ResponseTier == "" {
-				res.ResponseTier = TierClip
-			}
-			res.ResponseText = dr.Text
-			res.SkillName = dr.SkillName
-			res.SkillOK = dr.SkillOK
-			res.DeskEnd = dr.End
-			res.Disposition = dr.Disposition
-			res.DeskStepID = dr.StepID
-			res.DeskTransfer = dr.Transfer
-			if dr.Text != "" {
-				p.Mem.Append("assistant", dr.Text)
-			}
-			return res, nil
-		}
-	}
 
 	// 3. playbook step (if profile has playbook)
 	if p.Doc.Playbook != nil && len(p.Doc.Playbook.States) > 0 {

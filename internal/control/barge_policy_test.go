@@ -4,15 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coraltele/com.coraltele.aiorchestrator/internal/desk"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 )
 
 func TestBargePolicyTextCommit(t *testing.T) {
 	p := defaultBargePolicy()
-	// Final-text barge requires >= MinBargeChars (default 3). Mid-utterance
-	// interrupts are caught by the energy-VAD path regardless of length, so the
-	// text path can stay strict and ignore 1-2 char STT noise.
 	if !p.textCommit("stop") {
 		t.Fatal("a real word should commit")
 	}
@@ -34,27 +30,6 @@ func TestBargePolicyPartialCommit(t *testing.T) {
 	partial = port.ListenPartial{Text: "hello", Confidence: 0.5}
 	if p.partialCommit(partial, since) {
 		t.Fatal("low confidence should not commit")
-	}
-}
-
-func TestBargePolicyFromDesk(t *testing.T) {
-	allowed := true
-	doc := desk.Doc{CX: desk.CXPolicy{
-		BargeIn:                true,
-		WelcomeBargeAllowed:    &allowed,
-		MinBargeChars:          3,
-		MinBargeMs:             400,
-		BargePartialConfidence: 0.8,
-	}}
-	p := bargePolicyFromDesk(doc)
-	if !p.WelcomeBargeAllowed {
-		t.Fatal("welcome barge should be allowed")
-	}
-	if p.MinBargeChars != 3 {
-		t.Fatalf("min chars = %d", p.MinBargeChars)
-	}
-	if !p.textCommit("abc") {
-		t.Fatal("abc should commit with min 3")
 	}
 }
 
