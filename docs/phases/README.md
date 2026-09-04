@@ -33,7 +33,7 @@ Evidence: `.agent/work/P1.*` (local)
 | P2.11 | [P2.11_caller_preference.md](./P2.11_caller_preference.md) | **Closed** (`7788d1e`) |
 | P2.12 | [P2.12_slots_attributes.md](./P2.12_slots_attributes.md) | **Closed** (`8d2e1f9`) |
 | P2.13 | [P2.13_drop_obsolete.md](./P2.13_drop_obsolete.md) | **Closed** (`1a59b3e`) |
-| P2.14 | [P2.14_migration_ci.md](./P2.14_migration_ci.md) | **Closed** (owner signed 2026-09-05); R1–R7; no DDL |
+| P2.14 | [P2.14_migration_ci.md](./P2.14_migration_ci.md) | **Closed** (`c1e8040`) |
 
 ## Still later
 
