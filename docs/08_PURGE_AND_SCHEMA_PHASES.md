@@ -283,7 +283,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 03 language-neutral graph  
 - **Goal:** How `prompt_ref` → per-locale text is stored and versioned with flow.  
 - **Depends on:** P2.7 Locked.  
-- **Exit:** Entity Locked.
+- **L3 file:** [phases/P2.8_prompts_locale.md](./phases/P2.8_prompts_locale.md) — **Planning Locked** 2026-09-04 (embedded `doc.prompts` + `default_locale`; no SQL table).  
+- **Exit:** Entity Locked — **met**.
 
 ### P2.9 — Routing matrix
 
