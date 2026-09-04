@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.14 **Closed** (P2 planning catalog Done). DDL: M-A Closed.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.14 **Closed** (P2 planning catalog Done). DDL: M-A–M-B Closed.
 
 ## P1 — Purge
 
@@ -40,7 +40,8 @@ Evidence: `.agent/work/P1.*` (local)
 | Phase | File | Status |
 |---|---|---|
 | M-A | [M-A_create_flow.md](./M-A_create_flow.md) | **Closed** (`78f57f7`) — `010_flow_registry.sql` |
-| M-B…M-H | per [P2.13](./P2.13_drop_obsolete.md) / [P2.14](./P2.14_migration_ci.md) | Not started |
+| M-B | [M-B_create_binding.md](./M-B_create_binding.md) | **Closed** — `011_binding.sql` |
+| M-C…M-H | per [P2.13](./P2.13_drop_obsolete.md) / [P2.14](./P2.14_migration_ci.md) | Not started |
 
 ## Still later
 

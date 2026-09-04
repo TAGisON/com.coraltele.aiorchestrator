@@ -136,6 +136,26 @@ func TestMigrationSQL_HasFlowRegistry(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasBinding(t *testing.T) {
+	body, err := os.ReadFile("migrations/011_binding.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS binding") {
+		t.Fatal("migration missing binding")
+	}
+	if !strings.Contains(s, "binding_tenant_kind_idx") {
+		t.Fatal("migration missing binding_tenant_kind_idx")
+	}
+	if strings.Contains(s, "DROP TABLE") {
+		t.Fatal("M-B must not DROP tables")
+	}
+	if strings.Contains(s, "kb_document") || strings.Contains(s, "kb_chunk") {
+		t.Fatal("M-B must not touch kb_*")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
