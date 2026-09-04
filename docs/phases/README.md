@@ -10,13 +10,14 @@ Gate **Locked** 2026-09-04. L4 in progress.
 | Phase | File | Status |
 |---|---|---|
 | P1.0 | [P1.0_purge_inventory.md](./P1.0_purge_inventory.md) | **Done** (owner signed) |
-| P1.1 | [P1.1_delete_admin_ui.md](./P1.1_delete_admin_ui.md) | **Closed** (Reviewer+Summarizer pass; uncommitted) |
-| P1.2 | [P1.2_delete_user_ui.md](./P1.2_delete_user_ui.md) | **Closed** (wave; uncommitted) |
-| P1.3 | [P1.3_delete_supervisor_ui.md](./P1.3_delete_supervisor_ui.md) | **Closed** (wave; uncommitted) |
-| P1.4 | [P1.4_remove_console_shell.md](./P1.4_remove_console_shell.md) | **Closed** (wave; uncommitted) |
-| P1.5–P1.12 | see `P1.*.md` | Specs ready; not started |
+| P1.1 | [P1.1_delete_admin_ui.md](./P1.1_delete_admin_ui.md) | **Closed** (committed `573c94b`) |
+| P1.2 | [P1.2_delete_user_ui.md](./P1.2_delete_user_ui.md) | **Closed** (wave; `573c94b`) |
+| P1.3 | [P1.3_delete_supervisor_ui.md](./P1.3_delete_supervisor_ui.md) | **Closed** (wave; `573c94b`) |
+| P1.4 | [P1.4_remove_console_shell.md](./P1.4_remove_console_shell.md) | **Closed** (wave; `573c94b`) |
+| P1.5 | [P1.5_delete_desk_package.md](./P1.5_delete_desk_package.md) | **Closed** (Reviewer+Summarizer pass; desk delete **uncommitted**) |
+| P1.6–P1.12 | see `P1.*.md` | Specs ready; next after P1.5 close |
 
-Evidence: `.agent/work/P1.0/`, `.agent/work/P1.1_P1.4_ui_wave/`
+Evidence: `.agent/work/P1.0/`, `.agent/work/P1.1_P1.4_ui_wave/`, `.agent/work/P1.5/`
 
 ## P2 — Schema
 
