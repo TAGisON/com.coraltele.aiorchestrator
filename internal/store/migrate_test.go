@@ -194,6 +194,28 @@ func TestMigrationSQL_HasSessionRecordingLifecycle(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasTranscriptTurnExpand(t *testing.T) {
+	body, err := os.ReadFile("migrations/014_transcript_turn_expand.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, col := range []string{"event_kind", "actionable", "payload", "node_id", "edge_id", "language"} {
+		if !strings.Contains(s, col) {
+			t.Fatalf("migration missing %s", col)
+		}
+	}
+	if !strings.Contains(s, "transcript_turn_session_id_turn_id_role_key") {
+		t.Fatal("migration must drop pair UNIQUE constraint")
+	}
+	if !strings.Contains(s, "ALTER COLUMN turn_id DROP NOT NULL") {
+		t.Fatal("migration must allow NULL turn_id")
+	}
+	if strings.Contains(s, "DROP TABLE") {
+		t.Fatal("M-D must not DROP tables")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
