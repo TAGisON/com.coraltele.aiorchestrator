@@ -326,7 +326,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 
 - **Depends on:** P2.7–P2.12 replacements **Locked** (and later L4 applied in order).  
 - **Goal:** Explicit DROP list including at least: `desk`, `desk_draft`, `desk_version`, `kb_document`, `kb_chunk`, plus any unused skill ledger named in inventory.  
-- **Exit:** DROP list Locked; expand/contract **order** written (one concern per migration step — no bulk DROP of unrelated families in one file without sequenced statements and rollback notes).
+- **L3 file:** [phases/P2.13_drop_obsolete.md](./phases/P2.13_drop_obsolete.md) — **Planning Locked** 2026-09-04 (M-F..M-H; `session_attributes` kept; M-H unused-confirm).  
+- **Exit:** DROP list Locked; expand/contract **order** written — **met**.
 
 ### P2.14 — Migration + CI discipline
 
