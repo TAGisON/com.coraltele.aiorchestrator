@@ -216,6 +216,31 @@ func TestMigrationSQL_HasTranscriptTurnExpand(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasDropDesk(t *testing.T) {
+	body, err := os.ReadFile("migrations/015_drop_desk.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, table := range []string{"desk_version", "desk_draft", "desk"} {
+		if !strings.Contains(s, "DROP TABLE IF EXISTS "+table) {
+			t.Fatalf("migration missing DROP %s", table)
+		}
+	}
+	if strings.Contains(s, "kb_document") || strings.Contains(s, "kb_chunk") {
+		t.Fatal("M-F must not DROP kb_*")
+	}
+	idxV := strings.Index(s, "DROP TABLE IF EXISTS desk_version")
+	idxD := strings.Index(s, "DROP TABLE IF EXISTS desk_draft")
+	idx := strings.Index(s, "DROP TABLE IF EXISTS desk\n")
+	if idx < 0 {
+		idx = strings.Index(s, "DROP TABLE IF EXISTS desk;")
+	}
+	if !(idxV >= 0 && idxD > idxV && idx > idxD) {
+		t.Fatal("DROP order must be desk_version → desk_draft → desk")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.14 **Closed**. DDL: M-A–M-E Closed; auto-loop → M-F.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.14 **Closed**. DDL: M-A–M-F Closed; auto-loop → M-G.
 
 ## P1 — Purge
 
@@ -45,7 +45,7 @@ Evidence: `.agent/work/P1.*` (local)
 | M-Cr | [M-Cr_session_recording.md](./M-Cr_session_recording.md) | **Closed** (`3b30daf`) — `013_session_recording_lifecycle.sql` |
 | M-D | [M-D_transcript_expand.md](./M-D_transcript_expand.md) | **Closed** (`44c711b`) — `014_transcript_turn_expand.sql` |
 | M-E | [M-E_reader_cutover.md](./M-E_reader_cutover.md) | **Closed** (`24aefde`) — kb/compliance Go readers removed |
-| M-F | (DROP desk*) | Not started — next auto-loop |
+| M-F | [M-F_drop_desk.md](./M-F_drop_desk.md) | **Closed** — `015_drop_desk.sql` |
 | M-G…M-H | per [P2.13](./P2.13_drop_obsolete.md) | Not started |
 
 ## Still later
