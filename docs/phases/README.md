@@ -44,8 +44,9 @@ Evidence: `.agent/work/P1.*` (local)
 | M-C | [M-C_session_flow_pin.md](./M-C_session_flow_pin.md) | **Closed** (`77a59ce`) — `012_session_flow_pin.sql` |
 | M-Cr | [M-Cr_session_recording.md](./M-Cr_session_recording.md) | **Closed** (`3b30daf`) — `013_session_recording_lifecycle.sql` |
 | M-D | [M-D_transcript_expand.md](./M-D_transcript_expand.md) | **Closed** (`44c711b`) — `014_transcript_turn_expand.sql` |
-| M-E | [M-E_reader_cutover.md](./M-E_reader_cutover.md) | **Closed** — kb/compliance Go readers removed |
-| M-F…M-H | per [P2.13](./P2.13_drop_obsolete.md) | Not started (after M-E) |
+| M-E | [M-E_reader_cutover.md](./M-E_reader_cutover.md) | **Closed** (`24aefde`) — kb/compliance Go readers removed |
+| M-F | (DROP desk*) | Not started — next auto-loop |
+| M-G…M-H | per [P2.13](./P2.13_drop_obsolete.md) | Not started |
 
 ## Still later
 
