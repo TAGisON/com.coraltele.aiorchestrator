@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.3 **Closed**; P2.4 Planning Locked.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.4 **Closed**; P2.5 Planning Locked.
 
 ## P1 — Purge
 
@@ -23,8 +23,9 @@ Evidence: `.agent/work/P1.*` (local)
 | P2.1 | [P2.1_credentials_engines.md](./P2.1_credentials_engines.md) | **Closed** (`64b2fa1`) |
 | P2.2 | [P2.2_session.md](./P2.2_session.md) | **Closed** (`2a50cca`) |
 | P2.3 | [P2.3_transcript_events.md](./P2.3_transcript_events.md) | **Closed** (`b154aa9`) |
-| P2.4 | [P2.4_audit_events.md](./P2.4_audit_events.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
-| P2.5–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.4 close |
+| P2.4 | [P2.4_audit_events.md](./P2.4_audit_events.md) | **Closed** (`ce47941`) |
+| P2.5 | [P2.5_recording_metadata.md](./P2.5_recording_metadata.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
+| P2.6–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.5 close |
 
 ## Still later
 

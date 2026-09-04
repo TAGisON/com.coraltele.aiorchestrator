@@ -258,7 +258,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 
 - **Refs:** 02 recording leak lesson; 04 Ending  
 - **Goal:** Fields + lifecycle rules (stop with leg).  
-- **Exit:** Rules Locked (runtime stop behaviour is a later runtime phase — cite this exit).
+- **L3 file:** [phases/P2.5_recording_metadata.md](./phases/P2.5_recording_metadata.md) — **Planning Locked** 2026-09-04 (session expand cols; stop reasons; DDL deferred).  
+- **Exit:** Rules Locked (runtime stop behaviour is a later runtime phase — cite this exit) — **met**.
 
 ### P2.6 — Disposition
 
