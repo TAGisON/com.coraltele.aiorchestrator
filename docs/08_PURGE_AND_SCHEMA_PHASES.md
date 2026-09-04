@@ -235,14 +235,16 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 06 lifecycle; 04 Ending  
 - **Existing:** `session`  
 - **Goal:** Canonical live CC session columns (flow version ref, languages, recording_ref, states).  
-- **Exit:** Field table; deprecate unused columns listed explicitly.
+- **L3 file:** [phases/P2.2_session.md](./phases/P2.2_session.md) — **Planning Locked** 2026-09-04 (inventory vs `001`/`004`/`005` + Go `State*`; migration **none**; `flow_*` pins → P2.7).  
+- **Exit:** Field table; deprecate unused columns listed explicitly — **met**.
 
 ### P2.3 — Transcript events
 
 - **Refs:** 04 § Transcript; 01 Automatic Call Transcription  
 - **Existing:** `transcript_turn`  
 - **Goal:** Event-capable model (role, text, actionable flag, reason, tool/graph refs, seq, timestamps).  
-- **Exit:** Entity+fields Locked; mapping from old turns documented.
+- **L3 file:** [phases/P2.3_transcript_events.md](./phases/P2.3_transcript_events.md) — **Planning Locked** 2026-09-04 (keep name; expand cols + drop pair unique; DDL deferred).  
+- **Exit:** Entity+fields Locked; mapping from old turns documented — **met**.
 
 ### P2.4 — Audit events
 
