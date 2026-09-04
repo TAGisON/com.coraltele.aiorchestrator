@@ -1,6 +1,8 @@
 <#
 .SYNOPSIS
   Copy one feature round trail from app .agent/work into the validation-evidence worktree and commit.
+.NOTES
+  product-validation.json pipeline removed in P1.9 — set -EvidenceRoot explicitly; pipelines pending new L3 catalog.
 #>
 [CmdletBinding()]
 param(

@@ -1,6 +1,8 @@
 <#
 .SYNOPSIS
   Coral agentic pipeline runner (phase build + product validation).
+.NOTES
+  Obsolete .agent/pipelines JSON (coral-phase, contact-agent-cc, product-validation, validation-v1) removed in P1.9 — pending new L3 catalog; expect fail-fast until re-authored.
 #>
 [CmdletBinding()]
 param(
