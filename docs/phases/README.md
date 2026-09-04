@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.10 **Closed**; P2.11 Planning Locked.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0–P2.11 **Closed**; P2.12 Planning Locked.
 
 ## P1 — Purge
 
@@ -30,8 +30,9 @@ Evidence: `.agent/work/P1.*` (local)
 | P2.8 | [P2.8_prompts_locale.md](./P2.8_prompts_locale.md) | **Closed** (`d76f919`) |
 | P2.9 | [P2.9_routing_matrix.md](./P2.9_routing_matrix.md) | **Closed** (`b5a1bd9`) |
 | P2.10 | [P2.10_bindings_redesign.md](./P2.10_bindings_redesign.md) | **Closed** (`9381fac`) |
-| P2.11 | [P2.11_caller_preference.md](./P2.11_caller_preference.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
-| P2.12–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.11 close |
+| P2.11 | [P2.11_caller_preference.md](./P2.11_caller_preference.md) | **Closed** (`7788d1e`) |
+| P2.12 | [P2.12_slots_attributes.md](./P2.12_slots_attributes.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
+| P2.13–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.12 close |
 
 ## Still later
 

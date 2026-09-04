@@ -319,7 +319,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 03 slots  
 - **Existing:** `session_attributes`  
 - **Goal:** Minimal slot keys for V1 graph.  
-- **Exit:** Key policy Locked.
+- **L3 file:** [phases/P2.12_slots_attributes.md](./phases/P2.12_slots_attributes.md) — **Planning Locked** 2026-09-04 (keep table; key policy; migration **none**; exclude from P2.13 DROP).  
+- **Exit:** Key policy Locked — **met**.
 
 ### P2.13 — DROP obsolete tables
 
