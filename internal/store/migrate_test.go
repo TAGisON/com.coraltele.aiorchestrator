@@ -117,6 +117,25 @@ func TestMigrationSQL_HasCallerPreference(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasFlowRegistry(t *testing.T) {
+	body, err := os.ReadFile("migrations/010_flow_registry.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, table := range []string{"flow", "flow_draft", "flow_version"} {
+		if !strings.Contains(s, "CREATE TABLE IF NOT EXISTS "+table) {
+			t.Fatalf("migration missing table %s", table)
+		}
+	}
+	if strings.Contains(s, "CREATE TABLE IF NOT EXISTS desk") {
+		t.Fatal("flow registry must not create desk tables")
+	}
+	if strings.Contains(s, "ALTER TABLE session") {
+		t.Fatal("M-A must not ALTER session (pins are M-C)")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
