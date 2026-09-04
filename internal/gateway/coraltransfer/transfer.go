@@ -40,7 +40,7 @@ type Gateway struct {
 	DefaultDialplan string
 	DefaultContext  string
 	// DefaultDestination is used when the skill args carry no destination, e.g. a
-	// desk-wide "human agent" queue number.
+	// shared "human agent" queue number.
 	DefaultDestination string
 }
 
@@ -175,7 +175,7 @@ func (g *Gateway) notify(ctx context.Context, body []byte) (int, error) {
 	return resp.StatusCode, nil
 }
 
-// resolveDestination accepts the aliases desks and LLM tool calls actually emit.
+// resolveDestination accepts the aliases operators and LLM tool calls actually emit.
 func (g *Gateway) resolveDestination(args map[string]any) string {
 	for _, key := range []string{"destination", "number", "extension", "dest", "transfer_to"} {
 		if v := stringArg(args, key, ""); v != "" {

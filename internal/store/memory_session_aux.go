@@ -7,7 +7,7 @@ import (
 )
 
 // sessionAuxMemory holds session-adjacent durable maps (attrs, skills, prefs).
-// Not Contact Desk registry/draft/version storage (removed in P1.8).
+// Not former desk registry/draft/version storage (removed in P1.8).
 type sessionAuxMemory struct {
 	attrs    map[string]map[string]SessionAttribute
 	skillSeq int64

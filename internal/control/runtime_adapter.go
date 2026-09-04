@@ -181,8 +181,8 @@ func (r *SessionRuntime) StartLiveTalk(ctx context.Context, sessionID string) er
 	// on Sarvam auto-detect ("unknown"). Auto-detect re-guesses every utterance
 	// and mis-transcribes Hindi/Hinglish as Marathi/Gujarati/Kannada (seen in
 	// live sessions), which then breaks language consistency and prompt rendering.
-	// The desk default (hi-IN for coral-tfn) is the stable per-call language; a
-	// real switch re-pins the stream (see maybeRepinListen).
+	// Prefer a stable per-call language; a real switch re-pins the stream
+	// (see maybeRepinListen).
 	lang := r.initialListenLanguage(sessionID, a)
 	stream, err := listenGW.OpenStream(ctx, port.ListenRequest{
 		SessionID:    port.SessionID(sessionID),
@@ -256,7 +256,7 @@ func (r *SessionRuntime) rtpSettleWatch(ctx context.Context, sessionID string) {
 }
 
 // silenceWatch is idle until a future graph runtime owns silence repair.
-// Post-P1.6: no desk no-response ladder (dialogue offline).
+// Post-P1: no guided no-response ladder (dialogue offline).
 func (r *SessionRuntime) silenceWatch(ctx context.Context, arm <-chan struct{}, a *session.Actor, talk *composer.Talk) {
 	select {
 	case <-ctx.Done():

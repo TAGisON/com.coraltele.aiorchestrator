@@ -44,3 +44,13 @@ These may still exist in code on `main`; they are **not** the target brain:
 ```
 
 Implementation will follow the new docs on this branch; old product/architecture markdown under `docs/` was removed and replaced by this set.
+
+## Post-P1 state (after P1.0–P1.12 L4)
+
+| Piece | State |
+|---|---|
+| Media / edge / Sarvam gateways | **Up** — PCM pipe, transfer/hangup verbs, vendor adapters |
+| Dialogue brain (desk engine / guided paths) | **Offline** — no `internal/desk`, control desk API, deskskills, or desk store APIs |
+| Three consoles (admin / user / supervisor) | **Gone** — placeholder UI at `/` only |
+| Postgres `desk` / `desk_draft` / `desk_version` | **Orphan tables** until P2.13 DROP; orch does not read/write them |
+| Next brain | Conversation graph + live turn machine (P2 / later runtime phases) |

@@ -288,23 +288,10 @@ func (s *Server) handlePlatformStatus(w http.ResponseWriter, r *http.Request) {
 		"ready_for_sessions": ready,
 		"blockers":           blockers,
 		"warnings":           warnings,
-		"uis": map[string]string{
-			"admin":      "/admin/",
-			"supervisor": "/supervisor/",
-			"user":       "/user/",
-		},
 	})
 }
 
 func (s *Server) authMiddlewareUIBypass(path string) bool {
-	if path == "/" {
-		return true
-	}
-	prefixes := []string{"/admin", "/supervisor", "/user", "/shared"}
-	for _, p := range prefixes {
-		if path == p || strings.HasPrefix(path, p+"/") {
-			return true
-		}
-	}
-	return false
+	// Placeholder control UI at `/` only (three consoles removed in P1.1–P1.4).
+	return path == "/"
 }

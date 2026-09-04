@@ -80,7 +80,7 @@ func TestExecute_TransfersLeg(t *testing.T) {
 	}
 }
 
-// Desks and LLM tool calls spell the destination several ways.
+// Operators and LLM tool calls spell the destination several ways.
 func TestExecute_DestinationAliases(t *testing.T) {
 	for _, key := range []string{"destination", "number", "extension", "dest", "transfer_to"} {
 		var got string

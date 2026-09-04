@@ -74,10 +74,6 @@ type Document struct {
 	Analytics struct {
 		Emit []string `json:"emit"`
 	} `json:"analytics"`
-	// XDesk is a legacy profile extension field. Ignored at runtime (P1.8);
-	// present so published docs with x_desk still parse without failing answer.
-	// Do not invent x_flow here (P2.7).
-	XDesk json.RawMessage `json:"x_desk,omitempty"`
 }
 
 // ResponseConfig is response.ladder + clips + turn templates (distinct from post-call templates.*).

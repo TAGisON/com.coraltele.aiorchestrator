@@ -189,9 +189,7 @@ func main() {
 	go func() {
 		applog.Info("control listening",
 			"addr", addr,
-			"admin", "http://127.0.0.1"+addr+"/admin/",
-			"supervisor", "http://127.0.0.1"+addr+"/supervisor/",
-			"user", "http://127.0.0.1"+addr+"/user/",
+			"ui", "http://127.0.0.1"+addr+"/",
 			"store", storeBackend,
 		)
 		kinds := []port.PortKind{

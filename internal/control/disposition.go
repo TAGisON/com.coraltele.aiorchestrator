@@ -73,7 +73,7 @@ func (s *Server) handlePatchDisposition(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// EndSessionAfterTalk stops a session after talk teardown (former desk end hook; neutral).
+// EndSessionAfterTalk stops a session after talk teardown (neutral session-end hook).
 func (s *Server) EndSessionAfterTalk(ctx context.Context, sessionID, disposition string) {
 	sess, err := s.repo.GetSession(ctx, sessionID)
 	if err != nil {

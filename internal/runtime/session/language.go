@@ -88,7 +88,7 @@ func echoTokens(s string) []string {
 }
 
 // IsGreetingOnly reports whether text is only a call opener (no intent content).
-// Used so "Hello" / "Namaste" cannot lock STT/prefs to English on a bilingual desk.
+// Used so "Hello" / "Namaste" cannot lock STT/prefs to English on a bilingual line.
 func IsGreetingOnly(text string) bool {
 	s := strings.ToLower(strings.TrimSpace(text))
 	if s == "" {
@@ -147,7 +147,7 @@ func (a *Actor) ListenLanguageHint() string {
 	return a.activeLanguage
 }
 
-// SetLanguageAllowlist restricts first-lock to desk runtime languages (empty = any).
+// SetLanguageAllowlist restricts first-lock to allowlisted languages (empty = any).
 func (a *Actor) SetLanguageAllowlist(langs []string) {
 	a.mu.Lock()
 	a.languageAllowlist = append([]string(nil), langs...)

@@ -36,38 +36,15 @@ type Result struct {
 	SkillOK       bool
 	PlaybookState string
 	BlockedThink  bool
-	// DeskEnd / DeskTransfer left for P1.12 rename; unset without desk controller.
-	DeskEnd     bool
-	Disposition string
-	DeskStepID  string
-	DeskTransfer *TransferIntent
+	Disposition   string
 }
 
-// TransferIntent is a guided-path decision to move the caller's leg to a human.
+// TransferIntent is a decision to move the caller's leg to a human (future graph/tools).
 type TransferIntent struct {
 	Number string // extension/DID to dial (uuid_transfer destination)
 	Owner  string // human name announced / shown on screen-pop
 	Target string // queue label
 	Reason string // summary for audit
-}
-
-// Controller is an optional deterministic dialog owner (Contact Desk guided paths).
-// When it handles a turn, rules / ladder / Think are skipped for that turn.
-type Controller interface {
-	Turn(ctx context.Context, userText string) (ControllerResult, bool)
-	Welcome() (string, bool)
-}
-
-// ControllerResult is one controller-decided turn.
-type ControllerResult struct {
-	Text        string
-	Tier        string
-	SkillName   string
-	SkillOK     bool
-	End         bool
-	Disposition string
-	StepID      string
-	Transfer    *TransferIntent
 }
 
 // Deps are resolved gateway instances (from registry Select).

@@ -19,7 +19,7 @@ type bargePolicy struct {
 	PartialConfidence   float64
 }
 
-// defaultBargePolicy matches former desk DefaultCX numeric defaults (not imported):
+// defaultBargePolicy matches former DefaultCX numeric defaults (copied once; no CX import):
 // BargeIn true, ListenWhileSpeak true, WelcomeBargeAllowed false,
 // MinBargeChars 3, MinBargeMs 280, BargePartialConfidence 0.70.
 func defaultBargePolicy() bargePolicy {
