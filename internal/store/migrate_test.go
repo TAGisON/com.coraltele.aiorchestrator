@@ -241,6 +241,30 @@ func TestMigrationSQL_HasDropDesk(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasDropKB(t *testing.T) {
+	body, err := os.ReadFile("migrations/016_drop_kb.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, table := range []string{"kb_chunk", "kb_document"} {
+		if !strings.Contains(s, "DROP TABLE IF EXISTS "+table) {
+			t.Fatalf("migration missing DROP %s", table)
+		}
+	}
+	for _, banned := range []string{"desk_version", "desk_draft", "desk", "skill_invocation",
+		"pii_access_audit", "erasure_request", "consent_record"} {
+		if strings.Contains(s, "DROP TABLE IF EXISTS "+banned) {
+			t.Fatalf("M-G must not DROP %s", banned)
+		}
+	}
+	idxC := strings.Index(s, "DROP TABLE IF EXISTS kb_chunk")
+	idxD := strings.Index(s, "DROP TABLE IF EXISTS kb_document")
+	if !(idxC >= 0 && idxD > idxC) {
+		t.Fatal("DROP order must be kb_chunk -> kb_document")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
