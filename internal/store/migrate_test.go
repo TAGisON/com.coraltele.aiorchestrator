@@ -173,6 +173,27 @@ func TestMigrationSQL_HasSessionFlowPin(t *testing.T) {
 	}
 }
 
+func TestMigrationSQL_HasSessionRecordingLifecycle(t *testing.T) {
+	body, err := os.ReadFile("migrations/013_session_recording_lifecycle.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, col := range []string{
+		"recording_started_at", "recording_stopped_at", "recording_stop_reason", "recording_bytes",
+	} {
+		if !strings.Contains(s, col) {
+			t.Fatalf("migration missing %s", col)
+		}
+	}
+	if strings.Contains(s, "BYTEA") || strings.Contains(s, "bytea") {
+		t.Fatal("must not store PCM as BYTEA")
+	}
+	if strings.Contains(s, "transcript_turn") || strings.Contains(s, "DROP TABLE") {
+		t.Fatal("M-Cr must not touch transcript or DROP")
+	}
+}
+
 func TestApplyMigrations_Integration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
