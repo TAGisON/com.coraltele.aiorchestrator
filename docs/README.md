@@ -1,7 +1,7 @@
 # Coral LLM Call Centre — documentation
 
 **Branch purpose:** Greenfield architecture for an **LLM-based voice call centre** on Coral PABX / FreeSWITCH.  
-**Status:** Architecture planning (brain + flow locked in prose). JSON schema deferred.
+**Status:** Architecture locked (01–06). Planning **Locked** (07–12 + phases). **L4 authorized** — purge wave P1 in progress.
 
 ## Source of truth (read in order)
 
@@ -13,6 +13,13 @@
 | 4 | [04_LIVE_TURN_MACHINE.md](./04_LIVE_TURN_MACHINE.md) | Speaking / listening / thinking / tool lock; actionable vs transcript-only STT |
 | 5 | [05_MEDIA_AND_VENDORS.md](./05_MEDIA_AND_VENDORS.md) | STT / LLM / TTS roles; Sarvam capability baseline |
 | 6 | [06_APPLICATION_FLOW.md](./06_APPLICATION_FLOW.md) | **Whole-application flowcharts** (start here for the big picture) |
+| 7 | [07_PLANNING_STANDARDS.md](./07_PLANNING_STANDARDS.md) | Planning layers, phase template, reference discipline, agentic gate |
+| 8 | [08_PURGE_AND_SCHEMA_PHASES.md](./08_PURGE_AND_SCHEMA_PHASES.md) | P1 purge + P2 schema catalog (**ODs settled**; no L4 yet) |
+| 9 | [09_EVIDENCE_AND_RECORDING.md](./09_EVIDENCE_AND_RECORDING.md) | Transcript / audit / recording behaviour (**Draft**; aligns P2.3–P2.5) |
+| 10 | [10_CODING_PRINCIPLES.md](./10_CODING_PRINCIPLES.md) | Coding rules + EC-* edge-case library (**Draft**) |
+| 11 | [11_CI_AND_CD.md](./11_CI_AND_CD.md) | CI jobs + lab promote CD (**Draft**; no Actions yet in repo) |
+| 12 | [12_AGENTIC_L4_ROLES.md](./12_AGENTIC_L4_ROLES.md) | Implementer / Reviewer / Summarizer (**Draft** — skills under `.cursor/skills/`) |
+| — | [phases/](./phases/README.md) | L3: **P1.0–P1.12**, **P2.0–P2.14** (no L4 yet) |
 
 ## Hard engineering rules (unchanged)
 

@@ -26,7 +26,7 @@ func (s *Server) SetUIExtras(x UIExtras) { s.ui = x }
 // SetLabExtras is deprecated; use SetUIExtras.
 func (s *Server) SetLabExtras(x LabExtras) { s.SetUIExtras(x) }
 
-// mountUIRoutes registers console APIs and Admin / Supervisor / User static UIs.
+// mountUIRoutes registers console JSON APIs and a minimal root placeholder (no three-console SPAs).
 func (s *Server) mountUIRoutes(uiFS fs.FS) {
 	s.mux.HandleFunc("GET /v1/profiles", s.handleListProfiles)
 	s.mux.HandleFunc("GET /v1/profiles/{id}/versions/{ver}", s.handleGetProfileVersion)
@@ -39,21 +39,6 @@ func (s *Server) mountUIRoutes(uiFS fs.FS) {
 	if uiFS == nil {
 		return
 	}
-	mountStatic := func(urlPrefix, dir string) {
-		sub, err := fs.Sub(uiFS, dir)
-		if err != nil {
-			return
-		}
-		h := http.FileServer(http.FS(sub))
-		s.mux.Handle("GET "+urlPrefix+"/", http.StripPrefix(urlPrefix+"/", h))
-		s.mux.HandleFunc("GET "+urlPrefix, func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, urlPrefix+"/", http.StatusFound)
-		})
-	}
-	mountStatic("/admin", "admin")
-	mountStatic("/supervisor", "supervisor")
-	mountStatic("/user", "user")
-	mountStatic("/shared", "shared")
 
 	s.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {

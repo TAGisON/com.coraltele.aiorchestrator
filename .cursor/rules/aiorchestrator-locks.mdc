@@ -5,9 +5,15 @@ alwaysApply: true
 
 # com.coraltele.aiorchestrator locks
 
-- Docs (LLM call centre restart): `docs/README.md` → `docs/01_*.md` … `docs/06_APPLICATION_FLOW.md`
+- Docs (LLM call centre restart): `docs/README.md` → `docs/01_*.md` … `docs/12_*.md` + `docs/phases/`
 - Brain: conversation **graph** is law (`docs/03_BRAIN_AND_GRAPH.md`)
 - Live behaviour: turn machine (`docs/04_LIVE_TURN_MACHINE.md`)
+- Planning: `docs/07_PLANNING_STANDARDS.md` — no L4 until owner Locks 09–12 + skills
+- Purge/schema phases: `docs/08_PURGE_AND_SCHEMA_PHASES.md` (ODs settled; serial P1 then P2)
+- Evidence: `docs/09_EVIDENCE_AND_RECORDING.md` (Draft)
+- Coding: `docs/10_CODING_PRINCIPLES.md` (Draft)
+- CI/CD: `docs/11_CI_AND_CD.md` (Draft)
+- L4 roles: `docs/12_AGENTIC_L4_ROLES.md` + `.cursor/skills/aiorchestrator-l4-*` (Draft)
 - Kernel: **Go** only; no Python/Java media kernel
 - Live PCM: in-memory only; no Kafka/Redis for audio
 - Edge: FreeSWITCH `mod_audio_stream` is a dumb PCM pipe

@@ -4,61 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AiOrchestrator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/shared/styles.css" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 40rem; color: #1a1a1a; }
+    code { background: #f0f0f0; padding: 0.1em 0.35em; }
+    a { color: #0b57d0; }
+  </style>
 </head>
 <body>
-  <div class="shell">
-    <div class="top">
-      <div class="brand">AiOrchestrator <span>consoles</span></div>
-      <div class="nav">
-        <a href="/v1/health">/v1/health</a>
-        <a href="/v1/platform/status">/v1/platform/status</a>
-      </div>
-    </div>
-    <h1>Choose a console</h1>
-    <p class="lede">Three separate surfaces. Configuration is never pre-seeded — Admin must configure engines and publish a contact desk before User can start a call. Supervisor inspects durable transcripts, attributes, and audit trails.</p>
-    <div id="statusBanner" class="banner" hidden></div>
-    <div class="portal">
-      <a class="role" href="/admin/">
-        <h2>Admin</h2>
-        <p>Platform readiness, tenant engines, vendor credentials, contact desks and publishing, connector sandbox, retention and erasure.</p>
-        <div class="path">/admin/</div>
-      </a>
-      <a class="role" href="/supervisor/">
-        <h2>Supervisor</h2>
-        <p>Session list, live state, transcript, contact attributes with audited reveal, handoff pack, connector trail, disposition.</p>
-        <div class="path">/supervisor/</div>
-      </a>
-      <a class="role" href="/user/">
-        <h2>User</h2>
-        <p>Text call against a published desk in English or Hindi, or a live voice call over the session edge.</p>
-        <div class="path">/user/</div>
-      </a>
-    </div>
-    <p class="hint" style="margin-top:1.25rem">First run: open <a href="/admin/">Admin</a> → <em>Contact desks</em> → <strong>Install Coral TFN preset</strong> → <strong>Publish desk</strong>, then go to <a href="/user/">User</a> and start a text call.</p>
-  </div>
-  <script src="/shared/api.js"></script>
-  <script>
-    CoralUI.onReady(function () {
-      CoralUI.loadPlatformStatus().then(function (st) {
-        var el = document.getElementById("statusBanner");
-        if (!st.ready_for_sessions) {
-          CoralUI.showBanner(el, "bad",
-            "<strong>Not ready for sessions.</strong> Blockers: <code>" +
-            ((st.blockers || []).join(", ") || "unknown") + "</code>. Open Admin first.");
-        } else if ((st.warnings || []).length) {
-          CoralUI.showBanner(el, "",
-            "<strong>Degraded.</strong> Warnings: <code>" + st.warnings.join(", ") + "</code>");
-        } else {
-          CoralUI.showBanner(el, "ok", "<strong>Ready.</strong> Engines and profiles are configured.");
-        }
-      }).catch(function (e) {
-        CoralUI.showBanner(document.getElementById("statusBanner"), "bad", CoralUI.formatApiError(e));
-      });
-    });
-  </script>
+  <h1>AiOrchestrator</h1>
+  <p>Control plane is up. The Admin / User / Supervisor consoles were removed (LLM call centre purge P1.1–P1.4). Graph editor UI comes later.</p>
+  <p>API checks: <a href="/v1/health"><code>/v1/health</code></a> · <a href="/v1/platform/status"><code>/v1/platform/status</code></a></p>
 </body>
 </html>

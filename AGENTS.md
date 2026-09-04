@@ -10,9 +10,19 @@ Read in order under `docs/`:
 4. `docs/03_BRAIN_AND_GRAPH.md` — graph brain (**locked**)  
 5. `docs/04_LIVE_TURN_MACHINE.md` — live states (**locked**)  
 6. `docs/05_MEDIA_AND_VENDORS.md` — STT/LLM/TTS  
-7. `docs/06_APPLICATION_FLOW.md` — **whole-application flowcharts**
+7. `docs/06_APPLICATION_FLOW.md` — **whole-application flowcharts**  
+8. `docs/07_PLANNING_STANDARDS.md` — planning layers + phase template (**planning only**)  
+9. `docs/08_PURGE_AND_SCHEMA_PHASES.md` — P1 purge / P2 schema (**ODs settled**; planning only)  
+10. `docs/09_EVIDENCE_AND_RECORDING.md` — transcript / audit / recording behaviour (**Draft**)  
+11. `docs/10_CODING_PRINCIPLES.md` — coding rules + EC-* library (**Draft**)  
+12. `docs/11_CI_AND_CD.md` — CI/CD plan (**Draft**)  
+13. `docs/12_AGENTIC_L4_ROLES.md` — L4 roles + skills (**Draft**)  
+14. `docs/phases/` — L3 specs (**P1.*** + **P2.0–P2.14**; no L4 yet)  
+15. `.cursor/skills/aiorchestrator-l4-{implementer,reviewer,summarizer}/` — L4 skills
 
 Older product/architecture docs were removed on branch `docs/llm-callcentre-architecture`. Do not resurrect caption/translator/meeting platform scope into this programme.
+
+**Implementation gate:** No code deletes/migrations until `07` §8 checklist is complete and an Implementer skill is approved. Plans must cite architecture refs; do not invent against 01–06.
 
 ## Hard rules
 
