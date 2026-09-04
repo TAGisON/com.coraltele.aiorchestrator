@@ -3,7 +3,7 @@
 **Parent:** [07_PLANNING_STANDARDS.md](../07_PLANNING_STANDARDS.md) §4  
 **Domain plan:** [08_PURGE_AND_SCHEMA_PHASES.md](../08_PURGE_AND_SCHEMA_PHASES.md)
 
-Gate **Locked** 2026-09-04. P1 L4 **Done**; P2 L4 starting at P2.0.
+Gate **Locked** 2026-09-04. P1 L4 **Done**; P2.0 **Closed**; P2.1 Planning Locked.
 
 ## P1 — Purge
 
@@ -19,8 +19,9 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| P2.0 | [P2.0_schema_principles.md](./P2.0_schema_principles.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
-| P2.1–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.0 close |
+| P2.0 | [P2.0_schema_principles.md](./P2.0_schema_principles.md) | **Closed** (`1741e0e`) |
+| P2.1 | [P2.1_credentials_engines.md](./P2.1_credentials_engines.md) | **Planning Locked** (owner signed 2026-09-04); no DDL |
+| P2.2–P2.14 | see `P2.*.md` | Specs drafted; L4 after P2.1 close |
 
 ## Still later
 

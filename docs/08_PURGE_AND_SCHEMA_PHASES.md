@@ -227,7 +227,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 05 gateways  
 - **Existing:** `gateway_credentials`, `system_settings`, `tenant_engines`  
 - **Goal:** Decide keep/reshape **field-by-field** (one entity focus).  
-- **Exit:** Field table Locked; migration plan note only.
+- **L3 file:** [phases/P2.1_credentials_engines.md](./phases/P2.1_credentials_engines.md) — **Planning Locked** 2026-09-04 (keep-as-is; migration **none**).  
+- **Exit:** Field table Locked; migration plan note only — **met**.
 
 ### P2.2 — Session
 
