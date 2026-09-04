@@ -219,7 +219,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 01 V1; 03 bindings; 04 transcript intent; 05 no PCM in DB  
 - **Goal:** Rules for IDs, tenant_id, versioning, immutability of audit/transcript append, expand/contract migrations.  
 - **Depends on:** P1 series Locked (planning); for L4: P1 Done.  
-- **Exit:** Written principles + examples; no DDL yet.
+- **L3 file:** [phases/P2.0_schema_principles.md](./phases/P2.0_schema_principles.md) — **Planning Locked** 2026-09-04 (P2.0-P1…P12); no DDL.  
+- **Exit:** Written principles + examples; no DDL yet — **met**.
 
 ### P2.1 — Credentials and tenant engine settings
 
