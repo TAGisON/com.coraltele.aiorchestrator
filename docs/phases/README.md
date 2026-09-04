@@ -43,7 +43,7 @@ Evidence: `.agent/work/P1.*` (local)
 | M-B | [M-B_create_binding.md](./M-B_create_binding.md) | **Closed** (`3534682`) — `011_binding.sql` |
 | M-C | [M-C_session_flow_pin.md](./M-C_session_flow_pin.md) | **Closed** (`77a59ce`) — `012_session_flow_pin.sql` |
 | M-Cr | [M-Cr_session_recording.md](./M-Cr_session_recording.md) | **Closed** (`3b30daf`) — `013_session_recording_lifecycle.sql` |
-| M-D | [M-D_transcript_expand.md](./M-D_transcript_expand.md) | **Closed** — `014_transcript_turn_expand.sql` |
+| M-D | [M-D_transcript_expand.md](./M-D_transcript_expand.md) | **Closed** (`44c711b`) — `014_transcript_turn_expand.sql` |
 | M-E…M-H | per [P2.13](./P2.13_drop_obsolete.md) / [P2.14](./P2.14_migration_ci.md) | Not started |
 
 ## Still later
