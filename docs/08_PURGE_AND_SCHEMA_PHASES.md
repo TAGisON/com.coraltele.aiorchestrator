@@ -274,7 +274,8 @@ Each phase follows [07 §4](./07_PLANNING_STANDARDS.md). **Planning detail only.
 - **Refs:** 03 entire; 06 config; OD-08-3  
 - **Existing to replace:** `desk`, `desk_draft`, `desk_version`  
 - **Goal:** Draft + immutable published versions of conversation graph; storage strategy for nodes/edges decided here.  
-- **Exit:** Table names + columns Locked; **no** silent reuse of desk JSON shape without an explicit mapping note.  
+- **L3 file:** [phases/P2.7_flow_publish_model.md](./phases/P2.7_flow_publish_model.md) — **Planning Locked** 2026-09-04 (`flow`/`flow_draft`/`flow_version` + envelope `coral.flow.v1`; JSONB nodes; session pins; DDL deferred).  
+- **Exit:** Table names + columns Locked; **no** silent reuse of desk JSON shape without an explicit mapping note — **met**.  
 - **Forbidden:** Naming new tables `desk_*`.
 
 ### P2.8 — Prompts / locale assets
