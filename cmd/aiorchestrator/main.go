@@ -182,6 +182,7 @@ func main() {
 	_ = srv.StartPlaybackWorker(workerCtx, mgr)
 	_ = srv.StartPostcallWorker(workerCtx)
 	startRecordingRetention(workerCtx, boot.RecordingRoot, boot.RecordingRetentionDays)
+	startRecordingOrphanReaper(workerCtx, repo)
 
 	addr := boot.HTTPAddr
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
@@ -234,6 +235,30 @@ func startRecordingRetention(ctx context.Context, root string, days int) {
 				applog.Warn("recording retention sweep failed", "root", root, "err", err)
 			} else if removed > 0 {
 				applog.Info("recording retention sweep", "root", root, "removed_days", removed)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+}
+
+func startRecordingOrphanReaper(ctx context.Context, repo store.Repository) {
+	if repo == nil {
+		return
+	}
+	go func() {
+		// Boot sweep, then every few minutes — cheap query; crash leaks should not wait a day.
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			n, err := record.ReapOrphans(ctx, repo, 200)
+			if err != nil {
+				applog.Warn("recording orphan reaper failed", "err", err)
+			} else if n > 0 {
+				applog.Info("recording orphan reaper", "reaped", n)
 			}
 			select {
 			case <-ctx.Done():

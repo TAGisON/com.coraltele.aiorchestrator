@@ -242,6 +242,28 @@ func (m *Memory) MarkSessionRecordingStopped(ctx context.Context, id, reason str
 	return s, nil
 }
 
+func (m *Memory) ListOrphanRecordingSessions(ctx context.Context, limit int) ([]Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	var out []Session
+	for _, s := range m.sessions {
+		if !IsTerminalSessionState(s.State) {
+			continue
+		}
+		if s.RecordingStartedAt == nil || s.RecordingStoppedAt != nil {
+			continue
+		}
+		out = append(out, s)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
 func (m *Memory) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
