@@ -202,6 +202,46 @@ func (m *Memory) UpdateSessionRecordingRef(ctx context.Context, id, ref string) 
 	return s, nil
 }
 
+func (m *Memory) MarkSessionRecordingStarted(ctx context.Context, id, ref string) (Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	s.RecordingRef = ref
+	if s.RecordingStartedAt == nil {
+		now := time.Now().UTC()
+		s.RecordingStartedAt = &now
+	}
+	s.UpdatedAt = time.Now().UTC()
+	m.sessions[id] = s
+	return s, nil
+}
+
+func (m *Memory) MarkSessionRecordingStopped(ctx context.Context, id, reason string, nbytes *int64) (Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	reason = MapRecordingStopReason(reason)
+	if s.RecordingStoppedAt == nil {
+		now := time.Now().UTC()
+		s.RecordingStoppedAt = &now
+	}
+	if s.RecordingStopReason == "" {
+		s.RecordingStopReason = reason
+	}
+	if s.RecordingBytes == nil && nbytes != nil {
+		s.RecordingBytes = nbytes
+	}
+	s.UpdatedAt = time.Now().UTC()
+	m.sessions[id] = s
+	return s, nil
+}
+
 func (m *Memory) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

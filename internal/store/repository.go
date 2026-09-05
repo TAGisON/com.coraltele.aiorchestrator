@@ -22,6 +22,8 @@ type Repository interface {
 	UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error)
 	// UpdateSessionRecordingRef stores the on-disk path of the call recording.
 	UpdateSessionRecordingRef(ctx context.Context, id, ref string) (Session, error)
+	MarkSessionRecordingStarted(ctx context.Context, id, ref string) (Session, error)
+	MarkSessionRecordingStopped(ctx context.Context, id, reason string, nbytes *int64) (Session, error)
 
 	GetTenantEngines(ctx context.Context, tenantID string) (TenantEngines, error)
 	UpsertTenantEngines(ctx context.Context, te TenantEngines) (TenantEngines, error)

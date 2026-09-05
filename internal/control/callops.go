@@ -114,8 +114,12 @@ func (r *SessionRuntime) startRecorder(sessionID string, a *session.Actor) *reco
 	r.mu.Unlock()
 
 	if r.Repo != nil {
-		if _, err := r.Repo.UpdateSessionRecordingRef(context.Background(), sessionID, rec.Path()); err != nil {
-			applog.Warn("persist recording_ref", "session", sessionID, "err", err)
+		if _, err := r.Repo.MarkSessionRecordingStarted(context.Background(), sessionID, rec.Path()); err != nil {
+			applog.Warn("persist recording start", "session", sessionID, "err", err)
+		} else {
+			r.auditRecording(sessionID, store.AuditRecordingStarted, map[string]any{
+				"recording_ref": rec.Path(),
+			})
 		}
 	}
 	return rec
@@ -146,6 +150,50 @@ func (r *SessionRuntime) stopRecorder(sessionID, endReason string) {
 		sum.Extra = map[string]any{"failure_scenario": fs}
 	}
 	rec.Close(sum)
+	reason := store.MapRecordingStopReason(endReason)
+	var nbytes *int64
+	if n := rec.FileBytes(); n > 0 {
+		nbytes = &n
+	}
+	if r.Repo != nil {
+		if _, err := r.Repo.MarkSessionRecordingStopped(context.Background(), sessionID, reason, nbytes); err != nil {
+			applog.Warn("persist recording stop", "session", sessionID, "err", err)
+		}
+	}
+	payload := map[string]any{
+		"recording_ref": rec.Path(),
+		"reason":        reason,
+	}
+	if nbytes != nil {
+		payload["bytes"] = *nbytes
+	}
+	r.auditRecording(sessionID, store.AuditRecordingStopped, payload)
+}
+
+func (r *SessionRuntime) auditRecording(sessionID, eventType string, payload map[string]any) {
+	if r == nil || r.Repo == nil {
+		return
+	}
+	r.mu.Lock()
+	talk := r.talks[sessionID]
+	r.mu.Unlock()
+	if talk != nil && talk.Obs != nil {
+		talk.Obs.Audit(context.Background(), eventType, payload)
+		return
+	}
+	raw, _ := json.Marshal(payload)
+	tenant := ""
+	if sess, err := r.Repo.GetSession(context.Background(), sessionID); err == nil {
+		tenant = sess.TenantID
+	}
+	if _, err := r.Repo.AppendAuditEvent(context.Background(), store.AuditEvent{
+		SessionID: sessionID,
+		TenantID:  tenant,
+		EventType: eventType,
+		Payload:   raw,
+	}); err != nil {
+		applog.Warn("recording audit fail-open", "session", sessionID, "type", eventType, "err", err)
+	}
 }
 
 // ------------------------------------------------------------- call control --

@@ -98,13 +98,14 @@ type Recorder struct {
 
 	// f, dataBytes and writeFails are owned by the mux goroutine until it exits;
 	// Close waits on muxDone before touching them.
-	f          *os.File
-	dataBytes  int64
-	startedAt  time.Time
-	closeOnce  sync.Once
-	done       chan struct{}
-	muxDone    chan struct{}
-	writeFails int
+	f           *os.File
+	dataBytes   int64
+	closedBytes int64
+	startedAt   time.Time
+	closeOnce   sync.Once
+	done        chan struct{}
+	muxDone     chan struct{}
+	writeFails  int
 
 	droppedCaller int64
 	droppedAgent  int64
@@ -207,6 +208,14 @@ func (r *Recorder) Path() string {
 		return ""
 	}
 	return r.path
+}
+
+// FileBytes is WAV size after Close (header + data), or 0 if not closed.
+func (r *Recorder) FileBytes() int64 {
+	if r == nil {
+		return 0
+	}
+	return r.closedBytes
 }
 
 // Dir is the recording directory, or "" when not recording.
@@ -368,6 +377,7 @@ func (r *Recorder) Close(sum Summary) {
 	if err := r.f.Close(); err != nil {
 		applog.Warn("session recording close", "session", r.meta.SessionID, "err", err)
 	}
+	r.closedBytes = r.dataBytes + wavHeaderBytes
 	r.writeMeta(sum)
 	applog.Info("session recording finished",
 		"session", r.meta.SessionID, "path", r.path,

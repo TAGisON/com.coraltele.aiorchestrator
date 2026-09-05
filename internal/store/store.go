@@ -58,6 +58,10 @@ type Session struct {
 	CoralUserID           string
 	Caller                json.RawMessage
 	RecordingRef          string
+	RecordingStartedAt    *time.Time
+	RecordingStoppedAt    *time.Time
+	RecordingStopReason   string
+	RecordingBytes        *int64
 	Metadata              json.RawMessage
 	GatewayBinding        *GatewayBinding
 	DetectedLanguage      string
