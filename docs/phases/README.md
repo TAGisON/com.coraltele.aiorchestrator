@@ -72,5 +72,16 @@ Evidence: `.agent/work/P1.*` (local)
 | CD.0 | [CD.0_lab_promote.md](./CD.0_lab_promote.md) | **Closed** (9eb1aba) — lab PROMOTE.md |
 | CD.1 | [CD.1_lab_build_workflow.md](./CD.1_lab_build_workflow.md) | **Closed** (00c09f6) — manual lab-build artifacts |
 
+## Graph runtime (G.*)
+
+| Phase | File | Status |
+|---|---|---|
+| G.0 | [G.0_graph_runtime_inventory.md](./G.0_graph_runtime_inventory.md) | **Closed** — gap list + G.1–G.7 sketch |
+| G.1–G.7 | per G.0 | Not started |
+
 ## Still later
+
+- Admin SPA for flow authoring (API-first V1 OK)
+- Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
+- Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
 
