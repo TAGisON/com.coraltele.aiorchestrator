@@ -82,7 +82,7 @@ Evidence: `.agent/work/P1.*` (local)
 | G.3 | [G.3_runtime_core_cursor.md](./G.3_runtime_core_cursor.md) | **Closed** (599d37b) — Entry/Speak/ListenChoice/End cursor |
 | G.4 | [G.4_tool_arm_exec.md](./G.4_tool_arm_exec.md) | **Closed** (6870910) — Tool ARM + matrix freeze + exec once |
 | G.5 | [G.5_repair_language.md](./G.5_repair_language.md) | **Closed** (1d8fc87) — repair + ListenLanguage + locale |
-| G.6 | [G.6_inform_binding.md](./G.6_inform_binding.md) | **Closed** — Inform + inline_faq binding |
+| G.6 | [G.6_inform_binding.md](./G.6_inform_binding.md) | **Closed** (8a198e0) — Inform + inline_faq binding |
 | G.7 | per G.0 | Not started |
 
 ## Still later
