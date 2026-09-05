@@ -1,4 +1,4 @@
-# CI — Jobs A + B + C. Locked: docs/11_CI_AND_CD.md
+# CI — Jobs A + B + C + D. Locked: docs/11_CI_AND_CD.md
 name: ci
 
 on:
@@ -105,3 +105,20 @@ jobs:
 
       - name: go test cihygiene lock
         run: go test ./internal/cihygiene/... -count=1 -timeout 60s
+
+  golangci:
+    name: golangci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          args: --timeout=5m

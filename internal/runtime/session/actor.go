@@ -126,13 +126,6 @@ func (a *Actor) TerminalReason() string {
 	return a.terminal
 }
 
-func (a *Actor) setState(s string) {
-	a.mu.Lock()
-	a.state = s
-	a.mu.Unlock()
-	a.Bus.PublishEvent(bus.Event{Kind: "state", Data: s})
-}
-
 // Start transitions Created → Running and begins the actor loop (clock heartbeat + drain watch).
 func (a *Actor) Start(parent context.Context) error {
 	a.mu.Lock()

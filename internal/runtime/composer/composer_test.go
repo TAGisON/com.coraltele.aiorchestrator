@@ -398,7 +398,7 @@ func TestComposer_AnswerCallWritesAttachedSink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mgr.Stop(context.Background(), "sess-sink", "test")
+	defer func() { _, _ = mgr.Stop(context.Background(), "sess-sink", "test") }()
 
 	sink := &recordingSink{}
 	actor.AttachSink(sink, "test-sink")

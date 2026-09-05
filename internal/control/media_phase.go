@@ -113,15 +113,6 @@ func (m *sessionMedia) noteFirstUplink() bool {
 	return m.tryEnterReadyLocked()
 }
 
-func (m *sessionMedia) settleElapsed() bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.attachAt.IsZero() {
-		return false
-	}
-	return time.Since(m.attachAt) >= time.Duration(m.settleMs)*time.Millisecond
-}
-
 func (m *sessionMedia) tryEnterReadyLocked() bool {
 	if m.phase != MediaEstablishing {
 		return m.phase == MediaReady || m.phase == MediaWelcoming || m.phase == MediaConversing
@@ -163,12 +154,6 @@ func (m *sessionMedia) enterReadyFromSettle() bool {
 	}
 	m.phase = MediaReady
 	return true
-}
-
-func (m *sessionMedia) phaseAtLeast(want MediaPhase) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return mediaPhaseRank(m.phase) >= mediaPhaseRank(want)
 }
 
 func (m *sessionMedia) beginWelcome() error {

@@ -2,7 +2,6 @@ package fake_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -113,9 +112,7 @@ func TestTimeoutCode(t *testing.T) {
 	if ge.Code != port.CodeTimeout {
 		t.Fatal("timeout code")
 	}
-	if !errors.Is(ctx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
-		// ctx may already be done
-	}
+	_ = ctx.Err()
 	_ = ss
 }
 
