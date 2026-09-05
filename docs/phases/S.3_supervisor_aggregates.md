@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `S.3` |
 | **title** | Supervisor: light session/analytics aggregates |
-| **status** | **Closed** |
+| **status** | **Closed** (`eea05cf`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave S; OD-13-8 |
 | **depends_on** | S.2 Closed (`c158232`); existing analytics_event + sessions |
 
