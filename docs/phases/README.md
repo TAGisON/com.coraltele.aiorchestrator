@@ -115,12 +115,13 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | S.2 | [S.2_supervisor_audit.md](./S.2_supervisor_audit.md) | **Closed** (c158232) — audit browser + catalog `audit_event_types` |
 | S.3 | [S.3_supervisor_aggregates.md](./S.3_supervisor_aggregates.md) | **Closed** (eea05cf) — `GET /v1/analytics/summary` + Supervisor summary |
 | S.4 | [S.4_supervisor_soak_checklist.md](./S.4_supervisor_soak_checklist.md) | **Closed** (23d96f7) — Supervisor UI soak checklist |
-| V.1–V.2 | — | Next — dual chat+call prove |
+| V.1 | [V.1_dual_channel_prove.md](./V.1_dual_channel_prove.md) | **Closed** — dual chat+call prove checklist (same pin) |
+| V.2 | — | Optional — lab performance notes |
 
 ## Still later
 
-- Owner **runs** A.6 / C.4 / S.4 / L.0 / E.6 sign-off on lab (human)
-- **V.1** same published flow: chat soak + call soak, then V.2
+- Owner **runs** A.6 / C.4 / S.4 / V.1 / L.0 / E.6 sign-off on lab (human) — **this is E2E user testing**
+- Optional **V.2** lab performance notes
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
 

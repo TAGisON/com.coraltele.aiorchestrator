@@ -198,4 +198,4 @@ Serial waves. Detail each phase in `docs/phases/` before L4. Size: half-day–tw
 
 ## Handoff note (Locked)
 
-Admin **A.1–A.6** Closed. **C.1–C.4** Closed. **S.1–S.4** Closed (Supervisor complete). Next: [phases/V.1](./phases/) dual chat+call prove, or human soak sign-off on [A.6](./phases/A.6_admin_soak_checklist.md) / [C.4](./phases/C.4_chat_soak_checklist.md) / [S.4](./phases/S.4_supervisor_soak_checklist.md).
+Consoles **U.* / A.* / C.* / S.*** Closed. **V.1** Closed (dual prove checklist). Optional **V.2** lab notes. Owner runs soaks on lab: [A.6](./phases/A.6_admin_soak_checklist.md), [C.4](./phases/C.4_chat_soak_checklist.md), [S.4](./phases/S.4_supervisor_soak_checklist.md), [V.1](./phases/V.1_dual_channel_prove.md), [L.0](./phases/L.0_graph_lab_soak.md).
