@@ -76,7 +76,7 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| G.0 | [G.0_graph_runtime_inventory.md](./G.0_graph_runtime_inventory.md) | **Closed** — gap list + G.1–G.7 sketch |
+| G.0 | [G.0_graph_runtime_inventory.md](./G.0_graph_runtime_inventory.md) | **Closed** (fcfa5b2) — gap list + G.1–G.7 sketch |
 | G.1–G.7 | per G.0 | Not started |
 
 ## Still later
