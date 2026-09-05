@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.6` |
 | **title** | Admin V1 soak checklist (UI configure → publish → pin) |
-| **status** | **Closed** — checklist authored |
+| **status** | **Closed** (c53b441) — checklist authored |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) A.6 |
 | **depends_on** | A.1–A.5 Closed (`e1e6a78` tip of A.5); U.1–U.2 Closed |
 
