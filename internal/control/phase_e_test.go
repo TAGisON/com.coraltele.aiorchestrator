@@ -63,12 +63,12 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 	audits, _ := mem.ListAuditEvents(context.Background(), sid)
 	foundStart := false
 	for _, a := range audits {
-		if a.EventType == store.AuditSessionStarted {
+		if a.EventType == store.AuditSessionLive || a.EventType == store.AuditSessionCreated {
 			foundStart = true
 		}
 	}
 	if !foundStart {
-		t.Fatalf("want session.started audit %#v", audits)
+		t.Fatalf("want session.created/live audit %#v", audits)
 	}
 
 	actor, ok := mgr.Get(sid)
@@ -101,10 +101,10 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 	audits, _ = mem.ListAuditEvents(context.Background(), sid)
 	foundTerm, foundTurn := false, false
 	for _, a := range audits {
-		if a.EventType == store.AuditSessionTerminal {
+		switch a.EventType {
+		case store.AuditSessionCompleted, store.AuditSessionCancelled, store.AuditSessionFailed:
 			foundTerm = true
-		}
-		if a.EventType == store.AuditTurnCompleted {
+		case store.AuditTurnState:
 			foundTurn = true
 		}
 	}
@@ -266,12 +266,12 @@ func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
 	audits, _ := mem.ListAuditEvents(context.Background(), sid)
 	foundTerm := false
 	for _, a := range audits {
-		if a.EventType == store.AuditSessionTerminal {
+		if a.EventType == store.AuditSessionCancelled {
 			foundTerm = true
 		}
 	}
 	if !foundTerm {
-		t.Fatalf("want session.terminal audit %#v", audits)
+		t.Fatalf("want session.cancelled audit %#v", audits)
 	}
 
 	ams, _ := mem.ListAnalyticsEvents(context.Background(), sid)

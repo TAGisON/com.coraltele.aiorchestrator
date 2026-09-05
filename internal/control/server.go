@@ -409,6 +409,12 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "create session failed", nil)
 		return
 	}
+	if _, err := s.repo.AppendAuditEvent(r.Context(), store.AuditEvent{
+		SessionID: sess.ID, TenantID: sess.TenantID, EventType: store.AuditSessionCreated,
+		Payload: []byte(`{}`),
+	}); err != nil {
+		applog.Warn("session.created audit fail-open", "session", sess.ID, "err", err)
+	}
 	state := sess.State
 	if s.rt != nil {
 		if err := s.rt.StartSession(r.Context(), RuntimeStart{
@@ -563,6 +569,12 @@ func (s *Server) handleStopSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "drain failed", nil)
 		return
+	}
+	if _, err := s.repo.AppendAuditEvent(r.Context(), store.AuditEvent{
+		SessionID: id, TenantID: sess.TenantID, EventType: store.AuditSessionEnding,
+		Payload: []byte(`{}`),
+	}); err != nil {
+		applog.Warn("session.ending audit fail-open", "session", id, "err", err)
 	}
 	if s.rt != nil {
 		term, err := s.rt.StopSession(r.Context(), id, req.Reason)

@@ -71,8 +71,8 @@ func TestValidationV1_TierB(t *testing.T) {
 		_ = h.doJSON(t, http.MethodPost, "/v1/sessions/"+sid+"/inject", `{"text":"ping","speak":true}`)
 		_ = h.doJSON(t, http.MethodPost, "/v1/sessions/"+sid+"/stop", `{}`)
 		audits, _ := h.Repo.ListAuditEvents(context.Background(), sid)
-		if !hasAudit(audits, store.AuditSessionStarted) {
-			t.Fatalf("missing session.started %#v", audits)
+		if !hasAudit(audits, store.AuditSessionLive) {
+			t.Fatalf("missing session.live %#v", audits)
 		}
 	})
 

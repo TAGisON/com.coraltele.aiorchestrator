@@ -112,6 +112,12 @@ func hasAudit(events []store.AuditEvent, typ string) bool {
 	return false
 }
 
+func hasTerminalAudit(events []store.AuditEvent) bool {
+	return hasAudit(events, store.AuditSessionCompleted) ||
+		hasAudit(events, store.AuditSessionCancelled) ||
+		hasAudit(events, store.AuditSessionFailed)
+}
+
 func hasMetric(events []store.AnalyticsEvent, metric string) bool {
 	for _, e := range events {
 		if e.Metric == metric {

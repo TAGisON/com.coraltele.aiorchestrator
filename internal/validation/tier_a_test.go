@@ -125,14 +125,17 @@ func TestValidationV1_TierA(t *testing.T) {
 		}
 
 		audits, _ := h.Repo.ListAuditEvents(context.Background(), sid)
-		if !hasAudit(audits, store.AuditSessionStarted) {
-			t.Fatalf("missing session.started %#v", audits)
+		if !hasAudit(audits, store.AuditSessionCreated) {
+			t.Fatalf("missing session.created %#v", audits)
 		}
-		if !hasAudit(audits, store.AuditSessionTerminal) {
-			t.Fatalf("missing session.terminal %#v", audits)
+		if !hasAudit(audits, store.AuditSessionLive) {
+			t.Fatalf("missing session.live %#v", audits)
 		}
-		if !hasAudit(audits, store.AuditTurnCompleted) {
-			t.Fatalf("missing turn.completed %#v", audits)
+		if !hasTerminalAudit(audits) {
+			t.Fatalf("missing session terminal allowlist event %#v", audits)
+		}
+		if !hasAudit(audits, store.AuditTurnState) {
+			t.Fatalf("missing turn.state %#v", audits)
 		}
 	})
 
@@ -259,8 +262,8 @@ func TestValidationV1_TierA(t *testing.T) {
 			t.Fatalf("state=%s want Cancelled", sess.State)
 		}
 		audits, _ := h.Repo.ListAuditEvents(context.Background(), sid)
-		if !hasAudit(audits, store.AuditSessionTerminal) {
-			t.Fatalf("want session.terminal %#v", audits)
+		if !hasAudit(audits, store.AuditSessionCancelled) {
+			t.Fatalf("want session.cancelled %#v", audits)
 		}
 		ams, _ := h.Repo.ListAnalyticsEvents(context.Background(), sid)
 		if !hasMetric(ams, store.MetricSessionCompleted) && !hasMetric(ams, store.MetricSessionFailed) {

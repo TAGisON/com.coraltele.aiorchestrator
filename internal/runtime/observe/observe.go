@@ -156,8 +156,9 @@ func (o *Observer) OnTurnCompleted(ctx context.Context, t TurnCompleted) {
 	}
 	o.Metric(ctx, store.MetricTurnCompleted, 1, dims)
 	if t.SkillName != "" {
-		o.Audit(ctx, store.AuditSkillExecuted, map[string]any{
+		o.Audit(ctx, store.AuditToolExecuted, map[string]any{
 			"name": t.SkillName,
+			"tool": t.SkillName,
 			"ok":   t.SkillOK,
 		})
 	}
@@ -233,10 +234,7 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 	if err != nil {
 		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleAssistant, "err", err)
 	}
-	o.Audit(ctx, "speak.prompt", map[string]any{
-		"turn_id": turnID,
-		"text":    truncate(responseText, 512),
-	})
+	_ = turnID // speak.prompt removed — not on P2.4 allowlist (E.4)
 }
 
 // UserFinalSpec is a structured user_final emit (docs/09 B1).
@@ -293,7 +291,7 @@ func (o *Observer) OnBargeIn(ctx context.Context) {
 	if o == nil {
 		return
 	}
-	o.Audit(ctx, store.AuditBargeIn, map[string]any{"ts_ms": time.Now().UnixMilli()})
+	o.Audit(ctx, store.AuditTurnState, map[string]any{"ts_ms": time.Now().UnixMilli(), "barge_in": true})
 	o.Metric(ctx, store.MetricBargeIn, 1, nil)
 }
 
@@ -302,7 +300,7 @@ func (o *Observer) OnSessionStarted(ctx context.Context) {
 	if o == nil {
 		return
 	}
-	o.Audit(ctx, store.AuditSessionStarted, map[string]any{
+	o.Audit(ctx, store.AuditSessionLive, map[string]any{
 		"state":    store.StateRunning,
 		"caller":   jsonOrNil(o.Meta.Caller),
 		"metadata": jsonOrNil(o.Meta.Metadata),
@@ -315,7 +313,7 @@ func (o *Observer) OnSessionTerminal(ctx context.Context, terminal string, hando
 	if o == nil {
 		return
 	}
-	o.Audit(ctx, store.AuditSessionTerminal, map[string]any{"state": terminal, "handoff": handoff})
+	o.Audit(ctx, store.AuditTerminalType(terminal), map[string]any{"state": terminal, "handoff": handoff})
 	switch terminal {
 	case store.StateFailed:
 		o.Metric(ctx, store.MetricSessionFailed, 1, nil)

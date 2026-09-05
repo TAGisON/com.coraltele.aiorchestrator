@@ -20,12 +20,6 @@ const (
 	RecordingStopManual           = "manual"
 )
 
-// P2.4 recording audit types (new emitters).
-const (
-	AuditRecordingStarted = "recording.started"
-	AuditRecordingStopped = "recording.stopped"
-)
-
 // MapRecordingStopReason maps runtime stop hints to the closed P2.5 vocabulary.
 func MapRecordingStopReason(endReason string) string {
 	switch strings.ToLower(strings.TrimSpace(endReason)) {

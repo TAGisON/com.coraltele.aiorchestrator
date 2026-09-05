@@ -291,7 +291,7 @@ func TestSession_CreateStoresCallerAndMetadata(t *testing.T) {
 	_ = json.Unmarshal(rr.Body.Bytes(), &audit)
 	found := false
 	for _, e := range audit.Events {
-		if e.Type != "session.started" {
+		if e.Type != store.AuditSessionLive {
 			continue
 		}
 		found = true
@@ -301,6 +301,6 @@ func TestSession_CreateStoresCallerAndMetadata(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("missing session.started audit")
+		t.Fatal("missing session.live audit")
 	}
 }

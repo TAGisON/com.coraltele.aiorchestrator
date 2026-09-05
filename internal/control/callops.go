@@ -232,15 +232,28 @@ func (r *SessionRuntime) Transfer(ctx context.Context, sessionID string, req por
 		return fmt.Errorf("transfer: session %s has no telephony leg", sessionID)
 	}
 
+	toolPayload := map[string]any{
+		"tool":        "transfer",
+		"destination": dest,
+		"dialplan":    req.Dialplan,
+		"context":     req.Context,
+		"reason":      req.Reason,
+	}
+	r.auditRecording(sessionID, store.AuditToolArmed, toolPayload)
 	// Let queued speech finish, but never let a wedged sink block the transfer.
 	r.waitPlayout(ctx, sessionID, 10*time.Second)
+	r.auditRecording(sessionID, store.AuditToolExecuting, toolPayload)
 
 	if err := cc.Transfer(ctx, req); err != nil {
+		fail := map[string]any{"tool": "transfer", "destination": dest, "error": err.Error()}
+		r.auditRecording(sessionID, store.AuditToolFailed, fail)
 		return fmt.Errorf("transfer: %w", err)
 	}
 
 	applog.Info("session transferred", "session", sessionID, "dest", dest,
 		"dialplan", req.Dialplan, "context", req.Context, "reason", req.Reason)
+	okPayload := map[string]any{"tool": "transfer", "destination": dest, "ok": true, "name": "warm_transfer"}
+	r.auditRecording(sessionID, store.AuditToolExecuted, okPayload)
 	r.recordDisposition(ctx, sessionID, "transferred", req.Reason)
 	return nil
 }
@@ -287,14 +300,25 @@ func (r *SessionRuntime) FailCall(ctx context.Context, sessionID string, sc fall
 
 	cc, _, hasCC := r.callControl(sessionID)
 	if hasCC && cc != nil {
+		hangPayload := map[string]any{
+			"tool":     "hangup",
+			"scenario": string(sc),
+			"cause":    hangupCauseFor(sc),
+		}
+		r.auditRecording(sessionID, store.AuditToolArmed, hangPayload)
 		if played {
 			// Give the prompt time to reach the caller; the edge also drains
 			// before acting, this is just our own upper bound.
 			r.waitPlayout(ctx, sessionID, 20*time.Second)
 		}
+		r.auditRecording(sessionID, store.AuditToolExecuting, hangPayload)
 		if err := cc.Hangup(ctx, hangupCauseFor(sc)); err != nil {
 			applog.Warn("fallback hangup", "session", sessionID, "err", err)
+			fail := map[string]any{"tool": "hangup", "scenario": string(sc), "error": err.Error()}
+			r.auditRecording(sessionID, store.AuditToolFailed, fail)
 		} else {
+			okPayload := map[string]any{"tool": "hangup", "scenario": string(sc), "ok": true}
+			r.auditRecording(sessionID, store.AuditToolExecuted, okPayload)
 			r.waitCallControlGone(sessionID, 16*time.Second)
 		}
 	}

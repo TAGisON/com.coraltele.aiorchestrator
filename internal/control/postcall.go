@@ -320,7 +320,7 @@ func toGatewayIDs(ss []string) []port.GatewayID {
 // DetectHandoffFromAudit returns true if warm_transfer skill succeeded in audit.
 func DetectHandoffFromAudit(evs []store.AuditEvent) bool {
 	for _, ev := range evs {
-		if ev.EventType != store.AuditSkillExecuted {
+		if ev.EventType != store.AuditToolExecuted && ev.EventType != "skill.executed" {
 			continue
 		}
 		var p map[string]any
@@ -328,6 +328,9 @@ func DetectHandoffFromAudit(evs []store.AuditEvent) bool {
 			continue
 		}
 		name, _ := p["name"].(string)
+		if name == "" {
+			name, _ = p["tool"].(string)
+		}
 		ok, _ := p["ok"].(bool)
 		if name == "warm_transfer" && ok {
 			return true

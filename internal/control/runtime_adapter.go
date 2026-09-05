@@ -400,6 +400,7 @@ func (r *SessionRuntime) auditListenDecision(talk *composer.Talk, eventType, tex
 		"text":       truncateAuditText(text, 512),
 		"language":   lang,
 		"talk_state": string(talk.State()),
+		"suppressed": reason != "accepted",
 	}
 	talk.Obs.Audit(context.Background(), eventType, payload)
 	// Suppressed/ignored caller speech still belongs in the transcript for CX review.
@@ -446,7 +447,7 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 	if session.IsLikelyTTSEcho(text, talk.LastSpokenText()) {
 		r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "tts_echo"})
 		applog.Info("live listen final suppressed (tts echo)", "session", sessionID, "chars", len(text))
-		r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "tts_echo")
+		r.auditListenDecision(talk, store.AuditSTTFinal, text, final.Language, "tts_echo")
 		return
 	}
 	st := talk.State()
@@ -454,13 +455,13 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 		if !policy.Allowed {
 			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "barge_disabled"})
 			applog.Info("live listen final suppressed (barge disabled)", "session", string(talk.Session))
-			r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "barge_disabled")
+			r.auditListenDecision(talk, store.AuditSTTFinal, text, final.Language, "barge_disabled")
 			return
 		}
 		if !policy.textCommit(text) {
 			r.bargeMetric(talk, store.MetricBargeSuppressEchoTotal, map[string]any{"reason": "short"})
 			applog.Info("live listen final suppressed (short)", "session", string(talk.Session), "chars", len(text))
-			r.auditListenDecision(talk, "listen.suppressed", text, final.Language, "short")
+			r.auditListenDecision(talk, store.AuditSTTFinal, text, final.Language, "short")
 			return
 		}
 		applog.Info("live listen final barge commit", "session", string(talk.Session), "state", string(st), "chars", len(text))
@@ -468,7 +469,7 @@ func (r *SessionRuntime) deliverListenFinal(ctx context.Context, sessionID strin
 		talk.Interrupt()
 	}
 	applog.Info("live listen final", "session", string(talk.Session), "lang", final.Language, "chars", len(text))
-	r.auditListenDecision(talk, "listen.final", text, final.Language, "accepted")
+	r.auditListenDecision(talk, store.AuditSTTFinal, text, final.Language, "accepted")
 	// Actor locks language once on the first confident final.
 	// Pure greetings ("Hello" / "Namaste") must not lock or persist preferred language.
 	var err error

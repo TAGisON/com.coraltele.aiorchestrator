@@ -5,16 +5,50 @@ import (
 	"time"
 )
 
-// Closed audit event_type set for Phase E (INTEGRATION.md §5 / turn correlation).
+// P2.4 V1 audit event_type allowlist (docs/phases/P2.4_audit_events.md).
 const (
-	AuditSessionStarted  = "session.started"
-	AuditSessionTerminal = "session.terminal"
-	AuditTurnCompleted   = "turn.completed"
-	AuditSkillExecuted   = "skill.executed"
-	AuditBargeIn         = "barge_in"
-	AuditError           = "error"
-	AuditDisposition     = "disposition.suggestion"
+	AuditSessionCreated   = "session.created"
+	AuditSessionLive      = "session.live"
+	AuditSessionEnding    = "session.ending"
+	AuditSessionCompleted = "session.completed"
+	AuditSessionCancelled = "session.cancelled"
+	AuditSessionFailed    = "session.failed"
+	AuditTurnState        = "turn.state"
+	AuditSTTFinal         = "stt.final"
+	AuditGraphEdge        = "graph.edge"
+	AuditToolArmed        = "tool.armed"
+	AuditToolExecuting    = "tool.executing"
+	AuditToolExecuted     = "tool.executed"
+	AuditToolFailed       = "tool.failed"
+	AuditRecordingStarted = "recording.started"
+	AuditRecordingStopped = "recording.stopped"
+	AuditLanguageChanged  = "language.changed"
+
+	// Kept until E.5 revisits disposition evidence (P2.4 inventory).
+	AuditDisposition = "disposition.suggestion"
+
+	// Legacy aliases — prefer allowlist names above. Values match transitioned emitters.
+	AuditSessionStarted  = AuditSessionLive
+	AuditSessionTerminal = "session.terminal" // do not emit; OnSessionTerminal maps to completed/cancelled/failed
+	AuditTurnCompleted   = AuditTurnState
+	AuditSkillExecuted   = AuditToolExecuted
+	AuditBargeIn         = AuditTurnState
+	AuditError           = AuditSessionFailed
 )
+
+// AuditTerminalType maps a durable session terminal state to a P2.4 event_type.
+func AuditTerminalType(state string) string {
+	switch state {
+	case StateCompleted:
+		return AuditSessionCompleted
+	case StateCancelled:
+		return AuditSessionCancelled
+	case StateFailed:
+		return AuditSessionFailed
+	default:
+		return AuditSessionCompleted
+	}
+}
 
 // Locked analytics metric names (ANALYTICS_AND_POSTCALL.md §2).
 const (
