@@ -53,7 +53,7 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **In progress** |
+| E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **Closed** ($main) — gap list |
 | E.1–E.6 | per [09](../09_EVIDENCE_AND_RECORDING.md) | Not started (L3 files TBD) |
 
 ## Still later
