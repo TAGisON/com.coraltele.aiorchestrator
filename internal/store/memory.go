@@ -464,6 +464,12 @@ func (m *Memory) AppendTranscriptTurn(ctx context.Context, turn TranscriptTurn) 
 	m.transcriptSeq++
 	turn.ID = m.transcriptSeq
 	turn.CreatedAt = time.Now().UTC()
+	if turn.EventKind == "" {
+		turn.EventKind = EventKindUtterance
+	}
+	if len(turn.Payload) == 0 {
+		turn.Payload = json.RawMessage(`{}`)
+	}
 	m.transcripts[turn.SessionID] = append(list, turn)
 	return turn, nil
 }

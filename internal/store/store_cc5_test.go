@@ -21,12 +21,14 @@ func TestMemory_TranscriptAndDisposition(t *testing.T) {
 
 	u, err := mem.AppendTranscriptTurn(ctx, store.TranscriptTurn{
 		SessionID: "s1", Role: store.RoleUser, Text: "hello", TurnID: "turn-a",
+		EventKind: store.EventKindUserFinal, Actionable: store.BoolPtr(true),
 	})
 	if err != nil || u.Seq != 1 {
 		t.Fatalf("user turn %#v err=%v", u, err)
 	}
 	a, err := mem.AppendTranscriptTurn(ctx, store.TranscriptTurn{
 		SessionID: "s1", Role: store.RoleAssistant, Text: "hi", TurnID: "turn-a",
+		EventKind: store.EventKindBotUtterance,
 	})
 	if err != nil || a.Seq != 2 || a.TurnID != "turn-a" {
 		t.Fatalf("assistant turn %#v err=%v", a, err)
@@ -37,6 +39,9 @@ func TestMemory_TranscriptAndDisposition(t *testing.T) {
 	}
 	if list[0].Seq != 1 || list[1].Seq != 2 {
 		t.Fatalf("order %#v", list)
+	}
+	if list[0].EventKind != store.EventKindUserFinal || list[1].EventKind != store.EventKindBotUtterance {
+		t.Fatalf("kinds %#v", list)
 	}
 
 	d, err := mem.UpsertSessionDisposition(ctx, store.SessionDisposition{

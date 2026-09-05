@@ -24,13 +24,20 @@ func (s *Server) handleGetTranscript(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(turns))
 	for _, t := range turns {
-		items = append(items, map[string]any{
-			"seq":        t.Seq,
-			"turn_id":    t.TurnID,
-			"role":       t.Role,
-			"text":       t.Text,
-			"created_at": t.CreatedAt,
-		})
+		item := map[string]any{
+			"seq":               t.Seq,
+			"turn_id":           t.TurnID,
+			"role":              t.Role,
+			"text":              t.Text,
+			"event_kind":        t.EventKind,
+			"actionable_reason": t.ActionableReason,
+			"language":          t.Language,
+			"created_at":        t.CreatedAt,
+		}
+		if t.Actionable != nil {
+			item["actionable"] = *t.Actionable
+		}
+		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"session_id": id,

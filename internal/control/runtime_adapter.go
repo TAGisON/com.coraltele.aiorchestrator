@@ -404,8 +404,28 @@ func (r *SessionRuntime) auditListenDecision(talk *composer.Talk, eventType, tex
 	talk.Obs.Audit(context.Background(), eventType, payload)
 	// Suppressed/ignored caller speech still belongs in the transcript for CX review.
 	if reason != "accepted" && strings.TrimSpace(text) != "" {
-		note := "[" + reason + "] " + strings.TrimSpace(text)
-		talk.Obs.AppendUserOnly(context.Background(), note)
+		talk.Obs.AppendUserFinal(context.Background(), observe.UserFinalSpec{
+			Text:             strings.TrimSpace(text),
+			Language:         lang,
+			Actionable:       false,
+			ActionableReason: mapListenSuppressReason(reason),
+		})
+	}
+}
+
+func mapListenSuppressReason(reason string) string {
+	switch reason {
+	case "tts_echo":
+		return store.ActionableReasonEchoSuspect
+	case "barge_disabled":
+		return store.ActionableReasonBargeForbidden
+	case "short":
+		return store.ActionableReasonTooShort
+	default:
+		if strings.TrimSpace(reason) == "" {
+			return store.ActionableReasonEmpty
+		}
+		return reason
 	}
 }
 

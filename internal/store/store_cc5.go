@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"hash/fnv"
 	"strings"
@@ -29,16 +30,43 @@ SELECT COALESCE(MAX(seq), 0) + 1 FROM transcript_turn WHERE session_id=$1
 		return TranscriptTurn{}, err
 	}
 
+	payload := turn.Payload
+	if len(payload) == 0 {
+		payload = json.RawMessage(`{}`)
+	}
+	var turnID any
+	if strings.TrimSpace(turn.TurnID) != "" {
+		turnID = turn.TurnID
+	}
+
 	var out TranscriptTurn
+	var actionable *bool
+	var outTurnID *string
+	var outPayload []byte
 	err = tx.QueryRow(ctx, `
-INSERT INTO transcript_turn (session_id, seq, role, text, turn_id)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, session_id, seq, role, text, turn_id, created_at
-`, turn.SessionID, nextSeq, turn.Role, turn.Text, turn.TurnID).Scan(
-		&out.ID, &out.SessionID, &out.Seq, &out.Role, &out.Text, &out.TurnID, &out.CreatedAt,
+INSERT INTO transcript_turn (
+  session_id, seq, role, text, turn_id,
+  event_kind, actionable, actionable_reason, node_id, edge_id, language, payload
+)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+RETURNING id, session_id, seq, role, text, turn_id, event_kind, actionable, actionable_reason,
+          node_id, edge_id, language, payload, created_at
+`, turn.SessionID, nextSeq, turn.Role, turn.Text, turnID,
+		turn.EventKind, turn.Actionable, turn.ActionableReason, turn.NodeID, turn.EdgeID, turn.Language, payload,
+	).Scan(
+		&out.ID, &out.SessionID, &out.Seq, &out.Role, &out.Text, &outTurnID,
+		&out.EventKind, &actionable, &out.ActionableReason,
+		&out.NodeID, &out.EdgeID, &out.Language, &outPayload, &out.CreatedAt,
 	)
 	if err != nil {
 		return TranscriptTurn{}, err
+	}
+	if outTurnID != nil {
+		out.TurnID = *outTurnID
+	}
+	out.Actionable = actionable
+	if len(outPayload) > 0 {
+		out.Payload = json.RawMessage(outPayload)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return TranscriptTurn{}, err
@@ -48,7 +76,8 @@ RETURNING id, session_id, seq, role, text, turn_id, created_at
 
 func (s *Store) ListTranscriptTurns(ctx context.Context, sessionID string) ([]TranscriptTurn, error) {
 	rows, err := s.pool.Query(ctx, `
-SELECT id, session_id, seq, role, text, turn_id, created_at
+SELECT id, session_id, seq, role, text, turn_id, event_kind, actionable, actionable_reason,
+       node_id, edge_id, language, payload, created_at
 FROM transcript_turn WHERE session_id=$1 ORDER BY seq ASC
 `, sessionID)
 	if err != nil {
@@ -58,8 +87,20 @@ FROM transcript_turn WHERE session_id=$1 ORDER BY seq ASC
 	var out []TranscriptTurn
 	for rows.Next() {
 		var t TranscriptTurn
-		if err := rows.Scan(&t.ID, &t.SessionID, &t.Seq, &t.Role, &t.Text, &t.TurnID, &t.CreatedAt); err != nil {
+		var turnID *string
+		var payload []byte
+		if err := rows.Scan(
+			&t.ID, &t.SessionID, &t.Seq, &t.Role, &t.Text, &turnID,
+			&t.EventKind, &t.Actionable, &t.ActionableReason,
+			&t.NodeID, &t.EdgeID, &t.Language, &payload, &t.CreatedAt,
+		); err != nil {
 			return nil, err
+		}
+		if turnID != nil {
+			t.TurnID = *turnID
+		}
+		if len(payload) > 0 {
+			t.Payload = json.RawMessage(payload)
 		}
 		out = append(out, t)
 	}

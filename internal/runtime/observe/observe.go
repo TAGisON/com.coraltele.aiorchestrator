@@ -180,27 +180,41 @@ func (o *Observer) appendTranscript(ctx context.Context, turnID, userText, respo
 			Role:      store.RoleAssistant,
 			Text:      responseText,
 			TurnID:    turnID + "-interrupted",
+			EventKind: store.EventKindBotUtterance,
 		}); err != nil {
 			applog.Warn("observe interrupted assistant fail-open", "session", o.Meta.SessionID, "err", err)
 		}
 	}
 	for _, row := range []store.TranscriptTurn{
-		{SessionID: o.Meta.SessionID, Role: store.RoleUser, Text: userText, TurnID: turnID},
-		{SessionID: o.Meta.SessionID, Role: store.RoleAssistant, Text: responseText, TurnID: turnID},
+		{
+			SessionID:  o.Meta.SessionID,
+			Role:       store.RoleUser,
+			Text:       userText,
+			TurnID:     turnID,
+			EventKind:  store.EventKindUserFinal,
+			Actionable: store.BoolPtr(true),
+		},
+		{
+			SessionID: o.Meta.SessionID,
+			Role:      store.RoleAssistant,
+			Text:      responseText,
+			TurnID:    turnID,
+			EventKind: store.EventKindBotUtterance,
+		},
 	} {
 		if row.Role == store.RoleAssistant && barge {
+			continue
+		}
+		if strings.TrimSpace(row.Text) == "" {
 			continue
 		}
 		if _, err := o.Repo.AppendTranscriptTurn(writeCtx, row); err != nil {
 			applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", row.Role, "err", err)
 		}
 	}
-	if barge && strings.TrimSpace(responseText) != "" {
-		return
-	}
 }
 
-// AppendAssistantOnly writes a single assistant transcript turn (call answer / opening).
+// AppendAssistantOnly writes a single bot_utterance (call answer / opening).
 func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string) {
 	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
 		return
@@ -214,6 +228,7 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 		Role:      store.RoleAssistant,
 		Text:      responseText,
 		TurnID:    turnID,
+		EventKind: store.EventKindBotUtterance,
 	})
 	if err != nil {
 		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleAssistant, "err", err)
@@ -224,24 +239,45 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 	})
 }
 
-// AppendUserOnly writes a single user transcript turn (suppressed/ignored STT still visible).
-func (o *Observer) AppendUserOnly(ctx context.Context, userText string) {
+// UserFinalSpec is a structured user_final emit (docs/09 B1).
+type UserFinalSpec struct {
+	Text             string
+	Language         string
+	Actionable       bool
+	ActionableReason string
+}
+
+// AppendUserFinal writes a user_final transcript event (accepted or transcript-only).
+func (o *Observer) AppendUserFinal(ctx context.Context, u UserFinalSpec) {
 	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
 		return
 	}
-	if strings.TrimSpace(userText) == "" {
+	if strings.TrimSpace(u.Text) == "" {
 		return
+	}
+	reason := u.ActionableReason
+	if u.Actionable {
+		reason = ""
 	}
 	turnID := newTurnID()
 	_, err := o.Repo.AppendTranscriptTurn(storeCtx(ctx), store.TranscriptTurn{
-		SessionID: o.Meta.SessionID,
-		Role:      store.RoleUser,
-		Text:      userText,
-		TurnID:    turnID,
+		SessionID:        o.Meta.SessionID,
+		Role:             store.RoleUser,
+		Text:             u.Text,
+		TurnID:           turnID,
+		EventKind:        store.EventKindUserFinal,
+		Actionable:       store.BoolPtr(u.Actionable),
+		ActionableReason: reason,
+		Language:         u.Language,
 	})
 	if err != nil {
 		applog.Warn("observe transcript fail-open", "session", o.Meta.SessionID, "role", store.RoleUser, "err", err)
 	}
+}
+
+// AppendUserOnly is a legacy helper; prefer AppendUserFinal.
+func (o *Observer) AppendUserOnly(ctx context.Context, userText string) {
+	o.AppendUserFinal(ctx, UserFinalSpec{Text: userText, Actionable: true})
 }
 
 func newTurnID() string {
