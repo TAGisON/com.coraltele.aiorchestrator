@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live pin — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a href="/admin/bindings.html">Bindings</a>
+      <a href="/admin/flows.html">Flows</a>
+      <a href="/admin/flows-builder.html">Builder</a>
+      <a class="active" href="/admin/pin.html">Live pin</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Live pin</h1>
+    <p class="lede">Map each Talk profile to a published flow pin (optional DID label for lab/edge notes). Stored in system setting <code>answer_pins</code> — no new tables. Live sessions still require the pin on create (G.7).</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Platform status</h2>
+      <button type="button" class="btn secondary" id="reload-status">Refresh</button>
+      <div class="probe" id="status-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Answer pins</h2>
+      <div id="pin-rows"></div>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="add-pin">Add pin</button>
+        <button type="button" class="btn" id="save-pins">Save pins</button>
+        <button type="button" class="btn secondary" id="reload-pins">Reload</button>
+      </div>
+      <div class="probe" id="pins-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Lab session (with pin)</h2>
+      <p style="color:var(--muted);font-size:0.9rem">Creates a session via Control using the selected profile + flow pin. Use <code>playback</code> without telephony; <code>live</code> requires engines. <code>chat</code> listed for future C.1.</p>
+      <div class="field-row">
+        <div>
+          <label class="field" for="lab-profile">Profile</label>
+          <select id="lab-profile"></select>
+        </div>
+        <div>
+          <label class="field" for="lab-flow">Flow</label>
+          <select id="lab-flow"></select>
+        </div>
+        <div>
+          <label class="field" for="lab-ver">Flow version</label>
+          <input id="lab-ver" type="text" value="latest" />
+        </div>
+        <div>
+          <label class="field" for="lab-clock">Clock</label>
+          <select id="lab-clock"></select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="create-session">Create session</button>
+      </div>
+      <div class="probe" id="sess-out"></div>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+    let profiles = [];
+    let flows = [];
+    let catalog = null;
+
+    function pinRow(pre) {
+      pre = pre || {};
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.style.marginTop = "0.5rem";
+      wrap.innerHTML =
+        '<div class="field-row">' +
+        '<div><label class="field">Profile</label><select class="p-profile"></select></div>' +
+        '<div><label class="field">Flow</label><select class="p-flow"></select></div>' +
+        '<div><label class="field">Flow version</label><input class="p-ver" type="text" value="latest" /></div>' +
+        '<div><label class="field">DID label</label><input class="p-did" type="text" placeholder="optional" /></div>' +
+        '</div>' +
+        '<label class="field">Note</label><input class="p-note" type="text" />' +
+        '<div class="actions"><button type="button" class="btn secondary p-rm">Remove</button></div>';
+      const pids = profiles.map((p) => p.id);
+      const fids = flows.map((f) => f.id);
+      AdminUI.fillSelect(wrap.querySelector(".p-profile"), pids, pre.profile_id || "");
+      AdminUI.fillSelect(wrap.querySelector(".p-flow"), fids, pre.flow_id || "");
+      wrap.querySelector(".p-ver").value = pre.flow_version || "latest";
+      wrap.querySelector(".p-did").value = pre.did || "";
+      wrap.querySelector(".p-note").value = pre.note || "";
+      wrap.querySelector(".p-rm").onclick = () => wrap.remove();
+      document.getElementById("pin-rows").appendChild(wrap);
+    }
+
+    function collectPins() {
+      const pins = [];
+      document.querySelectorAll("#pin-rows .card").forEach((row) => {
+        const profile_id = row.querySelector(".p-profile").value;
+        const flow_id = row.querySelector(".p-flow").value;
+        if (!profile_id || !flow_id) return;
+        pins.push({
+          profile_id: profile_id,
+          flow_id: flow_id,
+          flow_version: row.querySelector(".p-ver").value.trim() || "latest",
+          did: row.querySelector(".p-did").value.trim(),
+          note: row.querySelector(".p-note").value.trim(),
+        });
+      });
+      return pins;
+    }
+
+    async function loadLists() {
+      catalog = await OrchAPI.catalog();
+      const [pr, fl] = await Promise.all([OrchAPI.listProfiles(), OrchAPI.listFlows("tenant_id=default")]);
+      profiles = pr.profiles || [];
+      flows = fl.flows || [];
+      AdminUI.fillSelect(document.getElementById("lab-profile"), profiles.map((p) => p.id));
+      AdminUI.fillSelect(document.getElementById("lab-flow"), flows.map((f) => f.id));
+      AdminUI.fillSelect(document.getElementById("lab-clock"), catalog.clocks || ["live", "playback", "chat"], "playback");
+    }
+
+    async function loadStatus() {
+      const out = document.getElementById("status-out");
+      try {
+        const s = await OrchAPI.platformStatus();
+        out.className = "probe " + (s.ready_for_sessions ? "ok" : "err");
+        out.textContent =
+          "status=" + s.status +
+          "\nready=" + s.ready_for_sessions +
+          "\nstore=" + s.store_backend +
+          "\nblockers=" + JSON.stringify(s.blockers || []) +
+          "\nwarnings=" + JSON.stringify(s.warnings || []);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    async function loadPins() {
+      const out = document.getElementById("pins-out");
+      try {
+        const data = await OrchAPI.getAnswerPins();
+        document.getElementById("pin-rows").innerHTML = "";
+        (data.pins || []).forEach((p) => pinRow(p));
+        if (!(data.pins || []).length) pinRow();
+        AdminUI.showStatus(out, true, "Loaded " + (data.pins || []).length + " pin(s)");
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    document.getElementById("add-pin").onclick = () => pinRow();
+    document.getElementById("reload-pins").onclick = loadPins;
+    document.getElementById("reload-status").onclick = loadStatus;
+    document.getElementById("save-pins").onclick = async () => {
+      const out = document.getElementById("pins-out");
+      try {
+        const data = await OrchAPI.putAnswerPins({ pins: collectPins() });
+        document.getElementById("pin-rows").innerHTML = "";
+        (data.pins || []).forEach((p) => pinRow(p));
+        if (!(data.pins || []).length) pinRow();
+        AdminUI.showStatus(out, true, "Saved " + (data.pins || []).length + " pin(s)");
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("create-session").onclick = async () => {
+      const out = document.getElementById("sess-out");
+      const profile_id = document.getElementById("lab-profile").value;
+      const flow_id = document.getElementById("lab-flow").value;
+      const flow_version = document.getElementById("lab-ver").value.trim() || "latest";
+      const clock = document.getElementById("lab-clock").value || "playback";
+      if (!profile_id) {
+        AdminUI.showStatus(out, false, "select profile");
+        return;
+      }
+      const body = {
+        profile_id: profile_id,
+        profile_version: "latest",
+        clock: clock,
+        tenant_id: "default",
+      };
+      if (clock === "live" || clock === "chat" || flow_id) {
+        if (!flow_id) {
+          AdminUI.showStatus(out, false, "flow pin required for live/chat (and recommended always)");
+          return;
+        }
+        body.flow_id = flow_id;
+        body.flow_version = flow_version === "latest" ? "latest" : parseInt(flow_version, 10);
+      }
+      try {
+        const got = await OrchAPI.createSession(body);
+        AdminUI.showStatus(
+          out,
+          true,
+          "session_id=" + got.session_id + " state=" + got.state + " flow=" + (got.flow_id || "") + "@" + (got.flow_version || "")
+        );
+      } catch (e) {
+        let extra = "";
+        if (e.data && e.data.error && e.data.error.details) extra = " " + JSON.stringify(e.data.error.details);
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message + extra);
+      }
+    };
+
+    loadLists()
+      .then(() => Promise.all([loadPins(), loadStatus()]))
+      .catch((e) => AdminUI.showStatus(document.getElementById("pins-out"), false, e.message));
+  </script>
+</body>
+</html>

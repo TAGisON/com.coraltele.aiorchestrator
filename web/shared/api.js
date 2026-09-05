@@ -99,6 +99,9 @@
       request("POST", "/v1/flows/" + encodeURIComponent(id) + "/versions", typeof doc === "string" ? doc : JSON.stringify(doc)),
     getFlowVersion: (id, ver) =>
       request("GET", "/v1/flows/" + encodeURIComponent(id) + "/versions/" + encodeURIComponent(String(ver))),
+    getAnswerPins: () => request("GET", "/v1/tenant/answer-pins"),
+    putAnswerPins: (body) => request("PUT", "/v1/tenant/answer-pins", body),
+    createSession: (body) => request("POST", "/v1/sessions", body),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>

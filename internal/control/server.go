@@ -148,6 +148,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/tenant/settings", s.handleListSystemSettings)
 	s.mux.HandleFunc("GET /v1/tenant/settings/{key}", s.handleGetSystemSetting)
 	s.mux.HandleFunc("PUT /v1/tenant/settings/{key}", s.handlePutSystemSetting)
+	s.mux.HandleFunc("GET /v1/tenant/answer-pins", s.handleGetAnswerPins)
+	s.mux.HandleFunc("PUT /v1/tenant/answer-pins", s.handlePutAnswerPins)
 	s.mux.HandleFunc("POST /v1/profiles", s.handleCreateProfile)
 	s.mux.HandleFunc("POST /v1/profiles/{id}/versions", s.handlePublishProfile)
 	s.mux.HandleFunc("POST /v1/flows", s.handleCreateFlow)
