@@ -67,7 +67,8 @@ Evidence: `.agent/work/P1.*` (local)
 |---|---|---|
 | CI.0 | [CI.0_workflow_job_a.md](./CI.0_workflow_job_a.md) | **Closed** (`14b1965`) — Job A |
 | CI.1 | [CI.1_migrate_empty.md](./CI.1_migrate_empty.md) | **Closed** (`14b1965`) — Job B |
-| CI.2–CI.3 / CD.* | per [11](../11_CI_AND_CD.md) | Not started |
+| CI.2 | [CI.2_secrets_hygiene.md](./CI.2_secrets_hygiene.md) | **Closed** — Job C secrets-hygiene |
+| CI.3 / CD.* | per [11](../11_CI_AND_CD.md) | Not started |
 
 ## Still later
 

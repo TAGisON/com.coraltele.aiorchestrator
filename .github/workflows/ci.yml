@@ -1,4 +1,4 @@
-# CI — Jobs A + B. Locked: docs/11_CI_AND_CD.md
+# CI — Jobs A + B + C. Locked: docs/11_CI_AND_CD.md
 name: ci
 
 on:
@@ -70,3 +70,38 @@ jobs:
 
       - name: migrate apply (store integration)
         run: go test ./internal/store/... -count=1 -timeout 120s
+
+  secrets-hygiene:
+    name: secrets-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: path deny (tracked secrets)
+        run: |
+          set -euo pipefail
+          tracked=$(git ls-files -- \
+            '.agent/secrets.local.json' \
+            '.agent/secrets' \
+            '.agent/secrets/**' \
+            '.env' \
+            'credentials.json' \
+            || true)
+          if [ -n "${tracked}" ]; then
+            echo "FORBIDDEN: secret-related paths are tracked in git:"
+            echo "${tracked}"
+            exit 1
+          fi
+          if ! grep -qxF '.agent/secrets.local.json' .gitignore; then
+            echo "FORBIDDEN: .gitignore missing .agent/secrets.local.json"
+            exit 1
+          fi
+          echo "path deny OK (clean tree; tracked secrets.local.json would fail this job)"
+
+      - name: go test cihygiene lock
+        run: go test ./internal/cihygiene/... -count=1 -timeout 60s
