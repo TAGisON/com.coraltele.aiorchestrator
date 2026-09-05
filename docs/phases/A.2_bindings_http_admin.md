@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.2` |
 | **title** | Bindings HTTP API + Admin binding CRUD |
-| **status** | **Closed** — bindings HTTP + Admin CRUD |
+| **status** | **Closed** (6b8b882) — bindings HTTP + Admin CRUD |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md); [P2.10](./P2.10_bindings_redesign.md) |
 | **depends_on** | A.1 Closed (`411eefd`); G.1 store bindings; U.1 catalog |
 

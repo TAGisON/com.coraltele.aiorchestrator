@@ -102,7 +102,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** (5d9713a) — `GET /v1/meta/catalog` |
 | U.2 | [U.2_console_shells.md](./U.2_console_shells.md) | **Closed** (60c46ab) — shared client + Admin/Supervisor/Chat shells |
 | A.1 | [A.1_admin_tenant_config.md](./A.1_admin_tenant_config.md) | **Closed** (411eefd) — profiles / engines / credentials / settings |
-| A.2 | [A.2_bindings_http_admin.md](./A.2_bindings_http_admin.md) | **Closed** — bindings HTTP + Admin CRUD |
+| A.2 | [A.2_bindings_http_admin.md](./A.2_bindings_http_admin.md) | **Closed** (6b8b882) — bindings HTTP + Admin CRUD |
 | A.3–A.6 | — | Next — flows, graph builder, pin, soak |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
@@ -110,7 +110,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 
 ## Still later
 
-- **A.2** bindings HTTP + Admin CRUD, then A.3–A.6 flows/builder/pin/soak
+- **A.3** flow list/create/draft Admin, then A.4–A.6 builder/pin/soak
 - Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
