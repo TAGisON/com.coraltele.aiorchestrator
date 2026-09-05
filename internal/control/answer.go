@@ -55,10 +55,10 @@ func (s *Server) handleAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := map[string]any{
-		"session_id":         id,
-		"welcome_completed":  welcomeCompleted,
-		"answered":           welcomeCompleted,
-		"spoken":             spoken,
+		"session_id":        id,
+		"welcome_completed": welcomeCompleted,
+		"answered":          welcomeCompleted,
+		"spoken":            spoken,
 	}
 	if det, act, ok := s.rt.Languages(id); ok {
 		out["detected_language"] = det

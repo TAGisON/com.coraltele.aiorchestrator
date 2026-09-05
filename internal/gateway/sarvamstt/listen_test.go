@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -22,8 +23,8 @@ func TestRecognizeBatchContract(t *testing.T) {
 			t.Error("missing api-subscription-key")
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"transcript":     "batch-hello",
-			"language_code":  "en-IN",
+			"transcript":    "batch-hello",
+			"language_code": "en-IN",
 		})
 	}))
 	defer srv.Close()
@@ -104,6 +105,9 @@ func TestOpenStreamWritePCMFinals(t *testing.T) {
 }
 
 func TestMissingKey(t *testing.T) {
+	t.Setenv("SARVAM_API_KEY", "")
+	t.Setenv("AIORCH_SECRETS_FILE", filepath.Join(t.TempDir(), "missing-secrets.json"))
+	sarvam.SetKeyProvider(nil)
 	g := &sarvamstt.Gateway{Cfg: sarvam.Config{}}
 	_, err := g.RecognizeBatch(context.Background(), port.ListenRequest{}, nil)
 	ge, ok := port.AsGatewayError(err)

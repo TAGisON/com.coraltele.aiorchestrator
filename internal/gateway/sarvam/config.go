@@ -154,6 +154,26 @@ func secretsPath() string {
 	return filepath.Join(wd, ".agent", "secrets.local.json")
 }
 
+// MergeRefresh applies hot-reload of API key (and fills empty URL fields) from loaded
+// config without wiping explicitly set endpoints (e.g. httptest in unit tests).
+func MergeRefresh(cur, loaded Config) Config {
+	out := cur
+	out.APIKey = loaded.APIKey
+	if strings.TrimSpace(out.STTRestURL) == "" {
+		out.STTRestURL = loaded.STTRestURL
+	}
+	if strings.TrimSpace(out.STTWSURL) == "" {
+		out.STTWSURL = loaded.STTWSURL
+	}
+	if strings.TrimSpace(out.ChatURL) == "" {
+		out.ChatURL = loaded.ChatURL
+	}
+	if strings.TrimSpace(out.TTSURL) == "" {
+		out.TTSURL = loaded.TTSURL
+	}
+	return out
+}
+
 // MapHTTPStatus maps Sarvam HTTP status codes to GatewayError.
 func MapHTTPStatus(status int, body string) *port.GatewayError {
 	msg := truncate(body, 200)

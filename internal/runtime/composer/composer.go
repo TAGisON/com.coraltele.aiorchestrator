@@ -33,8 +33,8 @@ const (
 
 // SinkBuffer holds unplayed Speak PCM; Flush drops it (barge-in).
 type SinkBuffer struct {
-	mu    sync.Mutex
-	frames []port.PCMFrame
+	mu      sync.Mutex
+	frames  []port.PCMFrame
 	flushed int
 }
 
@@ -98,30 +98,30 @@ type Talk struct {
 	// at most once per session; a call is only failed out one time.
 	OnFailure func(ctx context.Context, err error)
 
-	mu              sync.Mutex
-	state           TurnState
-	speakStream     port.SpeakStream
-	speakCancel     context.CancelFunc
-	thinkCancel     context.CancelFunc
-	lastBargeIn     bool
-	cancelCount     int
-	welcomeCompleted bool
-	welcoming       bool
+	mu                  sync.Mutex
+	state               TurnState
+	speakStream         port.SpeakStream
+	speakCancel         context.CancelFunc
+	thinkCancel         context.CancelFunc
+	lastBargeIn         bool
+	cancelCount         int
+	welcomeCompleted    bool
+	welcoming           bool
 	welcomeBargeAllowed bool
-	welcomeReadyAt  time.Time
-	welcomeFirstPCM bool
-	lastActivity    time.Time
-	lastSpokenText  string
-	failureOnce     sync.Once
+	welcomeReadyAt      time.Time
+	welcomeFirstPCM     bool
+	lastActivity        time.Time
+	lastSpokenText      string
+	failureOnce         sync.Once
 
 	// Local energy-VAD barge while Speaking. Sarvam STT emits no interim
 	// transcripts, so a mid-utterance interrupt cannot come from the STT partial
 	// path — the caller would talk over the bot and nothing would stop until they
 	// paused. Sustained caller speech on the read leg (which carries the caller
 	// mic, not the bot's injected TTS) triggers the barge instead.
-	bargeEnabled     bool
-	bargeMinSpeech   time.Duration
-	bargeRunStart    time.Time
+	bargeEnabled   bool
+	bargeMinSpeech time.Duration
+	bargeRunStart  time.Time
 }
 
 // LastSpokenText is the most recent agent TTS line (for echo suppression).
@@ -524,7 +524,7 @@ func (t *Talk) emitTurn(ctx context.Context, userText, response string, res thin
 			ThinkGateway:  thinkGW,
 			SpeakGateway:  speakGW,
 			VoiceID:       voiceID,
-			ResponseTier: res.ResponseTier,
+			ResponseTier:  res.ResponseTier,
 			Outcome:       outcome,
 			LatencyMs:     time.Since(started).Milliseconds(),
 		})

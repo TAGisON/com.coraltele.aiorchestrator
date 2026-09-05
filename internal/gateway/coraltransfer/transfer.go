@@ -52,16 +52,16 @@ func (g *Gateway) Capabilities() port.Capability {
 
 // Payload matches RULES_AND_SKILLS.md §2.
 type Payload struct {
-	SessionID        string          `json:"session_id"`
-	TenantID         string          `json:"tenant_id"`
-	Caller           json.RawMessage `json:"caller,omitempty"`
-	Intent           string          `json:"intent"`
-	Summary          string          `json:"summary"`
-	TranscriptExcerpt string         `json:"transcript_excerpt"`
-	RecordingRef     string          `json:"recording_ref"`
-	ProfileID        string          `json:"profile_id"`
-	ProfileVersion   int             `json:"version"`
-	EscalationReason string          `json:"escalation_reason"`
+	SessionID         string          `json:"session_id"`
+	TenantID          string          `json:"tenant_id"`
+	Caller            json.RawMessage `json:"caller,omitempty"`
+	Intent            string          `json:"intent"`
+	Summary           string          `json:"summary"`
+	TranscriptExcerpt string          `json:"transcript_excerpt"`
+	RecordingRef      string          `json:"recording_ref"`
+	ProfileID         string          `json:"profile_id"`
+	ProfileVersion    int             `json:"version"`
+	EscalationReason  string          `json:"escalation_reason"`
 }
 
 func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.SkillResult, error) {

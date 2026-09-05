@@ -98,9 +98,9 @@ func (s *Server) handlePatchProfileFields(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"session_id":         updated.ID,
-		"detected_language":  updated.DetectedLanguage,
-		"active_language":    updated.ActiveLanguage,
-		"language.primary":   primary,
+		"session_id":        updated.ID,
+		"detected_language": updated.DetectedLanguage,
+		"active_language":   updated.ActiveLanguage,
+		"language.primary":  primary,
 	})
 }

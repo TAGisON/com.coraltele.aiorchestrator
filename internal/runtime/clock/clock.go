@@ -39,8 +39,8 @@ func NewLive(frameMs int) *LiveClock {
 	return &LiveClock{frame: time.Duration(frameMs) * time.Millisecond}
 }
 
-func (c *LiveClock) Kind() Kind                 { return Live }
-func (c *LiveClock) VADEnabled() bool           { return true }
+func (c *LiveClock) Kind() Kind                   { return Live }
+func (c *LiveClock) VADEnabled() bool             { return true }
 func (c *LiveClock) FrameDuration() time.Duration { return c.frame }
 
 func (c *LiveClock) Pace(ctx context.Context) error {

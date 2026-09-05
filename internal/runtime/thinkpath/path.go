@@ -29,7 +29,7 @@ const (
 type Result struct {
 	ResponseText  string
 	Action        string // allow | refuse | escalate | block_think | strip_response | inject_text
-	ResponseTier string // clip | template | llm | refuse | escalate
+	ResponseTier  string // clip | template | llm | refuse | escalate
 	RuleID        string
 	KnowledgeHit  bool
 	SkillName     string

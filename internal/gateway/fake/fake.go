@@ -194,7 +194,7 @@ func (s *speakStream) finish() {
 }
 
 func (s *speakStream) Frames() <-chan port.PCMFrame { return s.frames }
-func (s *speakStream) Done() <-chan struct{}         { return s.done }
+func (s *speakStream) Done() <-chan struct{}        { return s.done }
 
 func (s *speakStream) Cancel(ctx context.Context) error {
 	s.cancel.Store(true)

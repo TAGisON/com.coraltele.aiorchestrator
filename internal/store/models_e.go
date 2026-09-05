@@ -7,13 +7,13 @@ import (
 
 // Closed audit event_type set for Phase E (INTEGRATION.md §5 / turn correlation).
 const (
-	AuditSessionStarted = "session.started"
+	AuditSessionStarted  = "session.started"
 	AuditSessionTerminal = "session.terminal"
-	AuditTurnCompleted  = "turn.completed"
-	AuditSkillExecuted  = "skill.executed"
-	AuditBargeIn        = "barge_in"
-	AuditError          = "error"
-	AuditDisposition    = "disposition.suggestion"
+	AuditTurnCompleted   = "turn.completed"
+	AuditSkillExecuted   = "skill.executed"
+	AuditBargeIn         = "barge_in"
+	AuditError           = "error"
+	AuditDisposition     = "disposition.suggestion"
 )
 
 // Locked analytics metric names (ANALYTICS_AND_POSTCALL.md §2).

@@ -173,4 +173,3 @@ func TestAnswer_GreetingBeforeInject(t *testing.T) {
 		t.Fatalf("want opening assistant only, got %#v", tr.Turns)
 	}
 }
-

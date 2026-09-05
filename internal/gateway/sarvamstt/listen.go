@@ -68,7 +68,7 @@ func (g *Gateway) client() *http.Client {
 
 func (g *Gateway) refreshCfg() {
 	if cfg, err := sarvam.LoadConfig(); err == nil {
-		g.Cfg = cfg
+		g.Cfg = sarvam.MergeRefresh(g.Cfg, cfg)
 	}
 }
 

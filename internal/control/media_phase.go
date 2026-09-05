@@ -22,9 +22,9 @@ const defaultRTPSettleMs = 500
 
 // SessionMediaView is exposed on GET /v1/sessions/{id}.
 type SessionMediaView struct {
-	Phase              MediaPhase
-	WelcomeCompleted   bool
-	WelcomeInProgress  bool
+	Phase             MediaPhase
+	WelcomeCompleted  bool
+	WelcomeInProgress bool
 }
 
 // AnswerError carries HTTP semantics for POST /answer phase gates.
@@ -43,9 +43,9 @@ func (e *AnswerError) Error() string {
 }
 
 var (
-	ErrAnswerNotReady = &AnswerError{Code: "not_ready", HTTPStatus: 409, RetryAfter: 1, Message: "media not ready"}
+	ErrAnswerNotReady    = &AnswerError{Code: "not_ready", HTTPStatus: 409, RetryAfter: 1, Message: "media not ready"}
 	ErrWelcomeInProgress = &AnswerError{Code: "welcome_in_progress", HTTPStatus: 409, RetryAfter: 2, Message: "welcome in progress"}
-	ErrWelcomeTimeout = &AnswerError{Code: "welcome_timeout", HTTPStatus: 504, Message: "welcome speak timed out"}
+	ErrWelcomeTimeout    = &AnswerError{Code: "welcome_timeout", HTTPStatus: 504, Message: "welcome speak timed out"}
 )
 
 type sessionMedia struct {

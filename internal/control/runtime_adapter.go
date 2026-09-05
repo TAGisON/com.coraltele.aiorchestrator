@@ -702,4 +702,3 @@ func bindThinkFromGateway(talk *composer.Talk, a *session.Actor) error {
 	talk.Path.Deps.Think = th
 	return nil
 }
-

@@ -56,7 +56,7 @@ func (g *Gateway) client() *http.Client {
 
 func (g *Gateway) refreshCfg() {
 	if cfg, err := sarvam.LoadConfig(); err == nil {
-		g.Cfg = cfg
+		g.Cfg = sarvam.MergeRefresh(g.Cfg, cfg)
 	}
 }
 
@@ -209,7 +209,7 @@ func (s *speakStream) finish() {
 }
 
 func (s *speakStream) Frames() <-chan port.PCMFrame { return s.frames }
-func (s *speakStream) Done() <-chan struct{}         { return s.done }
+func (s *speakStream) Done() <-chan struct{}        { return s.done }
 
 func (s *speakStream) Cancel(ctx context.Context) error {
 	s.cancel.Store(true)

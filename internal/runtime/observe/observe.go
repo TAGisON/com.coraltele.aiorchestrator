@@ -106,7 +106,7 @@ type TurnCompleted struct {
 	ThinkGateway  string
 	SpeakGateway  string
 	VoiceID       string
-	ResponseTier string // clip | template | llm | refuse | escalate
+	ResponseTier  string // clip | template | llm | refuse | escalate
 	Outcome       string
 	LatencyMs     int64
 	TurnID        string // optional; generated when empty

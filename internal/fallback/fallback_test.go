@@ -166,8 +166,8 @@ func TestStereoUploadIsNormalisedToMono(t *testing.T) {
 	s := newStore(t)
 	// Hand-build a stereo WAV: 100 frames × 2 ch × 2 bytes.
 	stereo := audio.EncodeWAV(make([]byte, 400), 8000)
-	stereo[22] = 2                                       // channels = 2
-	stereo[32] = 4                                       // block align = 4
+	stereo[22] = 2 // channels = 2
+	stereo[32] = 4 // block align = 4
 	a, err := s.Put("t1", ScenarioGeneric, stereo)
 	if err != nil {
 		t.Fatalf("stereo upload rejected: %v", err)

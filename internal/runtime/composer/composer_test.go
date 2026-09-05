@@ -425,8 +425,8 @@ func TestComposer_AnswerCallWritesAttachedSink(t *testing.T) {
 }
 
 type recordingSink struct {
-	writes int
-	marks  int
+	writes  int
+	marks   int
 	flushes int
 }
 
@@ -435,7 +435,7 @@ func (s *recordingSink) WritePCM(ctx context.Context, frame port.PCMFrame) error
 	s.writes++
 	return nil
 }
-func (s *recordingSink) Flush(ctx context.Context) error  { s.flushes++; return nil }
+func (s *recordingSink) Flush(ctx context.Context) error    { s.flushes++; return nil }
 func (s *recordingSink) WaitMark(ctx context.Context) error { s.marks++; return nil }
 func (s *recordingSink) Close(ctx context.Context) error    { return nil }
 

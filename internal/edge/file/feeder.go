@@ -20,11 +20,11 @@ const GatewayID port.GatewayID = "file"
 
 // Feeder reads mono s16le PCM or WAV and emits canonical frames.
 type Feeder struct {
-	id         port.GatewayID
-	frames     chan port.PCMFrame
-	events     chan port.FeederEvent
-	closeOnce  sync.Once
-	cancel     context.CancelFunc
+	id        port.GatewayID
+	frames    chan port.PCMFrame
+	events    chan port.FeederEvent
+	closeOnce sync.Once
+	cancel    context.CancelFunc
 }
 
 // Open starts a feeder that reads path (file:// or plain path), resamples to canonicalRate, paces via sched.

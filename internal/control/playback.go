@@ -77,13 +77,13 @@ func (s *Server) handleJobGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"job_id":             job.ID,
-		"state":              job.State,
-		"file_uri":           job.FileURI,
-		"profile_id":         job.ProfileID,
-		"profile_version":    job.ProfileVersion,
-		"session_id":         job.SessionID,
-		"error":              job.ErrorMessage,
+		"job_id":          job.ID,
+		"state":           job.State,
+		"file_uri":        job.FileURI,
+		"profile_id":      job.ProfileID,
+		"profile_version": job.ProfileVersion,
+		"session_id":      job.SessionID,
+		"error":           job.ErrorMessage,
 	})
 }
 

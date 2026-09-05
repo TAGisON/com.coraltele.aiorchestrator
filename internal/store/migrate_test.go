@@ -265,7 +265,6 @@ func TestMigrationSQL_HasDropKB(t *testing.T) {
 	}
 }
 
-
 func TestMigrationSQL_HasDropCompliance(t *testing.T) {
 	body, err := os.ReadFile("migrations/017_drop_compliance.sql")
 	if err != nil {

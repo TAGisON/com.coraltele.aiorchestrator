@@ -17,8 +17,8 @@ const ID port.GatewayID = "ingest-default"
 type Gateway struct {
 	repo store.Repository
 
-	mu     sync.RWMutex
-	local  []store.KBChunk // optional in-memory overlay for tests without store list
+	mu    sync.RWMutex
+	local []store.KBChunk // optional in-memory overlay for tests without store list
 }
 
 // New returns an ingest-default gateway backed by repo (may be nil if only IndexLocal used).

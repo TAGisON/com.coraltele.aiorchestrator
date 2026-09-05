@@ -1,0 +1,72 @@
+# CI — Jobs A + B. Locked: docs/11_CI_AND_CD.md
+name: ci
+
+on:
+  push:
+    branches: [main, "docs/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-build-test:
+    name: go-build-test
+    runs-on: ubuntu-latest
+    env:
+      # Never set live vendor keys in CI (docs/11 — use fakes / env-gated skips).
+      SARVAM_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: gofmt
+        run: |
+          dirty=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$dirty" ]; then
+            echo "gofmt needed on:"
+            echo "$dirty"
+            exit 1
+          fi
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test ./... -count=1 -timeout 180s
+
+  migrate-empty:
+    name: migrate-empty
+    runs-on: ubuntu-latest
+    env:
+      SARVAM_API_KEY: ""
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/aiorch_ci?sslmode=disable
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aiorch_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aiorch_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: migrate apply (store integration)
+        run: go test ./internal/store/... -count=1 -timeout 120s

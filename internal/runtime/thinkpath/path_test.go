@@ -28,7 +28,7 @@ func TestThinkPath_PreThinkRefuseRegex(t *testing.T) {
 	doc.Routers.Think.Providers = []string{"fake-think"}
 	doc.Rules = []profile.Rule{{
 		ID: "block-card", Phase: "pre_think",
-		When: map[string]any{"regex": `\d{12,19}`},
+		When:   map[string]any{"regex": `\d{12,19}`},
 		Action: "refuse", Message: "no cards",
 	}}
 	deps, err := thinkpath.Resolve(reg, doc, "live")
@@ -54,7 +54,7 @@ func TestThinkPath_KnowledgeMiss_GroundingRequired(t *testing.T) {
 	doc.Routers.Knowledge.Providers = []string{"fake-knowledge"}
 	doc.Rules = []profile.Rule{{
 		ID: "no-invent", Phase: "pre_think",
-		When: map[string]any{"grounding_required": true, "knowledge_hit": false},
+		When:   map[string]any{"grounding_required": true, "knowledge_hit": false},
 		Action: "escalate", Message: "escalate please", Skill: "warm_transfer",
 	}}
 	doc.Skills.Allowed = []string{"warm_transfer"}

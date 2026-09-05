@@ -16,7 +16,7 @@ type Document struct {
 		DisplayName string `json:"display_name"`
 		Family      string `json:"family"`
 	} `json:"metadata"`
-	Audio    struct {
+	Audio struct {
 		CanonicalSampleRateHz int `json:"canonical_sample_rate_hz"`
 		FrameMs               int `json:"frame_ms"`
 	} `json:"audio"`
@@ -36,19 +36,19 @@ type Document struct {
 		MidCallSwitch bool     `json:"mid_call_switch"`
 	} `json:"language"`
 	HotSwapAllowed []string `json:"hot_swap_allowed"`
-	Grounding struct {
+	Grounding      struct {
 		Required bool `json:"required"`
 	} `json:"grounding"`
 	Routers struct {
-		Listen     RouterProviders `json:"listen"`
-		Think      RouterProviders `json:"think"`
-		Speak      RouterProviders `json:"speak"`
-		Knowledge  RouterProviders `json:"knowledge"`
-		Translate  RouterProviders `json:"translate"`
+		Listen    RouterProviders `json:"listen"`
+		Think     RouterProviders `json:"think"`
+		Speak     RouterProviders `json:"speak"`
+		Knowledge RouterProviders `json:"knowledge"`
+		Translate RouterProviders `json:"translate"`
 	} `json:"routers"`
 	Skills struct {
-		Allowed     []string                    `json:"allowed"`
-		Definitions map[string]SkillDefinition  `json:"definitions"`
+		Allowed     []string                   `json:"allowed"`
+		Definitions map[string]SkillDefinition `json:"definitions"`
 	} `json:"skills"`
 	Knowledge struct {
 		HTTPKB *struct {
@@ -62,7 +62,7 @@ type Document struct {
 	// Response is the Talk response ladder (clip → template → llm). Omit = ladder no-op.
 	Response *ResponseConfig `json:"response"`
 	// Fallback is hop degradation (listen/think/speak down) — PROFILE_SCHEMA.
-	Fallback *FallbackConfig `json:"fallback"`
+	Fallback  *FallbackConfig `json:"fallback"`
 	Templates struct {
 		Disposition *struct {
 			ID string `json:"id"`
