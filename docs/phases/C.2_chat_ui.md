@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `C.2` |
 | **title** | Chat UI — details → turns → bot/tool lines |
-| **status** | **Closed** |
+| **status** | **Closed** (`7573718`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave C; OD-13-1/4/7 |
 | **depends_on** | C.1 Closed (`c8bfe3f`); U.2 shells; A.5 pins (optional prefill) |
 

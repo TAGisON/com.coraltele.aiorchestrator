@@ -108,7 +108,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | A.5 | [A.5_admin_live_pin.md](./A.5_admin_live_pin.md) | **Closed** (e1e6a78) — answer pins + platform status + lab session |
 | A.6 | [A.6_admin_soak_checklist.md](./A.6_admin_soak_checklist.md) | **Closed** (c53b441) — Admin UI soak checklist |
 | C.1 | [C.1_clock_chat.md](./C.1_clock_chat.md) | **Closed** (c8bfe3f) — `clock=chat` + pin gate + speak short-circuit |
-| C.2 | [C.2_chat_ui.md](./C.2_chat_ui.md) | **Closed** — Chat UI create/answer/inject/transcript |
+| C.2 | [C.2_chat_ui.md](./C.2_chat_ui.md) | **Closed** (7573718) — Chat UI create/answer/inject/transcript |
 | C.3–C.4 | — | Next — evidence parity + chat soak |
 | S.1–S.4 | — | Planned — Supervisor |
 | V.1–V.2 | — | Planned — dual chat+call prove |
