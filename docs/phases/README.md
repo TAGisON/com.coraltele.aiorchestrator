@@ -53,9 +53,16 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **Closed** ($main) — gap list |
+| E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **Closed** (`92643ca`) — gap list |
 | E.1–E.6 | per [09](../09_EVIDENCE_AND_RECORDING.md) | Not started (L3 files TBD) |
+
+## CI / CD (CI.*)
+
+| Phase | File | Status |
+|---|---|---|
+| CI.0 | [CI.0_workflow_job_a.md](./CI.0_workflow_job_a.md) | **Closed** (`14b1965`) — Job A |
+| CI.1 | [CI.1_migrate_empty.md](./CI.1_migrate_empty.md) | **Closed** (`14b1965`) — Job B |
+| CI.2–CI.3 / CD.* | per [11](../11_CI_AND_CD.md) | Not started |
 
 ## Still later
 
-- CI.0–CI.2 workflow L3 when implementing Actions  
