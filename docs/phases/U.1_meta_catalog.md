@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `U.1` |
 | **title** | `GET /v1/meta/catalog` — server enums for Admin dropdowns |
-| **status** | **Closed** — `GET /v1/meta/catalog` |
+| **status** | **Closed** (5d9713a) — `GET /v1/meta/catalog` |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) OD-13-3, OD-13-6, OD-13-7 |
 | **depends_on** | U.0 Closed; doc 13 Locked |
 

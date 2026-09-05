@@ -99,7 +99,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | Phase | File | Status |
 |---|---|---|
 | U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Closed** — gap inventory + phase freeze |
-| U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** — `GET /v1/meta/catalog` |
+| U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** (5d9713a) — `GET /v1/meta/catalog` |
 | U.2 | — | Next — shared client + three app shells |
 | A.1–A.6 | — | Planned — Admin full configuration |
 | C.1–C.4 | — | Planned — User chat channel |
