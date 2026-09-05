@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.4` |
 | **title** | Admin: structured flow builder, publish, version inspect |
-| **status** | **Closed** — structured builder + publish + version inspect |
+| **status** | **Closed** (d5e2f9d) — structured builder + publish + version inspect |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) A.4; OD-13-5 |
 | **depends_on** | A.3 Closed (`6c85e18`); U.1 catalog; G.2 validate/publish |
 

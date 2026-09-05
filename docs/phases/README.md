@@ -104,7 +104,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | A.1 | [A.1_admin_tenant_config.md](./A.1_admin_tenant_config.md) | **Closed** (411eefd) — profiles / engines / credentials / settings |
 | A.2 | [A.2_bindings_http_admin.md](./A.2_bindings_http_admin.md) | **Closed** (6b8b882) — bindings HTTP + Admin CRUD |
 | A.3 | [A.3_admin_flows_draft.md](./A.3_admin_flows_draft.md) | **Closed** (6c85e18) — flow list/create/draft |
-| A.4 | [A.4_admin_graph_builder.md](./A.4_admin_graph_builder.md) | **Closed** — graph builder + publish + version inspect |
+| A.4 | [A.4_admin_graph_builder.md](./A.4_admin_graph_builder.md) | **Closed** (d5e2f9d) — graph builder + publish + version inspect |
 | A.5–A.6 | — | Next — live pin UX, Admin soak |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
@@ -112,7 +112,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 
 ## Still later
 
-- **A.4** graph builder + publish + version inspect, then A.5–A.6 pin/soak
+- **A.5** profile / DID / live pin association, then A.6 Admin soak
 - Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
