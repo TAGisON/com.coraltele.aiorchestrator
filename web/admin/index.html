@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — AiOrchestrator</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <h1>Admin</h1>
+    <p class="lede">Configure profiles, engines, flows, matrix, and bindings. Shell only (U.2) — configuration screens land in A.* phases. Dropdowns will bind to <code>/v1/meta/catalog</code>.</p>
+
+    <div class="card">
+      <h2>API token (lab)</h2>
+      <p>Required when the orchestrator is started with an auth token. Stored in browser localStorage only.</p>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Catalog probe</h2>
+      <p>Verifies shared client + U.1 catalog wiring.</p>
+      <button type="button" class="btn" id="probe">Load catalog</button>
+      <div class="probe" id="out"></div>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script>
+    const out = document.getElementById("out");
+    const tokenInput = document.getElementById("token");
+    tokenInput.value = OrchAPI.token();
+    document.getElementById("save-token").onclick = () => {
+      OrchAPI.setToken(tokenInput.value);
+      out.textContent = "Token saved.";
+      out.className = "probe ok";
+    };
+    document.getElementById("probe").onclick = async () => {
+      out.className = "probe";
+      out.textContent = "Loading…";
+      try {
+        const c = await OrchAPI.catalog();
+        out.className = "probe ok";
+        out.textContent =
+          "schema_id=" + c.schema_id +
+          "\nnode_types=" + (c.node_types || []).length +
+          "\nedge_kinds=" + (c.edge_kinds || []).length +
+          "\nclocks=" + (c.clocks || []).join(", ");
+      } catch (e) {
+        out.className = "probe err";
+        out.textContent = (e.status || "") + " " + (e.message || String(e));
+      }
+    };
+  </script>
+</body>
+</html>

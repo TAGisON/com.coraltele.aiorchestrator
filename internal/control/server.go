@@ -101,7 +101,7 @@ func New(repo store.Repository, reg port.Registry, cfg Config) *Server {
 }
 
 // NewWithRuntime wires an optional runtime manager for session start/stop.
-// uiFS is optional embed root with admin/, supervisor/, user/, shared/, and index.html.
+// uiFS is optional embed root with admin/, supervisor/, chat/, shared/, and index.html.
 func NewWithRuntime(repo store.Repository, reg port.Registry, rt Runtime, cfg Config, uiFS fs.FS) *Server {
 	if cfg.OwnerInstance == "" {
 		cfg.OwnerInstance = "local"

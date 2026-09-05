@@ -26,7 +26,7 @@ func (s *Server) SetUIExtras(x UIExtras) { s.ui = x }
 // SetLabExtras is deprecated; use SetUIExtras.
 func (s *Server) SetLabExtras(x LabExtras) { s.SetUIExtras(x) }
 
-// mountUIRoutes registers console JSON APIs and a minimal root placeholder (no three-console SPAs).
+// mountUIRoutes registers console JSON APIs and static production shells (U.2).
 func (s *Server) mountUIRoutes(uiFS fs.FS) {
 	s.mux.HandleFunc("GET /v1/profiles", s.handleListProfiles)
 	s.mux.HandleFunc("GET /v1/profiles/{id}/versions/{ver}", s.handleGetProfileVersion)
@@ -40,11 +40,7 @@ func (s *Server) mountUIRoutes(uiFS fs.FS) {
 		return
 	}
 
-	s.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
+	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		b, err := fs.ReadFile(uiFS, "index.html")
 		if err != nil {
 			http.NotFound(w, r)
@@ -53,6 +49,35 @@ func (s *Server) mountUIRoutes(uiFS fs.FS) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(b)
 	})
+
+	mountStatic := func(urlPrefix, dir string) {
+		sub, err := fs.Sub(uiFS, dir)
+		if err != nil {
+			return
+		}
+		fileServer := http.FileServer(http.FS(sub))
+		// Exact prefix without trailing slash → redirect to /
+		s.mux.HandleFunc("GET "+urlPrefix, func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, urlPrefix+"/", http.StatusFound)
+		})
+		s.mux.Handle("GET "+urlPrefix+"/", http.StripPrefix(urlPrefix+"/", fileServer))
+	}
+	mountStatic("/admin", "admin")
+	mountStatic("/supervisor", "supervisor")
+	mountStatic("/chat", "chat")
+	mountStatic("/shared", "shared")
+}
+
+func (s *Server) authMiddlewareUIBypass(path string) bool {
+	if path == "/" {
+		return true
+	}
+	for _, p := range []string{"/admin", "/supervisor", "/chat", "/shared"} {
+		if path == p || strings.HasPrefix(path, p+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleListProfiles(w http.ResponseWriter, r *http.Request) {
@@ -289,9 +314,4 @@ func (s *Server) handlePlatformStatus(w http.ResponseWriter, r *http.Request) {
 		"blockers":           blockers,
 		"warnings":           warnings,
 	})
-}
-
-func (s *Server) authMiddlewareUIBypass(path string) bool {
-	// Placeholder control UI at `/` only (three consoles removed in P1.1–P1.4).
-	return path == "/"
 }

@@ -100,15 +100,15 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 |---|---|---|
 | U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Closed** — gap inventory + phase freeze |
 | U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** (5d9713a) — `GET /v1/meta/catalog` |
-| U.2 | — | Next — shared client + three app shells |
-| A.1–A.6 | — | Planned — Admin full configuration |
+| U.2 | [U.2_console_shells.md](./U.2_console_shells.md) | **Closed** — shared client + Admin/Supervisor/Chat shells |
+| A.1–A.6 | — | Next — Admin full configuration |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
 | V.1–V.2 | — | Planned — dual chat+call prove |
 
 ## Still later
 
-- **U.2** then A.* / C.* / S.* / V.* (serial)
+- **A.1** Admin profiles + tenant engines/credentials/settings, then A.2–A.6
 - Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)

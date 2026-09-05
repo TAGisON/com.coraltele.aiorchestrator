@@ -4,15 +4,31 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AiOrchestrator</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 40rem; color: #1a1a1a; }
-    code { background: #f0f0f0; padding: 0.1em 0.35em; }
-    a { color: #0b57d0; }
-  </style>
+  <link rel="stylesheet" href="/shared/styles.css" />
 </head>
 <body>
-  <h1>AiOrchestrator</h1>
-  <p>Control plane is up. The Admin / User / Supervisor consoles were removed (LLM call centre purge P1.1–P1.4). Graph editor UI comes later.</p>
-  <p>API checks: <a href="/v1/health"><code>/v1/health</code></a> · <a href="/v1/platform/status"><code>/v1/platform/status</code></a></p>
+  <div class="shell">
+    <nav class="shell-nav">
+      <span class="brand">AiOrchestrator</span>
+      <span class="role">Control plane</span>
+    </nav>
+    <h1>LLM call centre</h1>
+    <p class="lede">Production consoles (doc 13). Kernel APIs are live; fill screens in A.* / C.* / S.* after this shell wave.</p>
+    <ul class="hub-list">
+      <li>
+        <strong><a href="/admin/">Admin</a></strong>
+        <span>Profiles, engines, flows, matrix, bindings — full configuration.</span>
+      </li>
+      <li>
+        <strong><a href="/supervisor/">Supervisor</a></strong>
+        <span>Transcript, audit, disposition, light analytics — read-only.</span>
+      </li>
+      <li>
+        <strong><a href="/chat/">Chat</a></strong>
+        <span>Same graph as voice without STT/TTS — text channel for workflow testing.</span>
+      </li>
+    </ul>
+    <p class="lede" style="margin-top:1.5rem">API: <a href="/v1/health"><code>/v1/health</code></a> · <a href="/v1/meta/catalog"><code>/v1/meta/catalog</code></a> · <a href="/v1/platform/status"><code>/v1/platform/status</code></a></p>
+  </div>
 </body>
 </html>
