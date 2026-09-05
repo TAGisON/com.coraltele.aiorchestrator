@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,11 +188,17 @@ func TestCC5_PostcallDispositionGET(t *testing.T) {
 		if rr.Code == http.StatusOK {
 			var d map[string]any
 			_ = json.Unmarshal(rr.Body.Bytes(), &d)
-			if d["suggestion"] == nil || d["source"] != "postcall_worker" {
-				t.Fatalf("disposition body %#v", d)
+			// Ending may fill final (E.5) before postcall suggestion lands.
+			sug, _ := d["suggestion"].(string)
+			if strings.TrimSpace(sug) == "" {
+				time.Sleep(50 * time.Millisecond)
+				continue
 			}
 			if d["template_id"] != "cc-disposition-v1" {
 				t.Fatalf("template %#v", d)
+			}
+			if d["final"] != store.DispositionFinalOutOfScope {
+				t.Fatalf("want Ending fill-in final, got %#v", d)
 			}
 			dispOK = true
 			break
@@ -199,6 +206,6 @@ func TestCC5_PostcallDispositionGET(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if !dispOK {
-		t.Fatal("disposition GET never returned 200 after postcall")
+		t.Fatal("disposition GET never returned postcall suggestion")
 	}
 }

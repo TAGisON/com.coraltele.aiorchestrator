@@ -621,6 +621,7 @@ func (s *Server) onSessionTerminal(ctx context.Context, sess store.Session, term
 		analyticsEmitSet(doc, "contained"),
 		analyticsEmitSet(doc, "handoff"),
 	)
+	s.ensureTerminalDisposition(ctx, sess, terminal)
 	s.enqueuePostcall(ctx, sess)
 }
 

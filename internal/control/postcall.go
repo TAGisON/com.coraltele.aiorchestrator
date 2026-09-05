@@ -129,12 +129,20 @@ func (w *PostcallWorker) runJob(ctx context.Context, job store.PostcallJob) {
 
 	tplID := dispositionTemplateID(doc)
 	turns, _ := w.Repo.ListTranscriptTurns(ctx, sess.ID)
-	_, _ = w.Repo.UpsertSessionDisposition(ctx, store.SessionDisposition{
+	disp := store.SessionDisposition{
 		SessionID:  sess.ID,
 		Suggestion: suggestion,
 		TemplateID: tplID,
-		Source:     "postcall_worker",
-	})
+		Source:     store.DispositionSourcePostcallWorker,
+	}
+	if cur, err := w.Repo.GetSessionDisposition(ctx, sess.ID); err == nil {
+		// Keep live_tool / live_graph provenance when Ending already wrote final (E.5).
+		if strings.TrimSpace(cur.Final) != "" {
+			disp.Final = cur.Final
+			disp.Source = cur.Source
+		}
+	}
+	_, _ = w.Repo.UpsertSessionDisposition(ctx, disp)
 
 	obs.Audit(ctx, store.AuditDisposition, map[string]any{
 		"suggestion":            suggestion,

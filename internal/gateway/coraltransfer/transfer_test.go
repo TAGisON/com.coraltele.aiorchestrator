@@ -80,6 +80,26 @@ func TestExecute_TransfersLeg(t *testing.T) {
 	}
 }
 
+func TestExecute_PassesDispositionCode(t *testing.T) {
+	var got port.TransferRequest
+	g := &coraltransfer.Gateway{
+		Transfer: func(_ context.Context, _ string, req port.TransferRequest) error {
+			got = req
+			return nil
+		},
+	}
+	_, err := g.Execute(context.Background(), port.SkillRequest{
+		SessionID: "s", Name: "warm_transfer",
+		Args: []byte(`{"destination":"1001","disposition_code":"transferred_sales","intent":"sales"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DispositionCode != "transferred_sales" {
+		t.Fatalf("disposition_code = %q", got.DispositionCode)
+	}
+}
+
 // Operators and LLM tool calls spell the destination several ways.
 func TestExecute_DestinationAliases(t *testing.T) {
 	for _, key := range []string{"destination", "number", "extension", "dest", "transfer_to"} {

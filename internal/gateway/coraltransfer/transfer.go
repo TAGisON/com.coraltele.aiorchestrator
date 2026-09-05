@@ -136,10 +136,11 @@ func (g *Gateway) Execute(ctx context.Context, req port.SkillRequest) (port.Skil
 	}
 
 	err := g.Transfer(ctx, string(req.SessionID), port.TransferRequest{
-		Destination: dest,
-		Dialplan:    stringArg(args, "dialplan", g.DefaultDialplan),
-		Context:     stringArg(args, "context", g.DefaultContext),
-		Reason:      firstNonEmpty(p.EscalationReason, p.Intent, "warm_transfer"),
+		Destination:     dest,
+		Dialplan:        stringArg(args, "dialplan", g.DefaultDialplan),
+		Context:         stringArg(args, "context", g.DefaultContext),
+		Reason:          firstNonEmpty(p.EscalationReason, p.Intent, "warm_transfer"),
+		DispositionCode: stringArg(args, "disposition_code", ""),
 	})
 	if err != nil {
 		result["error"] = err.Error()

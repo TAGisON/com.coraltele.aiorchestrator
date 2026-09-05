@@ -36,11 +36,58 @@ const (
 )
 
 // Closed disposition suggestion tags (ANALYTICS_AND_POSTCALL.md §3).
+// Legacy — may linger in suggestion; not valid as V1 final (P2.6).
 const (
 	DispositionResolved   = "resolved"
 	DispositionUnresolved = "unresolved"
 	DispositionEscalated  = "escalated"
 )
+
+// Disposition source vocabulary (P2.6 Locked).
+const (
+	DispositionSourceLiveTool       = "live_tool"
+	DispositionSourceLiveGraph      = "live_graph"
+	DispositionSourceOpsPatch       = "ops_patch"
+	DispositionSourcePostcallWorker = "postcall_worker"
+)
+
+// V1 final disposition codes (P2.6 Locked).
+const (
+	DispositionFinalTransferredSales     = "transferred_sales"
+	DispositionFinalTransferredCorporate = "transferred_corporate"
+	DispositionFinalTransferredSupport   = "transferred_support"
+	DispositionFinalTransferredOther     = "transferred_other"
+	DispositionFinalHangupCompleted      = "hangup_completed"
+	DispositionFinalHangupSilence        = "hangup_silence"
+	DispositionFinalHangupAbuse          = "hangup_abuse"
+	DispositionFinalOutOfScope           = "out_of_scope"
+	DispositionFinalAbandonedCaller      = "abandoned_caller"
+	DispositionFinalSystemFailure        = "system_failure"
+)
+
+// DispositionFinalAllowlist is the closed V1 final set.
+var DispositionFinalAllowlist = []string{
+	DispositionFinalTransferredSales,
+	DispositionFinalTransferredCorporate,
+	DispositionFinalTransferredSupport,
+	DispositionFinalTransferredOther,
+	DispositionFinalHangupCompleted,
+	DispositionFinalHangupSilence,
+	DispositionFinalHangupAbuse,
+	DispositionFinalOutOfScope,
+	DispositionFinalAbandonedCaller,
+	DispositionFinalSystemFailure,
+}
+
+// ValidDispositionFinal reports whether code is on the P2.6 allowlist.
+func ValidDispositionFinal(code string) bool {
+	for _, d := range DispositionFinalAllowlist {
+		if d == code {
+			return true
+		}
+	}
+	return false
+}
 
 // TranscriptTurn is one ordered durable transcript event (table name kept from turn-pair era).
 type TranscriptTurn struct {

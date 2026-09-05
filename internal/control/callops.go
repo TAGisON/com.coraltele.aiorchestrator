@@ -30,9 +30,11 @@ func hangupCauseFor(sc fallback.Scenario) string {
 	}
 }
 
-// dispositionFor is the durable disposition recorded for a failed call.
+// dispositionFor maps FailCall scenarios to the P2.6 system_failure final.
+// FailCall is the unrecoverable pipeline exit — not hangup_silence/abuse tools.
 func dispositionFor(sc fallback.Scenario) string {
-	return "failed_" + string(sc)
+	_ = sc
+	return store.DispositionFinalSystemFailure
 }
 
 // ---------------------------------------------------------------- recording --
@@ -247,6 +249,7 @@ func (r *SessionRuntime) Transfer(ctx context.Context, sessionID string, req por
 	if err := cc.Transfer(ctx, req); err != nil {
 		fail := map[string]any{"tool": "transfer", "destination": dest, "error": err.Error()}
 		r.auditRecording(sessionID, store.AuditToolFailed, fail)
+		r.recordLiveDisposition(ctx, sessionID, store.DispositionFinalSystemFailure, err.Error())
 		return fmt.Errorf("transfer: %w", err)
 	}
 
@@ -254,7 +257,7 @@ func (r *SessionRuntime) Transfer(ctx context.Context, sessionID string, req por
 		"dialplan", req.Dialplan, "context", req.Context, "reason", req.Reason)
 	okPayload := map[string]any{"tool": "transfer", "destination": dest, "ok": true, "name": "warm_transfer"}
 	r.auditRecording(sessionID, store.AuditToolExecuted, okPayload)
-	r.recordDisposition(ctx, sessionID, "transferred", req.Reason)
+	r.recordLiveDisposition(ctx, sessionID, transferDispositionFinal(req), req.Reason)
 	return nil
 }
 
@@ -323,7 +326,7 @@ func (r *SessionRuntime) FailCall(ctx context.Context, sessionID string, sc fall
 		}
 	}
 
-	r.recordDisposition(ctx, sessionID, dispositionFor(sc), errString(cause))
+	r.recordLiveDisposition(ctx, sessionID, dispositionFor(sc), errString(cause))
 	if r.OnSessionEnd != nil {
 		r.OnSessionEnd(context.WithoutCancel(ctx), sessionID, dispositionFor(sc))
 	}
@@ -409,21 +412,29 @@ func (r *SessionRuntime) waitPlayout(ctx context.Context, sessionID string, time
 	}
 }
 
-// recordDisposition persists the outcome. Best effort: never blocks the exit path.
-func (r *SessionRuntime) recordDisposition(ctx context.Context, sessionID, disposition, note string) {
+// recordLiveDisposition persists a P2.6 allowlisted final after tool settle.
+// Best effort: never blocks the exit path.
+func (r *SessionRuntime) recordLiveDisposition(ctx context.Context, sessionID, final, note string) {
 	if r.Repo == nil {
 		return
 	}
-	// Source "system" distinguishes these from AI-suggested dispositions, and
-	// Final pins the outcome: an operator-visible failure is not a suggestion.
+	final = strings.TrimSpace(final)
+	if !store.ValidDispositionFinal(final) {
+		applog.Warn("reject non-allowlist disposition; using system_failure",
+			"session", sessionID, "got", final, "note", note)
+		final = store.DispositionFinalSystemFailure
+	}
 	d := store.SessionDisposition{
-		SessionID:  sessionID,
-		Suggestion: disposition,
-		Final:      disposition,
-		Source:     "system",
+		SessionID: sessionID,
+		Final:     final,
+		Source:    store.DispositionSourceLiveTool,
+	}
+	if cur, err := r.Repo.GetSessionDisposition(context.WithoutCancel(ctx), sessionID); err == nil {
+		d.Suggestion = cur.Suggestion
+		d.TemplateID = cur.TemplateID
 	}
 	if _, err := r.Repo.UpsertSessionDisposition(context.WithoutCancel(ctx), d); err != nil {
 		applog.Warn("persist disposition", "session", sessionID,
-			"disposition", disposition, "note", note, "err", err)
+			"disposition", final, "note", note, "err", err)
 	}
 }

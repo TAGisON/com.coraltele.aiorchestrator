@@ -39,6 +39,9 @@ type TransferRequest struct {
 	DrainMs int
 	// Reason is recorded for audit; it never reaches the dialplan.
 	Reason string
+	// DispositionCode is an optional P2.6 final code frozen at tool ARM
+	// (matrix disposition_code). Empty → runtime maps from Reason/intent.
+	DispositionCode string
 }
 
 // CallControl is implemented by sinks bound to a real telephony leg (currently

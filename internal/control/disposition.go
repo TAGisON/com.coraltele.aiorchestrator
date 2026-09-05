@@ -7,22 +7,9 @@ import (
 	"strings"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
-
-// V1 disposition codes (docs/phases/P2.6_disposition.md). Closed vocabulary.
-var dispositionAllowlist = []string{
-	"transferred_sales",
-	"transferred_corporate",
-	"transferred_support",
-	"transferred_other",
-	"hangup_completed",
-	"hangup_silence",
-	"hangup_abuse",
-	"out_of_scope",
-	"abandoned_caller",
-	"system_failure",
-}
 
 func (s *Server) handlePatchDisposition(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -39,16 +26,9 @@ func (s *Server) handlePatchDisposition(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, CodeBadRequest, "final required", nil)
 		return
 	}
-	valid := false
-	for _, d := range dispositionAllowlist {
-		if d == final {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+	if !store.ValidDispositionFinal(final) {
 		writeError(w, http.StatusBadRequest, CodeBadRequest, "unknown disposition code",
-			map[string]any{"allowed": dispositionAllowlist})
+			map[string]any{"allowed": store.DispositionFinalAllowlist})
 		return
 	}
 	cur, err := s.repo.GetSessionDisposition(r.Context(), id)
@@ -60,7 +40,7 @@ func (s *Server) handlePatchDisposition(w http.ResponseWriter, r *http.Request) 
 		SessionID:  id,
 		Suggestion: cur.Suggestion,
 		TemplateID: cur.TemplateID,
-		Source:     "ops_patch",
+		Source:     store.DispositionSourceOpsPatch,
 		Final:      final,
 	})
 	if err != nil {
@@ -71,6 +51,56 @@ func (s *Server) handlePatchDisposition(w http.ResponseWriter, r *http.Request) 
 		"session_id": out.SessionID, "suggestion": out.Suggestion,
 		"final": out.Final, "source": out.Source, "updated_at": out.UpdatedAt,
 	})
+}
+
+// transferDispositionFinal maps a settled transfer to a P2.6 final code.
+func transferDispositionFinal(req port.TransferRequest) string {
+	if store.ValidDispositionFinal(strings.TrimSpace(req.DispositionCode)) {
+		return strings.TrimSpace(req.DispositionCode)
+	}
+	hay := strings.ToLower(strings.TrimSpace(req.DispositionCode) + " " + strings.TrimSpace(req.Reason))
+	switch {
+	case strings.Contains(hay, "sales"):
+		return store.DispositionFinalTransferredSales
+	case strings.Contains(hay, "corporate") || strings.Contains(hay, "corp"):
+		return store.DispositionFinalTransferredCorporate
+	case strings.Contains(hay, "support") || strings.Contains(hay, "tech"):
+		return store.DispositionFinalTransferredSupport
+	default:
+		return store.DispositionFinalTransferredOther
+	}
+}
+
+// ensureTerminalDisposition writes a P2.6 final when Ending left final empty (P2.6 edge 3).
+func (s *Server) ensureTerminalDisposition(ctx context.Context, sess store.Session, terminal string) {
+	if s.repo == nil {
+		return
+	}
+	cur, err := s.repo.GetSessionDisposition(ctx, sess.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		applog.Warn("terminal disposition lookup", "session", sess.ID, "err", err)
+		return
+	}
+	if err == nil && strings.TrimSpace(cur.Final) != "" {
+		return
+	}
+	final := store.DispositionFinalOutOfScope
+	switch terminal {
+	case store.StateCancelled:
+		final = store.DispositionFinalAbandonedCaller
+	case store.StateFailed:
+		final = store.DispositionFinalSystemFailure
+	}
+	d := store.SessionDisposition{
+		SessionID:  sess.ID,
+		Suggestion: cur.Suggestion,
+		TemplateID: cur.TemplateID,
+		Source:     store.DispositionSourceLiveGraph,
+		Final:      final,
+	}
+	if _, err := s.repo.UpsertSessionDisposition(ctx, d); err != nil {
+		applog.Warn("terminal disposition fill-in", "session", sess.ID, "final", final, "err", err)
+	}
 }
 
 // EndSessionAfterTalk stops a session after talk teardown (neutral session-end hook).
