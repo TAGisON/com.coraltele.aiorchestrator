@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `V.1` |
 | **title** | Same published flow: chat soak + call soak |
-| **status** | **Closed** — checklist authored |
+| **status** | **Closed** (`7356791`) — checklist authored |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave V; OD-13-7 |
 | **depends_on** | S.4 Closed (`23d96f7`); C.4 / A.6 / L.0 checklists exist |
 
