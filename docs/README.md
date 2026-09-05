@@ -1,7 +1,7 @@
 # Coral LLM Call Centre — documentation
 
 **Branch purpose:** Greenfield architecture for an **LLM-based voice call centre** on Coral PABX / FreeSWITCH.  
-**Status:** Architecture locked (01–06). Planning 07–12 Locked. **Doc 13 Locked**. Kernel G.* Closed; U.0–U.2 Closed; Admin A.1–A.6 Closed; Chat C.1–C.4 Closed; **S.1 Closed**; next S.2 audit browser.
+**Status:** Architecture locked (01–06). Planning 07–12 Locked. **Doc 13 Locked**. Kernel G.* Closed; U.0–U.2 Closed; Admin A.1–A.6 Closed; Chat C.1–C.4 Closed; **S.1–S.2 Closed**; next S.3 light aggregates.
 
 ## Source of truth (read in order)
 

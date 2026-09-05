@@ -36,5 +36,6 @@ func (s *Server) handleMetaCatalog(w http.ResponseWriter, r *http.Request) {
 			store.EventKindToolLine,
 			store.EventKindNote,
 		},
+		"audit_event_types": store.AuditEventTypes(),
 	})
 }

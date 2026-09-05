@@ -42,4 +42,17 @@ func TestMetaCatalog(t *testing.T) {
 	if len(finals) != len(store.DispositionFinalAllowlist) {
 		t.Fatalf("disposition_final len %d", len(finals))
 	}
+	audits, _ := body["audit_event_types"].([]any)
+	if len(audits) != len(store.AuditEventTypes()) {
+		t.Fatalf("audit_event_types len %d want %d", len(audits), len(store.AuditEventTypes()))
+	}
+	foundGraph := false
+	for _, a := range audits {
+		if a == store.AuditGraphEdge {
+			foundGraph = true
+		}
+	}
+	if !foundGraph {
+		t.Fatalf("audit_event_types missing graph.edge: %v", audits)
+	}
 }

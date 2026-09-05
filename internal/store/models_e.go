@@ -36,6 +36,18 @@ const (
 	AuditError           = AuditSessionFailed
 )
 
+// AuditEventTypes returns the P2.4 V1 emitter allowlist (no legacy aliases).
+func AuditEventTypes() []string {
+	return []string{
+		AuditSessionCreated, AuditSessionLive, AuditSessionEnding,
+		AuditSessionCompleted, AuditSessionCancelled, AuditSessionFailed,
+		AuditTurnState, AuditSTTFinal, AuditGraphEdge,
+		AuditToolArmed, AuditToolExecuting, AuditToolExecuted, AuditToolFailed,
+		AuditRecordingStarted, AuditRecordingStopped, AuditLanguageChanged,
+		AuditDisposition,
+	}
+}
+
 // AuditTerminalType maps a durable session terminal state to a P2.4 event_type.
 func AuditTerminalType(state string) string {
 	switch state {

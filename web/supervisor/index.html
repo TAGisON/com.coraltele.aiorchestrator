@@ -15,7 +15,7 @@
       <a href="/chat/">Chat</a>
     </nav>
     <h1>Supervisor</h1>
-    <p class="lede">Read-only session list and detail — transcript, disposition, recording metadata. Audit browser is S.2; no config writes here.</p>
+    <p class="lede">Read-only session list and detail — transcript, disposition, recording metadata, and allowlisted audit events. No config writes here.</p>
 
     <div class="card">
       <h2>API token (lab)</h2>
@@ -60,6 +60,24 @@
       <div class="probe" id="disp-out"></div>
       <h3 class="detail-h">Recording meta</h3>
       <div class="probe" id="rec-out"></div>
+      <h3 class="detail-h">Audit</h3>
+      <div class="field-row" style="margin-bottom:0.5rem">
+        <div>
+          <label class="field" for="audit-filter">Filter event_type</label>
+          <select id="audit-filter"></select>
+        </div>
+      </div>
+      <div class="probe" id="audit-out"></div>
+      <table class="data" id="audit-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Type</th>
+            <th>Payload</th>
+          </tr>
+        </thead>
+        <tbody id="audit-body"></tbody>
+      </table>
       <h3 class="detail-h">Transcript</h3>
       <div id="turns" class="chat-turns" aria-live="polite"></div>
       <div class="probe" id="detail-err"></div>

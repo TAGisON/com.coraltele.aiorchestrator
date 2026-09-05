@@ -1,6 +1,8 @@
-/* Supervisor console (S.1) — read-only session list + detail. */
+/* Supervisor console (S.1/S.2) — read-only session list, detail, audit browser. */
 (function () {
   let selectedId = "";
+  let auditEvents = [];
+  let auditTypes = [];
 
   function el(id) {
     return document.getElementById(id);
@@ -56,6 +58,60 @@
   function flowLabel(s) {
     if (!s.flow_id) return "—";
     return s.flow_id + (s.flow_version != null ? "@" + s.flow_version : "");
+  }
+
+  function payloadPreview(payload) {
+    let raw = "";
+    try {
+      raw = typeof payload === "string" ? payload : JSON.stringify(payload);
+    } catch (_) {
+      raw = String(payload);
+    }
+    if (raw.length > 160) return raw.slice(0, 157) + "…";
+    return raw || "—";
+  }
+
+  function fillAuditFilter() {
+    const sel = el("audit-filter");
+    const cur = sel.value || "";
+    sel.innerHTML = "";
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "All types";
+    sel.appendChild(all);
+    auditTypes.forEach((t) => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function renderAudit() {
+    const filter = el("audit-filter").value;
+    const body = el("audit-body");
+    body.innerHTML = "";
+    const rows = (auditEvents || []).filter((e) => !filter || e.event_type === filter);
+    if (!rows.length) {
+      show(el("audit-out"), true, filter ? "No events for filter." : "No audit events.");
+      return;
+    }
+    show(el("audit-out"), true, rows.length + " event(s)" + (filter ? " · " + filter : ""));
+    rows.forEach((e) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" +
+        (e.created_at || "—") +
+        "</td>" +
+        "<td><code>" +
+        (e.event_type || "—") +
+        "</code></td>" +
+        "<td class=\"payload-cell\"></td>";
+      tr.querySelector(".payload-cell").textContent = payloadPreview(e.payload);
+      tr.title = typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload);
+      body.appendChild(tr);
+    });
   }
 
   function renderList(sessions) {
@@ -118,13 +174,14 @@
     el("detail-err").textContent = "";
     el("detail-err").className = "probe";
     try {
-      const [sess, tr, disp] = await Promise.all([
+      const [sess, tr, disp, audit] = await Promise.all([
         OrchAPI.getSession(id),
         OrchAPI.getTranscript(id),
         OrchAPI.getDisposition(id).catch((e) => {
           if (e.status === 404) return null;
           throw e;
         }),
+        OrchAPI.getAudit(id),
       ]);
       const summary = {
         session_id: sess.session_id,
@@ -153,10 +210,23 @@
         show(el("disp-out"), true, "(no disposition)");
       }
       show(el("rec-out"), true, recMetaLines(sess));
+      auditEvents = audit.audit_events || [];
+      renderAudit();
       renderTurns(tr.turns || []);
       await refreshList();
     } catch (e) {
       show(el("detail-err"), false, e.message || String(e));
+    }
+  }
+
+  async function loadCatalog() {
+    try {
+      const cat = await OrchAPI.catalog();
+      auditTypes = cat.audit_event_types || [];
+      fillAuditFilter();
+    } catch (_) {
+      auditTypes = [];
+      fillAuditFilter();
     }
   }
 
@@ -171,8 +241,9 @@
     el("btn-reload-detail").onclick = () => {
       if (selectedId) openDetail(selectedId);
     };
+    el("audit-filter").onchange = renderAudit;
   }
 
   bind();
-  refreshList().catch((e) => show(el("list-out"), false, e.message || String(e)));
+  loadCatalog().then(() => refreshList()).catch((e) => show(el("list-out"), false, e.message || String(e)));
 })();
