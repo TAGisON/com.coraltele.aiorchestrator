@@ -196,4 +196,10 @@ table.data th { color: var(--muted); font-weight: 600; }
   border-style: dashed;
   color: #e8d5a3;
 }
+.chat-turn.edge {
+  border-color: #5c6b7a;
+  border-style: dotted;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .chat-turn.meta { color: var(--muted); font-size: 0.9rem; }

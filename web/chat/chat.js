@@ -57,10 +57,11 @@
     }, 1500);
   }
 
-  function turnClass(t) {
+	function turnClass(t) {
     const kind = (t.event_kind || "").toLowerCase();
     if (kind === "tool_line") return "tool";
-    if (t.role === "user") return "user";
+    if (kind === "edge_taken") return "edge";
+    if (t.role === "user" || kind === "user_final") return "user";
     if (t.role === "assistant" || kind === "bot_utterance") return "bot";
     return "meta";
   }
