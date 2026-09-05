@@ -14,7 +14,7 @@ alwaysApply: true
 - Coding: `docs/10_CODING_PRINCIPLES.md` (Draft)
 - CI/CD: `docs/11_CI_AND_CD.md` (Draft)
 - L4 roles: `docs/12_AGENTIC_L4_ROLES.md` + `.cursor/skills/aiorchestrator-l4-*` (Draft)
-- Consoles: `docs/13_PRODUCTION_CONSOLES.md` (Draft) — Admin full config / Supervisor / Chat; no desk UI resurrect; L4 gated on ODs
+- Consoles: `docs/13_PRODUCTION_CONSOLES.md` (**Locked**) — Admin full config / Supervisor / Chat; no desk UI resurrect; U.1 catalog done; continue U.2+
 - Kernel: **Go** only; no Python/Java media kernel
 - Live PCM: in-memory only; no Kafka/Redis for audio
 - Edge: FreeSWITCH `mod_audio_stream` is a dumb PCM pipe

@@ -1,6 +1,6 @@
 # 13 — Production consoles (Admin / Supervisor / User chat)
 
-**Status:** **Draft** (owner go-ahead to plan 2026-09-05 — three production UIs; Admin full config control; server enums/dropdowns).  
+**Status:** **Locked** (owner “continue” 2026-09-05 — ODs settled as Proposed).  
 **Layer:** L2 domain plan per [07_PLANNING_STANDARDS.md](./07_PLANNING_STANDARDS.md) §3.  
 **Parent:** [07](./07_PLANNING_STANDARDS.md).  
 **Architecture refs:** [01](./01_VISION_AND_SCOPE.md), [02](./02_CURRENT_STATE.md), [03](./03_BRAIN_AND_GRAPH.md), [04](./04_LIVE_TURN_MACHINE.md), [05](./05_MEDIA_AND_VENDORS.md), [06](./06_APPLICATION_FLOW.md) § Config + channels.  
@@ -35,20 +35,20 @@ Ship three **production-ready** web consoles so operators can configure a legal 
 
 ---
 
-## Open decisions
+## Settled decisions (OD-13)
 
-| ID | Question | Options | Status |
-|---|---|---|---|
-| **OD-13-1** | App layout | **A)** Three apps `web/admin`, `web/supervisor`, `web/chat` + shared client lib · **B)** One SPA with role routes | **Proposed A** (matches OD-08-1 rebuild paths; clear blast radius) |
-| **OD-13-2** | Auth for V1 consoles | **A)** Existing control Bearer / lab token per role claim · **B)** Full IdP/SSO | **Proposed A** for lab/production-ready V1; SSO later |
-| **OD-13-3** | Catalog API | **A)** `GET /v1/meta/catalog` single payload · **B)** Per-resource option endpoints | **Proposed A** (one fetch for all Admin dropdowns) |
-| **OD-13-4** | Chat transport | **A)** Reuse `POST …/inject` + `GET …/events` (SSE) · **B)** Dedicated WS chat channel | **Proposed A** first; WS only if SSE insufficient |
-| **OD-13-5** | Flow authoring UX | **A)** Structured builder (node/edge forms from catalog) + validate/publish · **B)** Raw JSON editor only · **C)** A primary + optional advanced JSON | **Proposed C** (Admin must create/update properly; JSON escape hatch behind validate) |
-| **OD-13-6** | New DDL for consoles | **A)** None — catalogs from Go constants; use existing `flow_*` / profile / evidence · **B)** New UI preference tables | **Proposed A**; drop/re-migrate DB only if a later OD forces DDL |
-| **OD-13-7** | Chat session clock / media | How to mark “text channel”: e.g. `clock=chat` or `channel=text` with STT/TTS no-op | **Open** — settle in C.1 L3 with architecture_refs to 04 |
-| **OD-13-8** | Supervisor analytics depth | V1 = per-session + simple aggregates only | **Proposed settled** as light aggregates only (not 01 Later dashboard) |
+| ID | Decision | Implication |
+|---|---|---|
+| **OD-13-1** | **A** — Three apps: `web/admin`, `web/supervisor`, `web/chat` + shared client under `web/shared/` | Clear blast radius; matches OD-08-1 rebuild paths |
+| **OD-13-2** | **A** — Control Bearer / lab token (role claim later if needed) | SSO out of this wave |
+| **OD-13-3** | **A** — `GET /v1/meta/catalog` single payload | U.1 implements; Admin dropdowns bind only to this |
+| **OD-13-4** | **A** — `POST …/inject` + `GET …/events` (SSE) | Dedicated WS only if C.* proves SSE insufficient |
+| **OD-13-5** | **C** — Structured builder primary + optional advanced JSON (still validate on publish) | Admin full create/update without illegal free-typed topology |
+| **OD-13-6** | **A** — No new DDL for consoles V1 | Catalog from Go constants; existing `flow_*` / profile / evidence |
+| **OD-13-7** | **`clock=chat`** — text channel; graph pin required like live; STT/TTS no-op / unused | Implement in **C.1**; catalog lists `live` \| `playback` \| `chat` |
+| **OD-13-8** | Light aggregates only | Not 01 Later executive/QM dashboard |
 
-Owner must mark ODs **SETTLED** before status → **Locked**. Until Locked: L3 files may be authored as Draft; **no L4 console code**.
+L3 may proceed; L4 console/API work allowed per Closed phase ids.
 
 ---
 
@@ -190,15 +190,12 @@ Serial waves. Detail each phase in `docs/phases/` before L4. Size: half-day–tw
 
 ## Handoff to L3
 
-1. Owner settles OD-13-1…13-8 → status **Locked**.  
-2. Author/Close **U.0** (inventory).  
-3. Author **U.1** then Implementer… one id at a time ([12](./12_AGENTIC_L4_ROLES.md)).  
-4. Each L3 cites this doc + 01–06; exit criteria observable.  
-5. No console L4 until U.0 Closed and L2 Locked (or owner explicitly unlocks U.1 API-only while ODs finish).
+1. ~~Owner settles OD-13~~ **Done** (Locked).  
+2. Close **U.0**; author/implement **U.1** catalog, then **U.2** shells — one id at a time ([12](./12_AGENTIC_L4_ROLES.md)).  
+3. Each L3 cites this doc + 01–06; exit criteria observable.
 
 ---
 
-## Handoff note (Draft)
+## Handoff note (Locked)
 
-Next immediate artefact: [phases/U.0_consoles_inventory.md](./phases/U.0_consoles_inventory.md).  
-Do not start U.1/L4 until owner confirms ODs or says to proceed on Proposed defaults.
+Next: [phases/U.1_meta_catalog.md](./phases/U.1_meta_catalog.md) after U.0 Closed.

@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `U.0` |
 | **title** | Production consoles gap inventory + phase freeze |
-| **status** | **Draft** — awaiting L2 OD settle / Close |
+| **status** | **Closed** — inventory frozen; doc 13 Locked |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) |
 | **depends_on** | G.7 Closed; L.0 checklist authored; doc 13 Draft exists |
 
@@ -47,7 +47,7 @@ Freeze an honest gap list between the production-console L2 and today’s Contro
 - [x] Gap tables written for Admin / Supervisor / Chat / shared
 - [x] Phase sketch matches doc 13
 - [x] Admin full-control gaps named (including bindings HTTP + catalog)
-- [ ] Owner acknowledges inventory (Close) and preferably settles doc 13 ODs
+- [x] Owner acknowledges inventory (Close) and preferably settles doc 13 ODs
 
 ## edge_cases
 
@@ -71,7 +71,7 @@ Delete or revert this file + README U.* rows if programme abandons consoles wave
 
 ## handoff
 
-After Close + doc 13 Locked (or owner unlock): author **U.1** catalog API L3, then L4 Implementer on U.1 only.
+**Closed.** Next: **U.1** `GET /v1/meta/catalog`.
 
 ---
 

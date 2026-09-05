@@ -1,7 +1,7 @@
 # Coral LLM Call Centre — documentation
 
 **Branch purpose:** Greenfield architecture for an **LLM-based voice call centre** on Coral PABX / FreeSWITCH.  
-**Status:** Architecture locked (01–06). Planning 07–12 Locked for kernel waves. **Doc 13 Draft** — production consoles (Admin / Supervisor / Chat). Kernel G.* Closed; console L4 gated on 13 ODs.
+**Status:** Architecture locked (01–06). Planning 07–12 Locked for kernel waves. **Doc 13 Locked** — production consoles (Admin / Supervisor / Chat). Kernel G.* Closed; U.0–U.1 Closed.
 
 ## Source of truth (read in order)
 
@@ -19,7 +19,7 @@
 | 10 | [10_CODING_PRINCIPLES.md](./10_CODING_PRINCIPLES.md) | Coding rules + EC-* edge-case library |
 | 11 | [11_CI_AND_CD.md](./11_CI_AND_CD.md) | CI jobs + lab promote CD |
 | 12 | [12_AGENTIC_L4_ROLES.md](./12_AGENTIC_L4_ROLES.md) | Implementer / Reviewer / Summarizer |
-| 13 | [13_PRODUCTION_CONSOLES.md](./13_PRODUCTION_CONSOLES.md) | Admin / Supervisor / User chat (**Draft** — ODs open) |
+| 13 | [13_PRODUCTION_CONSOLES.md](./13_PRODUCTION_CONSOLES.md) | Admin / Supervisor / User chat (**Locked**) |
 | — | [phases/](./phases/README.md) | L3 catalogs (P/M/E/CI/G/L + **U/A/C/S/V** consoles) |
 
 ## Hard engineering rules (unchanged)

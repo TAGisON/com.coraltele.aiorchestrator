@@ -93,13 +93,14 @@ Evidence: `.agent/work/P1.*` (local)
 
 ## Production consoles (U.* / A.* / C.* / S.* / V.*)
 
-**L2:** [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) (**Draft** — settle ODs before L4).  
-Admin = full config (flows create/draft/publish, profiles, engines, bindings, matrix, pin). Chat = same graph without STT/TTS. Supervisor = evidence read-only.
+**L2:** [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) (**Locked** — ODs settled 2026-09-05).  
+Admin = full config (flows create/draft/publish, profiles, engines, bindings, matrix, pin). Chat = same graph without STT/TTS (`clock=chat`). Supervisor = evidence read-only.
 
 | Phase | File | Status |
 |---|---|---|
-| U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Draft** — gap inventory + phase freeze |
-| U.1–U.2 | — | Planned in doc 13 (catalog + shells) |
+| U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Closed** — gap inventory + phase freeze |
+| U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** — `GET /v1/meta/catalog` |
+| U.2 | — | Next — shared client + three app shells |
 | A.1–A.6 | — | Planned — Admin full configuration |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
@@ -107,7 +108,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 
 ## Still later
 
-- Owner **settles** doc 13 ODs → Lock → Close U.0 → U.1 L3/L4
+- **U.2** then A.* / C.* / S.* / V.* (serial)
 - Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)

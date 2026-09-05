@@ -134,6 +134,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
+	s.mux.HandleFunc("GET /v1/meta/catalog", s.handleMetaCatalog)
 	s.mux.HandleFunc("GET /v1/tenant/engines", s.handleGetTenantEngines)
 	s.mux.HandleFunc("PUT /v1/tenant/engines", s.handlePutTenantEngines)
 	s.mux.HandleFunc("GET /v1/tenant/config", s.handleGetTenantSettings)
