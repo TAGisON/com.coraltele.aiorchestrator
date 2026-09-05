@@ -198,4 +198,4 @@ Serial waves. Detail each phase in `docs/phases/` before L4. Size: half-day–tw
 
 ## Handoff note (Locked)
 
-Next: [phases/U.1_meta_catalog.md](./phases/U.1_meta_catalog.md) after U.0 Closed.
+Admin **A.1–A.6** Closed. Next: [phases/C.1](./phases/) text-channel (`clock=chat`) after owner assigns, or human Admin soak sign-off on [A.6](./phases/A.6_admin_soak_checklist.md).

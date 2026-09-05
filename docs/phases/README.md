@@ -106,15 +106,15 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | A.3 | [A.3_admin_flows_draft.md](./A.3_admin_flows_draft.md) | **Closed** (6c85e18) — flow list/create/draft |
 | A.4 | [A.4_admin_graph_builder.md](./A.4_admin_graph_builder.md) | **Closed** (d5e2f9d) — graph builder + publish + version inspect |
 | A.5 | [A.5_admin_live_pin.md](./A.5_admin_live_pin.md) | **Closed** (e1e6a78) — answer pins + platform status + lab session |
-| A.6 | — | Next — Admin soak checklist |
-| C.1–C.4 | — | Planned — User chat channel |
+| A.6 | [A.6_admin_soak_checklist.md](./A.6_admin_soak_checklist.md) | **Closed** — Admin UI soak checklist |
+| C.1–C.4 | — | Next — User chat channel (`clock=chat`) |
 | S.1–S.4 | — | Planned — Supervisor |
 | V.1–V.2 | — | Planned — dual chat+call prove |
 
 ## Still later
 
-- **A.6** Admin soak checklist, then C.* chat / S.* supervisor
-- Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
+- Owner **runs** A.6 / L.0 / E.6 sign-off on lab (human)
+- **C.1** text-channel session mode, then C.2–C.4 / S.* / V.*
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
 
