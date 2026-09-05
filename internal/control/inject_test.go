@@ -55,7 +55,7 @@ func TestInject_ClipTurnAndTranscript(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"cc-sales","profile_version":"latest","clock":"live"
+  "profile_id":"cc-sales","profile_version":"latest","clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -136,7 +136,7 @@ func TestAnswer_GreetingBeforeInject(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"cc-answer","profile_version":"latest","clock":"live"
+  "profile_id":"cc-answer","profile_version":"latest","clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)

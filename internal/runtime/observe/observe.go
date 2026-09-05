@@ -237,6 +237,52 @@ func (o *Observer) AppendAssistantOnly(ctx context.Context, responseText string)
 	_ = turnID // speak.prompt removed — not on P2.4 allowlist (E.4)
 }
 
+// EdgeTaken records a graph move (transcript edge_taken + audit graph.edge).
+func (o *Observer) EdgeTaken(ctx context.Context, edgeID, fromNode, toNode, kind string) {
+	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
+		return
+	}
+	writeCtx := storeCtx(ctx)
+	payload, _ := json.Marshal(map[string]any{
+		"edge_id": edgeID, "from": fromNode, "to": toNode, "kind": kind,
+	})
+	if _, err := o.Repo.AppendTranscriptTurn(writeCtx, store.TranscriptTurn{
+		SessionID: o.Meta.SessionID,
+		Role:      store.RoleSystem,
+		Text:      edgeID,
+		TurnID:    newTurnID(),
+		EventKind: store.EventKindEdgeTaken,
+		NodeID:    toNode,
+		EdgeID:    edgeID,
+		Payload:   payload,
+	}); err != nil {
+		applog.Warn("observe edge_taken fail-open", "session", o.Meta.SessionID, "err", err)
+	}
+	o.Audit(ctx, store.AuditGraphEdge, map[string]any{
+		"edge_id": edgeID, "from": fromNode, "to": toNode, "kind": kind,
+	})
+}
+
+// ToolLine records a Tool closing Speak as tool_line (not bot_utterance).
+func (o *Observer) ToolLine(ctx context.Context, text, nodeID string) {
+	if o == nil || o.Repo == nil || o.Meta.SessionID == "" {
+		return
+	}
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	if _, err := o.Repo.AppendTranscriptTurn(storeCtx(ctx), store.TranscriptTurn{
+		SessionID: o.Meta.SessionID,
+		Role:      store.RoleAssistant,
+		Text:      text,
+		TurnID:    newTurnID(),
+		EventKind: store.EventKindToolLine,
+		NodeID:    nodeID,
+	}); err != nil {
+		applog.Warn("observe tool_line fail-open", "session", o.Meta.SessionID, "err", err)
+	}
+}
+
 // UserFinalSpec is a structured user_final emit (docs/09 B1).
 type UserFinalSpec struct {
 	Text             string

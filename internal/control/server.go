@@ -357,6 +357,14 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	if clock == "" {
 		clock = "live"
 	}
+	flowID := strings.TrimSpace(req.FlowID)
+	if clock == "live" && flowID == "" {
+		writeError(w, http.StatusUnprocessableEntity, CodeFlowPinRequired,
+			"live sessions require flow_id and flow_version pin", map[string]any{
+				"hint": "publish a coral.flow.v1 then pass flow_id / flow_version; use clock=playback for profile-only lab",
+			})
+		return
+	}
 	pv, err := s.resolveProfileVersion(r.Context(), req.ProfileID, req.ProfileVersion)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, CodeNotFound, "profile version not found", nil)
@@ -390,7 +398,6 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	warnProfileEngineConflict(doc, binding)
 	bindingCopy := binding
 	var flowCursor *graph.Cursor
-	flowID := strings.TrimSpace(req.FlowID)
 	flowVer := 0
 	if flowID != "" {
 		fv, err := s.resolveFlowVersion(r.Context(), flowID, req.FlowVersion)

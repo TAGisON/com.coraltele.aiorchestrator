@@ -1,0 +1,36 @@
+{
+  "schema_id": "coral.flow.v1",
+  "entry_node_id": "entry",
+  "default_locale": "en-IN",
+  "nodes": [
+    { "id": "entry", "type": "Entry" },
+    { "id": "welcome", "type": "Speak", "prompt_ref": "welcome" },
+    { "id": "choice", "type": "ListenChoice", "repair": { "max_retries": 2, "unclear_prompt_ref": "repair_unclear" } },
+    { "id": "xfer_sales", "type": "Tool", "tool": "transfer", "matrix_intent": "sales", "prompt_ref": "closing_transfer" },
+    { "id": "hang", "type": "Tool", "tool": "hangup", "prompt_ref": "closing_hangup" }
+  ],
+  "edges": [
+    { "id": "e_entry_welcome", "from": "entry", "to": "welcome", "kind": "next" },
+    { "id": "e_welcome_choice", "from": "welcome", "to": "choice", "kind": "next" },
+    { "id": "e_choice_sales", "from": "choice", "to": "xfer_sales", "kind": "intent", "intent": "sales" },
+    { "id": "e_choice_bye", "from": "choice", "to": "hang", "kind": "intent", "intent": "bye" },
+    { "id": "e_choice_repair", "from": "choice", "to": "hang", "kind": "repair" }
+  ],
+  "prompts": {
+    "welcome": { "en-IN": "Welcome to Coral. How can I help?" },
+    "repair_unclear": { "en-IN": "Please say sales or bye." },
+    "closing_transfer": { "en-IN": "Connecting you to sales." },
+    "closing_hangup": { "en-IN": "Thank you for calling. Goodbye." }
+  },
+  "matrix": [
+    {
+      "intent": "sales",
+      "owner": "Sales",
+      "target": "sales-q",
+      "number": "1001",
+      "action": "transfer",
+      "disposition_code": "transferred_sales"
+    }
+  ],
+  "binding_refs": []
+}

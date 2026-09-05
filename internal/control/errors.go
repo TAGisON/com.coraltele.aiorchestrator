@@ -13,6 +13,7 @@ const (
 	CodeConflict           = "conflict"
 	CodeProfileInvalid     = "profile_invalid"
 	CodeFlowInvalid        = "flow_invalid"
+	CodeFlowPinRequired    = "flow_pin_required"
 	CodeGatewayUnavailable = "gateway_unavailable"
 	CodeRateLimited        = "rate_limited"
 	CodeBadRequest         = "bad_request"

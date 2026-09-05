@@ -111,7 +111,7 @@ func TestSession_CreatePersistsGatewayBinding(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
   "profile_id":"cc-lab",
   "profile_version":"latest",
-  "clock":"live"
+  "clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)

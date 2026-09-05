@@ -44,7 +44,7 @@ func TestCC5_GetTranscriptOrdered(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"cc5-lab","profile_version":"latest","clock":"live","tenant_id":"t1"
+  "profile_id":"cc5-lab","profile_version":"latest","clock":"playback","tenant_id":"t1"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -116,7 +116,7 @@ func TestCC5_PostcallDispositionGET(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"cc5-disp","profile_version":"latest","clock":"live","tenant_id":"t1"
+  "profile_id":"cc5-disp","profile_version":"latest","clock":"playback","tenant_id":"t1"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)

@@ -47,7 +47,7 @@ func TestPatchProfileFields_LanguagePrimary(t *testing.T) {
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr, Repo: mem}, control.Config{OwnerInstance: "lang-test"}, nil)
 
 	create := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"p-lang","clock":"live"
+  "profile_id":"p-lang","clock":"playback"
 }`))
 	rr := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, create)
@@ -120,10 +120,16 @@ func TestPatchProfileFields_RejectsDisallowedAndNoMidCall(t *testing.T) {
 	mgr := session.NewManager(reg)
 	srv := control.NewWithRuntime(mem, reg, &control.SessionRuntime{Mgr: mgr, Repo: mem}, control.Config{}, nil)
 	rr := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{"profile_id":"p2"}`)))
+	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{"profile_id":"p2","clock":"playback"}`)))
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
 	var created map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &created)
 	sid, _ := created["session_id"].(string)
+	if sid == "" {
+		t.Fatal("no session_id")
+	}
 
 	rr = httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, "/v1/sessions/"+sid+"/profile-fields",

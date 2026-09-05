@@ -18,8 +18,17 @@ type Turn struct {
 	Repair   bool     // unclear reprompt; cursor stays on listen node
 	Locale   string   // set when ListenLanguage matched (BCP-47)
 	NodeID   string   // cursor after this turn
-	EdgeID   string   // edge taken this turn (if any)
+	EdgeID   string   // last edge taken this turn (if any)
+	Taken    []EdgeTake
 	Armed    *ArmedTool
+}
+
+// EdgeTake records one legal graph move for evidence (G.7).
+type EdgeTake struct {
+	EdgeID string
+	From   string
+	To     string
+	Kind   string
 }
 
 // ArmedTool is a frozen irreversible action ready for arm→speak→exec (G.4).
@@ -141,10 +150,15 @@ func (c *Cursor) handleChoiceLocked(n flow.Node, text string) (Turn, error) {
 		return c.repairLocked(n)
 	}
 	c.retries[n.ID] = 0
+	from := c.nodeID
 	if err := c.takeLocked(edge); err != nil {
 		return Turn{}, err
 	}
-	turn := Turn{EdgeID: edge.ID, NodeID: c.nodeID}
+	turn := Turn{
+		EdgeID: edge.ID,
+		NodeID: c.nodeID,
+		Taken:  []EdgeTake{{EdgeID: edge.ID, From: from, To: edge.To, Kind: edge.Kind}},
+	}
 	rest, err := c.advanceSilentLocked()
 	if err != nil {
 		return Turn{}, err
@@ -168,10 +182,14 @@ func (c *Cursor) handleLanguageLocked(n flow.Node, text string) (Turn, error) {
 		return Turn{}, fmt.Errorf("ListenLanguage edge %q missing intent/option locale", edge.ID)
 	}
 	c.locale = locale
+	from := c.nodeID
 	if err := c.takeLocked(edge); err != nil {
 		return Turn{}, err
 	}
-	turn := Turn{EdgeID: edge.ID, NodeID: c.nodeID, Locale: locale}
+	turn := Turn{
+		EdgeID: edge.ID, NodeID: c.nodeID, Locale: locale,
+		Taken: []EdgeTake{{EdgeID: edge.ID, From: from, To: edge.To, Kind: edge.Kind}},
+	}
 	c.blockTool = true
 	defer func() { c.blockTool = false }()
 	rest, err := c.advanceSilentLocked()
@@ -188,7 +206,10 @@ func mergeAdvance(turn *Turn, rest Turn) {
 	turn.Ended = rest.Ended
 	turn.Armed = rest.Armed
 	turn.NodeID = rest.NodeID
+	turn.Taken = append(turn.Taken, rest.Taken...)
 	if turn.EdgeID == "" {
+		turn.EdgeID = rest.EdgeID
+	} else if rest.EdgeID != "" {
 		turn.EdgeID = rest.EdgeID
 	}
 }
@@ -224,10 +245,14 @@ func (c *Cursor) repairLocked(n flow.Node) (Turn, error) {
 		return Turn{}, fmt.Errorf("node %s repair exhausted: %w", n.ID, err)
 	}
 	c.retries[n.ID] = 0
+	from := c.nodeID
 	if err := c.takeLocked(e); err != nil {
 		return Turn{}, err
 	}
-	turn := Turn{EdgeID: e.ID, NodeID: c.nodeID}
+	turn := Turn{
+		EdgeID: e.ID, NodeID: c.nodeID,
+		Taken: []EdgeTake{{EdgeID: e.ID, From: from, To: e.To, Kind: e.Kind}},
+	}
 	rest, err := c.advanceSilentLocked()
 	if err != nil {
 		return Turn{}, err
@@ -266,10 +291,12 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			if err != nil {
 				return Turn{}, err
 			}
+			from := c.nodeID
 			if err := c.takeLocked(e); err != nil {
 				return Turn{}, err
 			}
 			out.EdgeID = e.ID
+			out.Taken = append(out.Taken, EdgeTake{EdgeID: e.ID, From: from, To: e.To, Kind: e.Kind})
 			continue
 		case flow.NodeSpeak:
 			line, err := c.resolvePromptLocked(n.PromptRef)
@@ -283,10 +310,12 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			if err != nil {
 				return Turn{}, err
 			}
+			from := c.nodeID
 			if err := c.takeLocked(e); err != nil {
 				return Turn{}, err
 			}
 			out.EdgeID = e.ID
+			out.Taken = append(out.Taken, EdgeTake{EdgeID: e.ID, From: from, To: e.To, Kind: e.Kind})
 			continue
 		case flow.NodeListenChoice, flow.NodeListenLanguage, flow.NodeListenSlot:
 			return out, nil
@@ -319,6 +348,7 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 					return Turn{}, ferr
 				}
 				failTurn.Lines = append(append([]string{}, out.Lines...), failTurn.Lines...)
+				failTurn.Taken = append(append([]EdgeTake{}, out.Taken...), failTurn.Taken...)
 				return failTurn, nil
 			}
 			if answer != "" {
@@ -328,10 +358,12 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			if err != nil {
 				return Turn{}, fmt.Errorf("Inform %s: %w", n.ID, err)
 			}
+			from := c.nodeID
 			if err := c.takeLocked(e); err != nil {
 				return Turn{}, err
 			}
 			out.EdgeID = e.ID
+			out.Taken = append(out.Taken, EdgeTake{EdgeID: e.ID, From: from, To: e.To, Kind: e.Kind})
 			continue
 		default:
 			return Turn{}, fmt.Errorf("unsupported node type %q", n.Type)
@@ -355,10 +387,14 @@ func (c *Cursor) failInformLocked(n flow.Node, cause error) (Turn, error) {
 	if err != nil {
 		return Turn{}, fmt.Errorf("Inform %s: %v (%w)", n.ID, cause, err)
 	}
+	from := c.nodeID
 	if err := c.takeLocked(e); err != nil {
 		return Turn{}, err
 	}
-	turn := Turn{EdgeID: e.ID, NodeID: c.nodeID}
+	turn := Turn{
+		EdgeID: e.ID, NodeID: c.nodeID,
+		Taken: []EdgeTake{{EdgeID: e.ID, From: from, To: e.To, Kind: e.Kind}},
+	}
 	rest, err := c.advanceSilentLocked()
 	if err != nil {
 		return Turn{}, err

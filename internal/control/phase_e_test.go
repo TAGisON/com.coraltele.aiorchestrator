@@ -49,7 +49,7 @@ func TestPhaseE_SessionTerminalAuditAnalyticsPostcall(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"e-lab","profile_version":"latest","clock":"live","tenant_id":"t1"
+  "profile_id":"e-lab","profile_version":"latest","clock":"playback","tenant_id":"t1"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -152,7 +152,7 @@ func TestPhaseE_SSE_SessionStateAndTurn(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"sse-lab","profile_version":"latest","clock":"live"
+  "profile_id":"sse-lab","profile_version":"latest","clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -236,7 +236,7 @@ func TestPhaseE_EdgeGoneTerminalAuditPostcall(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"edge-gone-lab","profile_version":"latest","clock":"live","tenant_id":"t1"
+  "profile_id":"edge-gone-lab","profile_version":"latest","clock":"playback","tenant_id":"t1"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)

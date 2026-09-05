@@ -105,7 +105,7 @@ func TestSession_CreateGetStop(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
   "profile_id":"contact-lab",
   "profile_version":"latest",
-  "clock":"live"
+  "clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -198,7 +198,7 @@ func TestSession_WithRuntime_CreateRunningStop(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
   "profile_id":"rt-lab",
   "profile_version":"latest",
-  "clock":"live"
+  "clock":"playback"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
@@ -249,7 +249,7 @@ func TestSession_CreateStoresCallerAndMetadata(t *testing.T) {
 	body := `{
   "profile_id":"rt-lab",
   "profile_version":"latest",
-  "clock":"live",
+  "clock":"playback",
   "caller":{"ani":"5001","caller_id_name":"Desk"},
   "metadata":{"edge":"mod_audio_stream","call_uuid":"fs-uuid-1","sip_call_id":"sip-abc","destination":"101"}
 }`

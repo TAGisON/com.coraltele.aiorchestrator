@@ -430,6 +430,7 @@ func (t *Talk) answerFromGraph(ctx context.Context) (spoken string, err error) {
 	if turn.Armed != nil {
 		t.ConfigureBarge(false, 0)
 	}
+	t.emitGraphEvidence(ctx, turn)
 	if spoken != "" {
 		if t.Mem != nil {
 			t.Mem.Append("assistant", spoken)
@@ -441,7 +442,15 @@ func (t *Talk) answerFromGraph(ctx context.Context) (spoken string, err error) {
 			return spoken, fmt.Errorf("answer speak: %w", err)
 		}
 		if t.Obs != nil {
-			t.Obs.AppendAssistantOnly(ctx, spoken)
+			if turn.Armed != nil {
+				nodeID := ""
+				if turn.Armed != nil {
+					nodeID = turn.Armed.NodeID
+				}
+				t.Obs.ToolLine(ctx, spoken, nodeID)
+			} else {
+				t.Obs.AppendAssistantOnly(ctx, spoken)
+			}
 		}
 	}
 	t.mu.Lock()
@@ -482,6 +491,15 @@ func (t *Talk) fireToolArmed(ctx context.Context, armed *graph.ArmedTool) error 
 		return nil
 	}
 	return t.OnToolArmed(ctx, *armed)
+}
+
+func (t *Talk) emitGraphEvidence(ctx context.Context, turn graph.Turn) {
+	if t.Obs == nil {
+		return
+	}
+	for _, e := range turn.Taken {
+		t.Obs.EdgeTaken(ctx, e.EdgeID, e.From, e.To, e.Kind)
+	}
 }
 
 func openingGreeting(doc profile.Document) string {
@@ -605,6 +623,7 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 		t.ConfigureBarge(false, 0)
 		res.Action = "tool_" + turn.Armed.Kind
 	}
+	t.emitGraphEvidence(ctx, turn)
 	if spoken != "" {
 		if err := t.speak(ctx, spoken); err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -633,8 +652,11 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 	t.mu.Lock()
 	t.lastActivity = time.Now()
 	t.mu.Unlock()
-	t.emitTurn(ctx, userText, spoken, res, barge, outcome, started)
 	if turn.Armed != nil {
+		if t.Obs != nil && spoken != "" {
+			t.Obs.ToolLine(ctx, spoken, turn.Armed.NodeID)
+		}
+		t.emitTurn(ctx, userText, "", res, barge, outcome, started)
 		if err := t.fireToolArmed(ctx, turn.Armed); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				t.failPipeline(ctx, err)
@@ -643,6 +665,7 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 		}
 		return nil
 	}
+	t.emitTurn(ctx, userText, spoken, res, barge, outcome, started)
 	if turn.Ended {
 		t.fireGraphEnd(ctx)
 	}

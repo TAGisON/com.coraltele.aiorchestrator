@@ -98,7 +98,7 @@ func TestSession_EdgeTokenSigned(t *testing.T) {
 }`)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewBufferString(`{
-  "profile_id":"edge-lab","profile_version":"latest","clock":"live","tenant_id":"t1"
+  "profile_id":"edge-lab","profile_version":"latest","clock":"playback","tenant_id":"t1"
 }`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(rr, req)
