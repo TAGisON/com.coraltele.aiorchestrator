@@ -13,6 +13,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/clock"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
@@ -87,6 +88,8 @@ type Actor struct {
 	Profile        profile.Document
 	Reg            port.Registry
 	GatewayBinding *store.GatewayBinding // pinned at create (CC); metadata for later phases
+	// FlowCursor is set when the session is pinned to a published coral.flow.v1 (G.3).
+	FlowCursor *graph.Cursor
 
 	Bus         *bus.Bus
 	Clock       clock.Scheduler
@@ -332,6 +335,7 @@ type StartParams struct {
 	ProfileRaw     json.RawMessage // optional; if Profile empty, parsed from raw
 	Reg            port.Registry
 	GatewayBinding *store.GatewayBinding
+	FlowCursor     *graph.Cursor
 }
 
 // Manager owns actors keyed by session id.
@@ -390,6 +394,7 @@ func (m *Manager) Start(ctx context.Context, p StartParams) (*Actor, error) {
 		Profile:        doc,
 		Reg:            reg,
 		GatewayBinding: p.GatewayBinding,
+		FlowCursor:     p.FlowCursor,
 		Bus:            bus.New(),
 		Clock:          clock.New(clockKind, frameMs),
 		Memory:         NewMemory(),

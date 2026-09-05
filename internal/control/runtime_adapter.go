@@ -57,6 +57,7 @@ func (r *SessionRuntime) StartSession(ctx context.Context, p RuntimeStart) error
 		Profile:        p.Profile,
 		ProfileRaw:     p.Document,
 		GatewayBinding: p.GatewayBinding,
+		FlowCursor:     p.FlowCursor,
 	})
 	if err != nil {
 		return err
@@ -635,6 +636,7 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		return nil, err
 	}
 	talk.BindActor(a)
+	talk.Graph = a.FlowCursor
 	if err := bindThinkFromGateway(talk, a); err != nil {
 		return nil, err
 	}
@@ -646,6 +648,18 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 	// Unrecoverable pipeline errors play the operator prompt and release the call.
 	talk.OnFailure = func(ctx context.Context, err error) {
 		r.FailCall(ctx, sessionID, fallback.Classify(err), err)
+	}
+	talk.OnGraphEnd = func(ctx context.Context, disposition string) {
+		if r.Repo != nil && strings.TrimSpace(disposition) != "" {
+			_, _ = r.Repo.UpsertSessionDisposition(context.WithoutCancel(ctx), store.SessionDisposition{
+				SessionID: sessionID,
+				Source:    store.DispositionSourceLiveGraph,
+				Final:     disposition,
+			})
+		}
+		if r.OnSessionEnd != nil {
+			r.OnSessionEnd(context.WithoutCancel(ctx), sessionID, disposition)
+		}
 	}
 	if r.Repo != nil {
 		meta := observe.SessionMeta{

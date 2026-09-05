@@ -19,8 +19,10 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/applog"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/edge/token"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/flow"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
@@ -51,6 +53,8 @@ type RuntimeStart struct {
 	// Caller is the optional create-time caller JSON (ANI etc.) used to restore
 	// per-ANI preferences before Listen opens.
 	Caller json.RawMessage
+	// FlowCursor when non-nil pins the session to a published coral.flow.v1 (G.3).
+	FlowCursor *graph.Cursor
 }
 
 // Config for the control HTTP server.
@@ -330,6 +334,8 @@ func (s *Server) handlePublishProfile(w http.ResponseWriter, r *http.Request) {
 type createSessionReq struct {
 	ProfileID      string          `json:"profile_id"`
 	ProfileVersion json.RawMessage `json:"profile_version"` // "latest" or number
+	FlowID         string          `json:"flow_id"`
+	FlowVersion    json.RawMessage `json:"flow_version"` // "latest" or number; ignored if flow_id empty
 	Clock          string          `json:"clock"`
 	Caller         json.RawMessage `json:"caller"`
 	RecordingRef   string          `json:"recording_ref"`
@@ -383,6 +389,41 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	warnProfileEngineConflict(doc, binding)
 	bindingCopy := binding
+	var flowCursor *graph.Cursor
+	flowID := strings.TrimSpace(req.FlowID)
+	flowVer := 0
+	if flowID != "" {
+		fv, err := s.resolveFlowVersion(r.Context(), flowID, req.FlowVersion)
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, CodeNotFound, "flow version not found", nil)
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusBadRequest, CodeBadRequest, err.Error(), nil)
+			return
+		}
+		flowDoc, err := flow.Parse(fv.Doc)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, CodeInternal, "pinned flow corrupt", nil)
+			return
+		}
+		if err := flow.Validate(flowDoc); err != nil {
+			var ve *flow.ValidationError
+			if errors.As(err, &ve) {
+				writeError(w, http.StatusUnprocessableEntity, CodeFlowInvalid, ve.Message, ve.Details)
+				return
+			}
+			writeError(w, http.StatusUnprocessableEntity, CodeFlowInvalid, err.Error(), nil)
+			return
+		}
+		flowCursor, err = graph.New(flowDoc, flowDoc.DefaultLocale)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, CodeInternal, "flow cursor failed", nil)
+			return
+		}
+		flowID = fv.FlowID
+		flowVer = fv.Version
+	}
 	sid, err := newID()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, CodeInternal, "id generate failed", nil)
@@ -403,6 +444,8 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		TenantID:              tenantID,
 		ProfileID:             pv.ProfileID,
 		ProfileVersion:        pv.Version,
+		FlowID:                flowID,
+		FlowVersion:           flowVer,
 		Clock:                 clock,
 		State:                 store.StateCreated,
 		OwnerInstance:         s.cfg.OwnerInstance,
@@ -433,6 +476,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			Document:       pv.Document,
 			GatewayBinding: sess.GatewayBinding,
 			Caller:         sess.Caller,
+			FlowCursor:     flowCursor,
 		}); err != nil {
 			_, _ = s.repo.UpdateSessionState(r.Context(), sess.ID, store.StateFailed)
 			ge, ok := port.AsGatewayError(err)
@@ -461,6 +505,8 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		"session_id":               sess.ID,
 		"profile_id":               sess.ProfileID,
 		"profile_version":          sess.ProfileVersion,
+		"flow_id":                  sess.FlowID,
+		"flow_version":             sess.FlowVersion,
 		"clock":                    sess.Clock,
 		"canonical_sample_rate_hz": sess.CanonicalSampleRateHz,
 		"state":                    state,
@@ -493,6 +539,28 @@ func (s *Server) resolveProfileVersion(ctx context.Context, profileID string, ve
 	return store.ProfileVersion{}, errors.New("profile_version must be latest or integer")
 }
 
+func (s *Server) resolveFlowVersion(ctx context.Context, flowID string, verRaw json.RawMessage) (store.FlowVersion, error) {
+	if len(verRaw) == 0 || string(verRaw) == `null` || string(verRaw) == `"latest"` {
+		return s.repo.GetLatestFlowVersion(ctx, flowID)
+	}
+	var n int
+	if err := json.Unmarshal(verRaw, &n); err == nil {
+		return s.repo.GetFlowVersion(ctx, flowID, n)
+	}
+	var sver string
+	if err := json.Unmarshal(verRaw, &sver); err == nil {
+		if sver == "" || sver == "latest" {
+			return s.repo.GetLatestFlowVersion(ctx, flowID)
+		}
+		n, err := strconv.Atoi(sver)
+		if err != nil {
+			return store.FlowVersion{}, errors.New("flow_version must be latest or integer")
+		}
+		return s.repo.GetFlowVersion(ctx, flowID, n)
+	}
+	return store.FlowVersion{}, errors.New("flow_version must be latest or integer")
+}
+
 func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	sess, err := s.repo.GetSession(r.Context(), id)
@@ -508,6 +576,8 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		"session_id":               sess.ID,
 		"profile_id":               sess.ProfileID,
 		"profile_version":          sess.ProfileVersion,
+		"flow_id":                  sess.FlowID,
+		"flow_version":             sess.FlowVersion,
 		"clock":                    sess.Clock,
 		"state":                    sess.State,
 		"owner_instance":           sess.OwnerInstance,

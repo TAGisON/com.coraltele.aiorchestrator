@@ -14,6 +14,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/router"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/bus"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/thinkpath"
@@ -97,6 +98,12 @@ type Talk struct {
 	// plays the operator's fallback prompt and releases the call. It is invoked
 	// at most once per session; a call is only failed out one time.
 	OnFailure func(ctx context.Context, err error)
+
+	// Graph is optional coral.flow.v1 cursor (G.3). When set, AnswerCall and
+	// turns walk the graph instead of the profile thinkpath ladder.
+	Graph *graph.Cursor
+	// OnGraphEnd fires once when the cursor reaches End (after final Speak lines).
+	OnGraphEnd func(ctx context.Context, disposition string)
 
 	mu                  sync.Mutex
 	state               TurnState
@@ -345,7 +352,9 @@ func (t *Talk) InjectFinal(ctx context.Context, userText string) error {
 	return t.runThinkSpeak(ctx, userText)
 }
 
-// AnswerCall speaks the opening (pre_speak_first inject_text + greeting clip) without Think or a user turn.
+// AnswerCall speaks the opening without Think or a user turn.
+// With a graph cursor: Entry → Speak… until ListenChoice/End.
+// Without: pre_speak_first inject_text + greeting clip (profile).
 // Idempotent: a second call returns ("", nil). Sets welcomeCompleted only after speak mark.
 func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	t.mu.Lock()
@@ -354,6 +363,10 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 		return "", nil
 	}
 	t.mu.Unlock()
+
+	if t.Graph != nil {
+		return t.answerFromGraph(ctx)
+	}
 
 	var parts []string
 	for _, rule := range t.Doc.Rules {
@@ -399,6 +412,56 @@ func (t *Talk) AnswerCall(ctx context.Context) (spoken string, err error) {
 	return spoken, nil
 }
 
+func (t *Talk) answerFromGraph(ctx context.Context) (spoken string, err error) {
+	if t.Actor != nil {
+		t.Graph.SetLocale(t.Actor.ActiveLanguage())
+	}
+	turn, err := t.Graph.Bootstrap()
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			t.failPipeline(ctx, err)
+		}
+		return "", err
+	}
+	spoken = strings.TrimSpace(strings.Join(turn.Lines, " "))
+	if spoken != "" {
+		if t.Mem != nil {
+			t.Mem.Append("assistant", spoken)
+		}
+		if err := t.speak(ctx, spoken); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				t.failPipeline(ctx, err)
+			}
+			return spoken, fmt.Errorf("answer speak: %w", err)
+		}
+		if t.Obs != nil {
+			t.Obs.AppendAssistantOnly(ctx, spoken)
+		}
+	}
+	t.mu.Lock()
+	t.welcomeCompleted = true
+	t.mu.Unlock()
+	if t.Bus != nil {
+		t.Bus.PublishEvent(bus.Event{Kind: "turn.completed", Data: map[string]any{
+			"outcome":       "answer",
+			"response_tier": "graph",
+			"node_id":       turn.NodeID,
+			"edge_id":       turn.EdgeID,
+		}})
+	}
+	if turn.Ended {
+		t.fireGraphEnd(ctx)
+	}
+	return spoken, nil
+}
+
+func (t *Talk) fireGraphEnd(ctx context.Context) {
+	if t.OnGraphEnd == nil {
+		return
+	}
+	t.OnGraphEnd(ctx, store.DispositionFinalHangupCompleted)
+}
+
 func openingGreeting(doc profile.Document) string {
 	if doc.Response == nil || doc.Response.Clips == nil {
 		return ""
@@ -431,12 +494,16 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Unlock()
 	defer cancel()
 
+	started := time.Now()
+	if t.Graph != nil {
+		return t.runGraphTurn(ctx, thinkCtx, userText, started)
+	}
+
 	if t.Path != nil && t.Actor != nil {
 		t.Path.PinnedEngines = t.Actor.GatewayBinding != nil
 		t.Path.ActiveLanguage = t.Actor.ActiveLanguage
 	}
 
-	started := time.Now()
 	res, err := t.Path.Run(thinkCtx, userText)
 	if err != nil {
 		t.setState(Listening)
@@ -477,6 +544,61 @@ func (t *Talk) runThinkSpeak(ctx context.Context, userText string) error {
 	t.mu.Unlock()
 	t.emitTurn(ctx, userText, res.ResponseText, res, barge, outcome, started)
 	return err
+}
+
+func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, started time.Time) error {
+	if t.Actor != nil {
+		t.Graph.SetLocale(t.Actor.ActiveLanguage())
+	}
+	turn, err := t.Graph.HandleUtterance(userText)
+	if err != nil {
+		t.setState(Listening)
+		t.emitTurn(ctx, userText, "", thinkpath.Result{Action: "error"}, false, "error", started)
+		if !errors.Is(err, context.Canceled) {
+			t.failPipeline(ctx, err)
+		}
+		return err
+	}
+	_ = thinkCtx
+	spoken := strings.TrimSpace(strings.Join(turn.Lines, " "))
+	res := thinkpath.Result{
+		ResponseText: spoken,
+		Action:       "graph",
+		ResponseTier: "graph",
+	}
+	if turn.NoMatch {
+		res.Action = "no_match"
+		t.setState(Listening)
+		t.emitTurn(ctx, userText, "", res, false, "no_match", started)
+		return nil
+	}
+	if spoken != "" {
+		if err := t.speak(ctx, spoken); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				t.failPipeline(ctx, err)
+			}
+			t.emitTurn(ctx, userText, spoken, res, t.LastBargeIn(), "error", started)
+			return err
+		}
+	} else {
+		t.setState(Listening)
+	}
+	barge := t.LastBargeIn()
+	outcome := "graph"
+	if barge {
+		outcome = "barge_in"
+	}
+	if turn.Ended {
+		outcome = "end"
+	}
+	t.mu.Lock()
+	t.lastActivity = time.Now()
+	t.mu.Unlock()
+	t.emitTurn(ctx, userText, spoken, res, barge, outcome, started)
+	if turn.Ended {
+		t.fireGraphEnd(ctx)
+	}
+	return nil
 }
 
 // LastActivity is when the last turn started or finished (silence watchdog).
