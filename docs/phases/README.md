@@ -89,7 +89,7 @@ Evidence: `.agent/work/P1.*` (local)
 
 | Phase | File | Status |
 |---|---|---|
-| L.0 | [L.0_graph_lab_soak.md](./L.0_graph_lab_soak.md) | **Closed** — graph V1 soak checklist (+ fixture) |
+| L.0 | [L.0_graph_lab_soak.md](./L.0_graph_lab_soak.md) | **Closed** (a84614b) — graph V1 soak checklist (+ fixture) |
 
 ## Still later
 

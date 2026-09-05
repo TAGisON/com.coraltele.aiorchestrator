@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `L.0` |
 | **title** | Graph V1 lab soak checklist (API / DID) |
-| **status** | **Closed** — checklist authored |
+| **status** | **Closed** (a84614b) — checklist authored |
 | **parent_plan** | [01](../01_VISION_AND_SCOPE.md) V1 done; [G.7](./G.7_evidence_cutover.md) |
 | **depends_on** | G.0–G.7 Closed (`ee2cbb3` tip of G.7); E.6 Closed |
 
