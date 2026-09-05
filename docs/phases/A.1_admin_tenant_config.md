@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.1` |
 | **title** | Admin: profiles, engines, credentials, settings |
-| **status** | **Closed** — Admin profiles / engines / credentials / settings |
+| **status** | **Closed** (411eefd) — Admin profiles / engines / credentials / settings |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Admin inventory |
 | **depends_on** | U.2 Closed (`60c46ab`) |
 

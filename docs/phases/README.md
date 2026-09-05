@@ -101,7 +101,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Closed** — gap inventory + phase freeze |
 | U.1 | [U.1_meta_catalog.md](./U.1_meta_catalog.md) | **Closed** (5d9713a) — `GET /v1/meta/catalog` |
 | U.2 | [U.2_console_shells.md](./U.2_console_shells.md) | **Closed** (60c46ab) — shared client + Admin/Supervisor/Chat shells |
-| A.1 | [A.1_admin_tenant_config.md](./A.1_admin_tenant_config.md) | **Closed** — profiles / engines / credentials / settings |
+| A.1 | [A.1_admin_tenant_config.md](./A.1_admin_tenant_config.md) | **Closed** (411eefd) — profiles / engines / credentials / settings |
 | A.2–A.6 | — | Next — bindings, flows, graph builder, pin, soak |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
