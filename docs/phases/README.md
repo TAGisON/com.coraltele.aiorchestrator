@@ -78,7 +78,7 @@ Evidence: `.agent/work/P1.*` (local)
 |---|---|---|
 | G.0 | [G.0_graph_runtime_inventory.md](./G.0_graph_runtime_inventory.md) | **Closed** (fcfa5b2) — gap list + G.1–G.7 sketch |
 | G.1 | [G.1_store_flow_binding.md](./G.1_store_flow_binding.md) | **Closed** (1c3140b) — flow/binding store + session pins |
-| G.2 | [G.2_flow_control_api.md](./G.2_flow_control_api.md) | **Closed** — `/v1/flows*` + coral.flow.v1 publish validate |
+| G.2 | [G.2_flow_control_api.md](./G.2_flow_control_api.md) | **Closed** (5fbdb9a) — `/v1/flows*` + coral.flow.v1 publish validate |
 | G.3–G.7 | per G.0 | Not started |
 
 ## Still later
