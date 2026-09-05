@@ -12,6 +12,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/composer"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
@@ -39,6 +40,7 @@ type SessionRuntime struct {
 	media        map[string]*sessionMedia
 	recorders    map[string]*record.Recorder
 	failScenario map[string]string // session → first failure scenario
+	toolDone     map[string]bool   // session → graph tool already executed (G.4 once)
 }
 
 type liveTalk struct {
@@ -660,6 +662,9 @@ func (r *SessionRuntime) talkFor(a *session.Actor) (*composer.Talk, error) {
 		if r.OnSessionEnd != nil {
 			r.OnSessionEnd(context.WithoutCancel(ctx), sessionID, disposition)
 		}
+	}
+	talk.OnToolArmed = func(ctx context.Context, tool graph.ArmedTool) error {
+		return r.execGraphTool(ctx, sessionID, tool)
 	}
 	if r.Repo != nil {
 		meta := observe.SessionMeta{

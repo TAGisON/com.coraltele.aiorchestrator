@@ -104,6 +104,9 @@ type Talk struct {
 	Graph *graph.Cursor
 	// OnGraphEnd fires once when the cursor reaches End (after final Speak lines).
 	OnGraphEnd func(ctx context.Context, disposition string)
+	// OnToolArmed fires after closing Speak when the cursor armed a Tool (G.4).
+	// Must execute at most once; Talk will not re-arm.
+	OnToolArmed func(ctx context.Context, tool graph.ArmedTool) error
 
 	mu                  sync.Mutex
 	state               TurnState
@@ -424,6 +427,9 @@ func (t *Talk) answerFromGraph(ctx context.Context) (spoken string, err error) {
 		return "", err
 	}
 	spoken = strings.TrimSpace(strings.Join(turn.Lines, " "))
+	if turn.Armed != nil {
+		t.ConfigureBarge(false, 0)
+	}
 	if spoken != "" {
 		if t.Mem != nil {
 			t.Mem.Append("assistant", spoken)
@@ -449,6 +455,15 @@ func (t *Talk) answerFromGraph(ctx context.Context) (spoken string, err error) {
 			"edge_id":       turn.EdgeID,
 		}})
 	}
+	if turn.Armed != nil {
+		if err := t.fireToolArmed(ctx, turn.Armed); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				t.failPipeline(ctx, err)
+			}
+			return spoken, err
+		}
+		return spoken, nil
+	}
 	if turn.Ended {
 		t.fireGraphEnd(ctx)
 	}
@@ -460,6 +475,13 @@ func (t *Talk) fireGraphEnd(ctx context.Context) {
 		return
 	}
 	t.OnGraphEnd(ctx, store.DispositionFinalHangupCompleted)
+}
+
+func (t *Talk) fireToolArmed(ctx context.Context, armed *graph.ArmedTool) error {
+	if armed == nil || t.OnToolArmed == nil {
+		return nil
+	}
+	return t.OnToolArmed(ctx, *armed)
 }
 
 func openingGreeting(doc profile.Document) string {
@@ -572,6 +594,10 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 		t.emitTurn(ctx, userText, "", res, false, "no_match", started)
 		return nil
 	}
+	if turn.Armed != nil {
+		t.ConfigureBarge(false, 0)
+		res.Action = "tool_" + turn.Armed.Kind
+	}
 	if spoken != "" {
 		if err := t.speak(ctx, spoken); err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -584,7 +610,10 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 		t.setState(Listening)
 	}
 	barge := t.LastBargeIn()
-	outcome := "graph"
+	outcome := res.Action
+	if outcome == "" || outcome == "graph" {
+		outcome = "graph"
+	}
 	if barge {
 		outcome = "barge_in"
 	}
@@ -595,6 +624,15 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 	t.lastActivity = time.Now()
 	t.mu.Unlock()
 	t.emitTurn(ctx, userText, spoken, res, barge, outcome, started)
+	if turn.Armed != nil {
+		if err := t.fireToolArmed(ctx, turn.Armed); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				t.failPipeline(ctx, err)
+			}
+			return err
+		}
+		return nil
+	}
 	if turn.Ended {
 		t.fireGraphEnd(ctx)
 	}

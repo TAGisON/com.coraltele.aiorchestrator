@@ -12,6 +12,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/audio"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/fallback"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/record"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/session"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
@@ -437,4 +438,80 @@ func (r *SessionRuntime) recordLiveDisposition(ctx context.Context, sessionID, f
 		applog.Warn("persist disposition", "session", sessionID,
 			"disposition", final, "note", note, "err", err)
 	}
+}
+
+// execGraphTool runs a cursor-armed Tool once: arm audits already happened via Transfer/HangupTool.
+func (r *SessionRuntime) execGraphTool(ctx context.Context, sessionID string, tool graph.ArmedTool) error {
+	r.mu.Lock()
+	if r.toolDone == nil {
+		r.toolDone = make(map[string]bool)
+	}
+	if r.toolDone[sessionID] {
+		r.mu.Unlock()
+		applog.Warn("graph tool already executed; ignoring", "session", sessionID, "node", tool.NodeID)
+		return nil
+	}
+	r.toolDone[sessionID] = true
+	r.mu.Unlock()
+
+	switch tool.Kind {
+	case "transfer":
+		req := port.TransferRequest{
+			Destination:     tool.Destination,
+			Reason:          "graph:" + tool.Intent,
+			DispositionCode: tool.DispositionCode,
+		}
+		if err := r.Transfer(ctx, sessionID, req); err != nil {
+			return err
+		}
+		final := transferDispositionFinal(req)
+		if r.OnSessionEnd != nil {
+			r.OnSessionEnd(context.WithoutCancel(ctx), sessionID, final)
+		}
+		return nil
+	case "hangup":
+		final := strings.TrimSpace(tool.DispositionCode)
+		if final == "" {
+			final = store.DispositionFinalHangupCompleted
+		}
+		if err := r.HangupTool(ctx, sessionID, "NORMAL_CLEARING", final); err != nil {
+			return err
+		}
+		if r.OnSessionEnd != nil {
+			r.OnSessionEnd(context.WithoutCancel(ctx), sessionID, final)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown graph tool %q", tool.Kind)
+	}
+}
+
+// HangupTool executes an intentional graph hangup Tool (not FailCall/system_failure).
+func (r *SessionRuntime) HangupTool(ctx context.Context, sessionID, cause, disposition string) error {
+	if strings.TrimSpace(cause) == "" {
+		cause = "NORMAL_CLEARING"
+	}
+	cc, _, ok := r.callControl(sessionID)
+	hangPayload := map[string]any{"tool": "hangup", "cause": cause, "source": "graph"}
+	r.auditRecording(sessionID, store.AuditToolArmed, hangPayload)
+	r.waitPlayout(ctx, sessionID, 10*time.Second)
+	r.auditRecording(sessionID, store.AuditToolExecuting, hangPayload)
+
+	if !ok || cc == nil {
+		// Lab / no telephony: still settle disposition so End path completes.
+		applog.Warn("hangup tool: no telephony leg; settling disposition only", "session", sessionID)
+		r.recordLiveDisposition(ctx, sessionID, disposition, "graph_hangup_no_leg")
+		r.auditRecording(sessionID, store.AuditToolExecuted, map[string]any{"tool": "hangup", "ok": true, "no_leg": true})
+		return nil
+	}
+	if err := cc.Hangup(ctx, cause); err != nil {
+		fail := map[string]any{"tool": "hangup", "cause": cause, "error": err.Error()}
+		r.auditRecording(sessionID, store.AuditToolFailed, fail)
+		r.recordLiveDisposition(ctx, sessionID, store.DispositionFinalSystemFailure, err.Error())
+		return fmt.Errorf("hangup tool: %w", err)
+	}
+	r.auditRecording(sessionID, store.AuditToolExecuted, map[string]any{"tool": "hangup", "ok": true})
+	r.recordLiveDisposition(ctx, sessionID, disposition, "graph_hangup")
+	r.waitCallControlGone(sessionID, 16*time.Second)
+	return nil
 }

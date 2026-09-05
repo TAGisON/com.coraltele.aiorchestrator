@@ -7,25 +7,40 @@ import (
 	"sync"
 
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/flow"
+	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
 )
 
 // Turn is one cursor step result for the Talk shell.
 type Turn struct {
-	Lines   []string // texts to Speak in order
+	Lines   []string // texts to Speak in order (includes Tool closing line)
 	Ended   bool     // landed on End (after speaking Lines)
 	NoMatch bool     // ListenChoice had no legal edge for utterance
 	NodeID  string   // cursor after this turn
 	EdgeID  string   // edge taken this turn (if any)
+	Armed   *ArmedTool
+}
+
+// ArmedTool is a frozen irreversible action ready for arm→speak→exec (G.4).
+type ArmedTool struct {
+	Kind            string // transfer | hangup
+	Destination     string // matrix number (transfer only)
+	Owner           string
+	Target          string
+	Intent          string
+	DispositionCode string
+	NodeID          string
 }
 
 // Cursor sits on exactly one node of a published flow document.
 type Cursor struct {
-	mu     sync.Mutex
-	doc    *flow.Document
-	nodeID string
-	locale string // active language hint; resolve falls back to default_locale
-	nodes  map[string]flow.Node
-	edges  []flow.Edge
+	mu       sync.Mutex
+	doc      *flow.Document
+	nodeID   string
+	locale   string // active language hint; resolve falls back to default_locale
+	nodes    map[string]flow.Node
+	edges    []flow.Edge
+	lastEdge flow.Edge
+	armed    bool // Tool already armed this cursor lifetime (exec once)
 }
 
 // New builds a cursor at entry_node_id.
@@ -104,6 +119,7 @@ func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	}
 	turn.Lines = rest.Lines
 	turn.Ended = rest.Ended
+	turn.Armed = rest.Armed
 	turn.NodeID = rest.NodeID
 	if turn.EdgeID == "" {
 		turn.EdgeID = rest.EdgeID
@@ -153,12 +169,73 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			out.Ended = true
 			return out, nil
 		case flow.NodeTool:
-			return Turn{}, fmt.Errorf("tool node %q requires G.4 ARM (not in G.3)", n.ID)
+			armed, err := c.armToolLocked(n)
+			if err != nil {
+				return Turn{}, err
+			}
+			if line, err := c.resolvePromptLocked(n.PromptRef); err != nil {
+				return Turn{}, err
+			} else if line != "" {
+				out.Lines = append(out.Lines, line)
+			}
+			out.Armed = armed
+			out.NodeID = c.nodeID
+			return out, nil
 		case flow.NodeDecide, flow.NodeInform:
-			return Turn{}, fmt.Errorf("node type %s at %q not implemented in G.3", n.Type, n.ID)
+			return Turn{}, fmt.Errorf("node type %s at %q not implemented yet", n.Type, n.ID)
 		default:
 			return Turn{}, fmt.Errorf("unsupported node type %q", n.Type)
 		}
+	}
+}
+
+func (c *Cursor) armToolLocked(n flow.Node) (*ArmedTool, error) {
+	if c.armed {
+		return nil, fmt.Errorf("tool already armed on this session cursor")
+	}
+	tool := strings.TrimSpace(n.Tool)
+	switch tool {
+	case flow.ToolHangup:
+		c.armed = true
+		return &ArmedTool{
+			Kind:            flow.ToolHangup,
+			DispositionCode: store.DispositionFinalHangupCompleted,
+			NodeID:          n.ID,
+		}, nil
+	case flow.ToolTransfer:
+		intent := strings.TrimSpace(n.MatrixIntent)
+		if intent == "" {
+			intent = strings.TrimSpace(c.lastEdge.MatrixIntent)
+		}
+		if intent == "" {
+			return nil, fmt.Errorf("transfer Tool %q missing matrix_intent", n.ID)
+		}
+		var row *flow.MatrixRow
+		for i := range c.doc.Matrix {
+			if strings.TrimSpace(c.doc.Matrix[i].Intent) == intent {
+				row = &c.doc.Matrix[i]
+				break
+			}
+		}
+		if row == nil {
+			return nil, fmt.Errorf("transfer Tool %q intent %q not in matrix", n.ID, intent)
+		}
+		num := strings.TrimSpace(row.Number)
+		if num == "" {
+			return nil, fmt.Errorf("transfer Tool %q matrix row %q has empty number", n.ID, intent)
+		}
+		c.armed = true
+		return &ArmedTool{
+			Kind:            flow.ToolTransfer,
+			Destination:     num,
+			Owner:           strings.TrimSpace(row.Owner),
+			Target:          strings.TrimSpace(row.Target),
+			Intent:          intent,
+			DispositionCode: strings.TrimSpace(row.DispositionCode),
+			NodeID:          n.ID,
+		}, nil
+	default:
+		return nil, fmt.Errorf("Tool node %q unknown tool %q", n.ID, tool)
 	}
 }
 
@@ -166,6 +243,7 @@ func (c *Cursor) takeLocked(e flow.Edge) error {
 	if _, ok := c.nodes[e.To]; !ok {
 		return fmt.Errorf("edge %s to unknown node %q", e.ID, e.To)
 	}
+	c.lastEdge = e
 	c.nodeID = e.To
 	return nil
 }
