@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.5` |
 | **title** | Admin: profile/DID → flow pin + platform status |
-| **status** | **Closed** — answer pins API + Admin live pin page |
+| **status** | **Closed** (e1e6a78) — answer pins API + Admin live pin page |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) A.5 |
 | **depends_on** | A.4 Closed (`d5e2f9d`); G.7 live pin gate |
 
