@@ -14,6 +14,7 @@ func TestUIFS_EmbedsShells(t *testing.T) {
 		"admin/engines.html",
 		"admin/profiles.html",
 		"admin/settings.html",
+		"admin/bindings.html",
 		"admin/admin.js",
 		"supervisor/index.html",
 		"chat/index.html",

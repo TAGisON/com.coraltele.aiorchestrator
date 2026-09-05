@@ -86,6 +86,9 @@
         rawBody: true,
         contentType: "audio/wav",
       }),
+    listBindings: (qs) => request("GET", "/v1/bindings" + (qs ? "?" + qs : "")),
+    getBinding: (id) => request("GET", "/v1/bindings/" + encodeURIComponent(id)),
+    putBinding: (id, body) => request("PUT", "/v1/bindings/" + encodeURIComponent(id), body),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>

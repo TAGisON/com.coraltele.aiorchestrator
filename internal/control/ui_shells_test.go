@@ -35,10 +35,11 @@ func TestConsoleShells_Static(t *testing.T) {
 		{"/admin/engines.html", http.StatusOK, "Tenant engines"},
 		{"/admin/profiles.html", http.StatusOK, "Publish version"},
 		{"/admin/settings.html", http.StatusOK, "Fallback prompts"},
+		{"/admin/bindings.html", http.StatusOK, "Inline FAQ"},
 		{"/admin/admin.js", http.StatusOK, "AdminUI"},
 		{"/supervisor/", http.StatusOK, "Supervisor"},
 		{"/chat/", http.StatusOK, "Chat"},
-		{"/shared/api.js", http.StatusOK, "putEngines"},
+		{"/shared/api.js", http.StatusOK, "listBindings"},
 		{"/shared/styles.css", http.StatusOK, "--accent"},
 		{"/admin", http.StatusFound, ""},
 	}

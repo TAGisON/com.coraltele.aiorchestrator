@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bindings — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a class="active" href="/admin/bindings.html">Bindings</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Bindings</h1>
+    <p class="lede">Knowledge / CRM bindings for Inform nodes. Kind, status, and knowledge mode come from <code>/v1/meta/catalog</code> only — no free-typed illegal values.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create / update binding</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="b-id">Binding id</label>
+          <input id="b-id" type="text" placeholder="e.g. lab-faq" />
+        </div>
+        <div>
+          <label class="field" for="b-name">Name</label>
+          <input id="b-name" type="text" placeholder="Lab FAQ" />
+        </div>
+        <div>
+          <label class="field" for="b-tenant">Tenant</label>
+          <input id="b-tenant" type="text" value="default" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label class="field" for="b-kind">Kind</label>
+          <select id="b-kind"></select>
+        </div>
+        <div>
+          <label class="field" for="b-status">Status</label>
+          <select id="b-status"></select>
+        </div>
+        <div>
+          <label class="field" for="b-mode">Knowledge mode</label>
+          <select id="b-mode"></select>
+        </div>
+      </div>
+
+      <div id="inline-block">
+        <h2 style="font-size:1rem;margin:1rem 0 0.5rem">Inline FAQ entries</h2>
+        <p style="color:var(--muted);font-size:0.9rem;margin:0 0 0.5rem">Questions are comma-separated. Locale defaults to en-IN.</p>
+        <div id="entries"></div>
+        <div class="actions">
+          <button type="button" class="btn secondary" id="add-entry">Add entry</button>
+        </div>
+      </div>
+
+      <div id="http-block" style="display:none">
+        <label class="field" for="http-gw">gateway_id (credentials separately)</label>
+        <input id="http-gw" type="text" placeholder="knowledge gateway id" />
+        <label class="field" for="http-path">path / endpoint note</label>
+        <input id="http-path" type="text" placeholder="/v1/retrieve" />
+        <p style="color:var(--muted);font-size:0.85rem">Runtime http_retrieve remains fail-closed until a later phase; Admin may still register the binding.</p>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn" id="save-binding">Save binding</button>
+        <button type="button" class="btn secondary" id="reload-bindings">Reload list</button>
+      </div>
+      <div class="probe" id="bind-out"></div>
+      <table class="data" id="bind-table">
+        <thead><tr><th>Id</th><th>Name</th><th>Kind</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+    let catalog = null;
+
+    function addEntryRow(pre) {
+      pre = pre || {};
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.style.marginTop = "0.5rem";
+      wrap.innerHTML =
+        '<label class="field">Entry id</label><input class="e-id" type="text" />' +
+        '<label class="field">Questions (comma-separated)</label><input class="e-q" type="text" />' +
+        '<div class="field-row"><div><label class="field">Locale</label><input class="e-loc" type="text" value="en-IN" /></div>' +
+        '<div><label class="field">Answer text</label><input class="e-text" type="text" /></div></div>' +
+        '<div class="actions"><button type="button" class="btn secondary e-rm">Remove</button></div>';
+      wrap.querySelector(".e-id").value = pre.id || "";
+      wrap.querySelector(".e-q").value = (pre.questions || []).join(", ");
+      const locale = pre.locale || "en-IN";
+      wrap.querySelector(".e-loc").value = locale;
+      wrap.querySelector(".e-text").value = (pre.text && (pre.text[locale] || pre.text["en-IN"])) || pre.answer || "";
+      wrap.querySelector(".e-rm").onclick = () => wrap.remove();
+      document.getElementById("entries").appendChild(wrap);
+    }
+
+    function syncModeUI() {
+      const kind = document.getElementById("b-kind").value;
+      const mode = document.getElementById("b-mode").value;
+      const knowledge = kind === "knowledge";
+      document.getElementById("b-mode").disabled = !knowledge;
+      document.getElementById("inline-block").style.display = knowledge && mode === "inline_faq" ? "block" : "none";
+      document.getElementById("http-block").style.display = knowledge && mode === "http_retrieve" ? "block" : "none";
+    }
+
+    function collectEntries() {
+      const rows = document.querySelectorAll("#entries .card");
+      const entries = [];
+      rows.forEach((row) => {
+        const id = row.querySelector(".e-id").value.trim();
+        const q = row.querySelector(".e-q").value.split(",").map((s) => s.trim()).filter(Boolean);
+        const loc = row.querySelector(".e-loc").value.trim() || "en-IN";
+        const text = row.querySelector(".e-text").value.trim();
+        if (!id || !text) return;
+        const t = {};
+        t[loc] = text;
+        entries.push({ id: id, questions: q.length ? q : [id], text: t });
+      });
+      return entries;
+    }
+
+    async function loadCatalog() {
+      catalog = await OrchAPI.catalog();
+      AdminUI.fillSelect(document.getElementById("b-kind"), catalog.binding_kinds || [], "knowledge");
+      AdminUI.fillSelect(document.getElementById("b-status"), catalog.binding_statuses || [], "active");
+      AdminUI.fillSelect(document.getElementById("b-mode"), catalog.knowledge_modes || [], "inline_faq");
+      syncModeUI();
+    }
+
+    async function loadList() {
+      const out = document.getElementById("bind-out");
+      const tbody = document.querySelector("#bind-table tbody");
+      try {
+        const tenant = document.getElementById("b-tenant").value.trim() || "default";
+        const data = await OrchAPI.listBindings("tenant_id=" + encodeURIComponent(tenant));
+        tbody.innerHTML = "";
+        (data.bindings || []).forEach((b) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td><a href='#' data-id='" + b.id + "'>" + b.id + "</a></td><td>" + (b.name || "") +
+            "</td><td>" + b.kind + "</td><td>" + b.status + "</td>";
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll("a[data-id]").forEach((a) => {
+          a.onclick = async (ev) => {
+            ev.preventDefault();
+            try {
+              const b = await OrchAPI.getBinding(a.getAttribute("data-id"));
+              document.getElementById("b-id").value = b.id;
+              document.getElementById("b-name").value = b.name || "";
+              document.getElementById("b-tenant").value = b.tenant_id || "default";
+              document.getElementById("b-kind").value = b.kind;
+              document.getElementById("b-status").value = b.status;
+              const cfg = b.config || {};
+              document.getElementById("b-mode").value = cfg.mode || "inline_faq";
+              document.getElementById("entries").innerHTML = "";
+              (cfg.entries || []).forEach((e) => addEntryRow(e));
+              if (!(cfg.entries || []).length) addEntryRow();
+              document.getElementById("http-gw").value = cfg.gateway_id || "";
+              document.getElementById("http-path").value = cfg.path || "";
+              syncModeUI();
+              AdminUI.showStatus(out, true, "Loaded " + b.id);
+            } catch (e) {
+              AdminUI.showStatus(out, false, e.message);
+            }
+          };
+        });
+        if (!(data.bindings || []).length) tbody.innerHTML = "<tr><td colspan='4'>No bindings</td></tr>";
+        AdminUI.showStatus(out, true, "Listed " + (data.bindings || []).length);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    document.getElementById("b-kind").onchange = syncModeUI;
+    document.getElementById("b-mode").onchange = syncModeUI;
+    document.getElementById("add-entry").onclick = () => addEntryRow();
+    document.getElementById("reload-bindings").onclick = loadList;
+
+    document.getElementById("save-binding").onclick = async () => {
+      const out = document.getElementById("bind-out");
+      const id = document.getElementById("b-id").value.trim();
+      if (!id) {
+        AdminUI.showStatus(out, false, "id required");
+        return;
+      }
+      const kind = document.getElementById("b-kind").value;
+      const status = document.getElementById("b-status").value;
+      const mode = document.getElementById("b-mode").value;
+      let config = {};
+      if (kind === "knowledge") {
+        if (mode === "http_retrieve") {
+          config = {
+            mode: "http_retrieve",
+            gateway_id: document.getElementById("http-gw").value.trim(),
+            path: document.getElementById("http-path").value.trim(),
+          };
+        } else {
+          config = { mode: "inline_faq", entries: collectEntries() };
+        }
+      }
+      try {
+        const got = await OrchAPI.putBinding(id, {
+          tenant_id: document.getElementById("b-tenant").value.trim() || "default",
+          kind: kind,
+          name: document.getElementById("b-name").value.trim() || id,
+          status: status,
+          config: config,
+        });
+        AdminUI.showStatus(out, true, "Saved " + got.id + " (" + got.kind + "/" + got.status + ")");
+        await loadList();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    loadCatalog()
+      .then(() => {
+        addEntryRow();
+        return loadList();
+      })
+      .catch((e) => AdminUI.showStatus(document.getElementById("bind-out"), false, e.message));
+  </script>
+</body>
+</html>
