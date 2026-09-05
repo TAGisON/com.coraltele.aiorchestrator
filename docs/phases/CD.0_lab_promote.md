@@ -53,4 +53,4 @@ Test-Path tools/lab/PROMOTE.md
 
 ## handoff
 
-Next: **CD.1** optional manual `workflow_dispatch` build artifact (or stop CD wave until owner asks).
+Next: **CD.1** optional manual `workflow_dispatch` build artifact — **Closed** when workflow lands; see [CD.1](./CD.1_lab_build_workflow.md).

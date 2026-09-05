@@ -11,6 +11,7 @@ V1 CD is **human-driven**. There is **no** auto-deploy to lab or prod on merge. 
 | # | Check | Pass when |
 |---|---|---|
 | P1 | CI green on the tip you promote | Jobs **A** `go-build-test`, **B** `migrate-empty`, **C** `secrets-hygiene`, **D** `golangci` all green (or equivalent local commands below) |
+| P1b | Optional artifact | Actions → **lab-build** → Run workflow (manual). Download `aiorchestrator-<sha>` (linux + windows). See [CD.1](../../docs/phases/CD.1_lab_build_workflow.md) | Artifact matches tip SHA in `TIP_SHA.txt` |
 | P2 | Tip SHA known | Record commit SHA in the sign-off block |
 | P3 | Secrets stay local | `.agent/secrets.local.json` exists on the lab host if needed; **never** committed ([CI.2](../../docs/phases/CI.2_secrets_hygiene.md)) |
 | P4 | No prod push | This checklist ends at **lab**. Production needs a future OD. |
@@ -30,8 +31,8 @@ golangci-lint run ./...            # v1.64.8 + .golangci.yml
 
 | # | Step | Command / action | Pass criteria | ☐ |
 |---|---|---|---|---|
-| 1 | Fetch tip | `git fetch` + checkout the reviewed SHA / branch | Working tree matches intended tip | ☐ |
-| 2 | Build binary | `go build -o aiorchestrator ./cmd/aiorchestrator` (Windows: `aiorchestrator.exe`) | Binary produced; no build errors | ☐ |
+| 1 | Fetch tip | `git fetch` + checkout the reviewed SHA / branch **or** download Actions artifact from **lab-build** (`workflow_dispatch`) | Working tree / binary matches intended tip | ☐ |
+| 2 | Build binary | `go build -o aiorchestrator ./cmd/aiorchestrator` (Windows: `aiorchestrator.exe`) — skip if using lab-build artifact | Binary produced; no build errors | ☐ |
 | 3 | Lab DB | `pwsh tools/lab/Init-LabDatabase.ps1` (or existing DB) | DB exists; schema applied on **boot** via migrations (not hand-edited SQL) | ☐ |
 | 4 | Config | `conf/aiorchestrator.properties` — `database.url` set; lab may use `database.require=true` | Boot does not exit for missing DB when require=true | ☐ |
 | 5 | Secrets | Copy `.agent/secrets.example.json` → `.agent/secrets.local.json` **or** configure tenant credentials via Control API / lab Settings | Sarvam (or fakes) available as intended for this promote | ☐ |

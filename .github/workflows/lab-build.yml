@@ -1,0 +1,54 @@
+# Lab build artifact (manual only)
+# Locked: docs/11_CI_AND_CD.md CD.1 — no auto prod, no deploy on merge.
+name: lab-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Optional operator note (not used by build)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lab-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build-artifacts
+    runs-on: ubuntu-latest
+    env:
+      SARVAM_API_KEY: ""
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: build linux amd64
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" \
+            -o dist/aiorchestrator-linux-amd64 ./cmd/aiorchestrator
+          echo "${{ github.sha }}" > dist/TIP_SHA.txt
+          echo "ref=${{ github.ref }}" >> dist/TIP_SHA.txt
+
+      - name: build windows amd64
+        run: |
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" \
+            -o dist/aiorchestrator-windows-amd64.exe ./cmd/aiorchestrator
+
+      - name: upload lab binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiorchestrator-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
