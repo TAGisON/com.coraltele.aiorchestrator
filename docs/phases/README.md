@@ -85,8 +85,15 @@ Evidence: `.agent/work/P1.*` (local)
 | G.6 | [G.6_inform_binding.md](./G.6_inform_binding.md) | **Closed** (8a198e0) — Inform + inline_faq binding |
 | G.7 | [G.7_evidence_cutover.md](./G.7_evidence_cutover.md) | **Closed** (ee2cbb3) — edge_taken/tool_line + live flow pin |
 
+## Lab soak (L.*)
+
+| Phase | File | Status |
+|---|---|---|
+| L.0 | [L.0_graph_lab_soak.md](./L.0_graph_lab_soak.md) | **Closed** — graph V1 soak checklist (+ fixture) |
+
 ## Still later
 
+- Owner **runs** L.0 / E.6 sign-off on lab (human)
 - Admin SPA for flow authoring (API-first V1 OK)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)

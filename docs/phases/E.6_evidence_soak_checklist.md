@@ -56,7 +56,8 @@ go test ./internal/store/... ./internal/runtime/observe/... ./internal/control/.
 ## handoff
 
 Evidence **E.*** wave complete for V1 runtime emitters.  
-**Next programme step:** **CI.2** secrets hygiene (docs/11), or graph/`flow_*` runtime L3 when scheduled.
+**Graph soak:** [L.0_graph_lab_soak.md](./L.0_graph_lab_soak.md) (after G.7).  
+**Promote:** [CD.0](./CD.0_lab_promote.md).
 
 ---
 
@@ -81,7 +82,7 @@ Evidence **E.*** wave complete for V1 runtime emitters.
 | 1.1 | Happy turn | Live/lab session → inject or speak a clear user final → bot reply → stop | `GET …/transcript` has `user_final` and `bot_utterance` with monotonic `seq`; actionable true on path that moved the turn | ☐ |
 | 1.2 | Transcript-only / suppress | Force short/echo-suspect or barge-forbidden path | Suppressed final still present as `user_final` with `actionable=false` and closed `actionable_reason` (e.g. `too_short`, `echo_suspect`, `barge_forbidden`) — **not** dropped | ☐ |
 | 1.3 | No offline overwrite | If WAV re-STT available in lab | Product transcript unchanged by offline STT (truth hierarchy: orch stream wins) | ☐ |
-| 1.4 | Deferred | Graph edge / tool closing line | **N/A until graph runtime** — do not fail soak for missing `edge_taken` / `tool_line` | — |
+| 1.4 | Graph evidence | See **[L.0](./L.0_graph_lab_soak.md)** | `edge_taken` / `tool_line` required on **graph** soak — not on profile-only E.6 path | ☐ / see L.0 |
 
 ## 2 — B2 Audit
 
