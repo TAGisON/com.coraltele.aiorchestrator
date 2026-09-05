@@ -49,7 +49,13 @@ Evidence: `.agent/work/P1.*` (local)
 | M-G | [M-G_drop_kb.md](./M-G_drop_kb.md) | **Closed** (`89cab6c`) — `016_drop_kb.sql` |
 | M-H | [M-H_drop_compliance.md](./M-H_drop_compliance.md) | **Closed** (`5862286`) — `017_drop_compliance.sql` |
 
+## Evidence runtime (E.*)
+
+| Phase | File | Status |
+|---|---|---|
+| E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **In progress** |
+| E.1–E.6 | per [09](../09_EVIDENCE_AND_RECORDING.md) | Not started (L3 files TBD) |
+
 ## Still later
 
-- E.* evidence runtime L3 expansion  
 - CI.0–CI.2 workflow L3 when implementing Actions  
