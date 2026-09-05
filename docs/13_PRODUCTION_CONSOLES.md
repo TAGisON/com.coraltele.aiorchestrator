@@ -198,4 +198,4 @@ Serial waves. Detail each phase in `docs/phases/` before L4. Size: half-day–tw
 
 ## Handoff note (Locked)
 
-Admin **A.1–A.6** Closed. **C.1–C.3** Closed (chat clock + UI + evidence parity). Next: [phases/C.4](./phases/) chat soak checklist, or human Admin soak sign-off on [A.6](./phases/A.6_admin_soak_checklist.md).
+Admin **A.1–A.6** Closed. **C.1–C.4** Closed (chat channel complete). Next: [phases/S.1](./phases/) Supervisor session list/detail, or human soak sign-off on [A.6](./phases/A.6_admin_soak_checklist.md) / [C.4](./phases/C.4_chat_soak_checklist.md).
