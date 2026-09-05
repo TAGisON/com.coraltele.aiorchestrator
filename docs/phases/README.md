@@ -58,7 +58,7 @@ Evidence: `.agent/work/P1.*` (local)
 | E.2 | [E.2_recording_lifecycle.md](./E.2_recording_lifecycle.md) | **Closed** (4c6418a) — start/stop stamps |
 | E.3 | [E.3_orphan_reaper.md](./E.3_orphan_reaper.md) | **Closed** (1aafbce) — orphan_reaper |
 | E.4 | [E.4_audit_allowlist.md](./E.4_audit_allowlist.md) | **Closed** (`8fc4d67`) — P2.4 allowlist emitters |
-| E.5 | [E.5_disposition_tool_settle.md](./E.5_disposition_tool_settle.md) | **Closed** — P2.6 final on tool settle / Ending |
+| E.5 | [E.5_disposition_tool_settle.md](./E.5_disposition_tool_settle.md) | **Closed** (193c9dd) — P2.6 final on tool settle / Ending |
 | E.6 | per [09](../09_EVIDENCE_AND_RECORDING.md) | Not started |
 
 ## CI / CD (CI.*)
