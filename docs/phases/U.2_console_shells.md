@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `U.2` |
 | **title** | Shared web client + Admin / Supervisor / Chat shells |
-| **status** | **Closed** — shared client + three app shells |
+| **status** | **Closed** (60c46ab) — shared client + three app shells |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) OD-13-1, OD-13-2 |
 | **depends_on** | U.1 Closed (`5d9713a`) |
 
