@@ -96,6 +96,12 @@ func Validate(doc *Document) error {
 				return invalid("Tool node requires tool=transfer|hangup", map[string]any{"node_id": id, "tool": n.Tool})
 			}
 		}
+		if n.Type == NodeInform {
+			ref := strings.TrimSpace(n.BindingRef)
+			if ref == "" {
+				return invalid("Inform node requires binding_ref", map[string]any{"node_id": id})
+			}
+		}
 		nodesByID[id] = n
 	}
 	if entryCount == 0 {
@@ -114,6 +120,22 @@ func Validate(doc *Document) error {
 	}
 	if en.Type != NodeEntry {
 		return invalid("entry_node_id must point at Entry", map[string]any{"entry_node_id": entryID, "type": en.Type})
+	}
+
+	refSet := make(map[string]struct{}, len(doc.BindingRefs))
+	for _, r := range doc.BindingRefs {
+		if s := strings.TrimSpace(r); s != "" {
+			refSet[s] = struct{}{}
+		}
+	}
+	for _, n := range doc.Nodes {
+		if n.Type != NodeInform {
+			continue
+		}
+		ref := strings.TrimSpace(n.BindingRef)
+		if _, ok := refSet[ref]; !ok {
+			return invalid("Inform binding_ref not in binding_refs", map[string]any{"node_id": n.ID, "binding_ref": ref})
+		}
 	}
 
 	for i, e := range doc.Edges {

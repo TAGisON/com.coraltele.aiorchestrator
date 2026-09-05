@@ -45,6 +45,8 @@ type Cursor struct {
 	armed     bool           // Tool already armed this cursor lifetime (exec once)
 	retries   map[string]int // per listen-node unclear counts
 	blockTool bool           // EC-23: set during ListenLanguage same-turn advance
+	lastQuery string         // last listen utterance (for Inform)
+	Lookup    InformLookup   // optional; required to answer Inform nodes
 }
 
 // New builds a cursor at entry_node_id.
@@ -125,7 +127,15 @@ func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	}
 }
 
+// SetInformLookup installs the live binding resolver (G.6).
+func (c *Cursor) SetInformLookup(fn InformLookup) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Lookup = fn
+}
+
 func (c *Cursor) handleChoiceLocked(n flow.Node, text string) (Turn, error) {
+	c.lastQuery = strings.TrimSpace(text)
 	edge, ok := matchChoice(c.outEdgesLocked(c.nodeID), text)
 	if !ok {
 		return c.repairLocked(n)
@@ -144,6 +154,7 @@ func (c *Cursor) handleChoiceLocked(n flow.Node, text string) (Turn, error) {
 }
 
 func (c *Cursor) handleLanguageLocked(n flow.Node, text string) (Turn, error) {
+	c.lastQuery = strings.TrimSpace(text)
 	edge, ok := matchChoice(c.outEdgesLocked(c.nodeID), text)
 	if !ok {
 		return c.repairLocked(n)
@@ -298,12 +309,62 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			out.Armed = armed
 			out.NodeID = c.nodeID
 			return out, nil
-		case flow.NodeDecide, flow.NodeInform:
-			return Turn{}, fmt.Errorf("node type %s at %q not implemented yet", n.Type, n.ID)
+		case flow.NodeDecide:
+			return Turn{}, fmt.Errorf("node type Decide at %q not implemented yet", n.ID)
+		case flow.NodeInform:
+			answer, err := c.runInformLocked(n)
+			if err != nil {
+				failTurn, ferr := c.failInformLocked(n, err)
+				if ferr != nil {
+					return Turn{}, ferr
+				}
+				failTurn.Lines = append(append([]string{}, out.Lines...), failTurn.Lines...)
+				return failTurn, nil
+			}
+			if answer != "" {
+				out.Lines = append(out.Lines, answer)
+			}
+			e, err := soleNext(c.outEdgesLocked(c.nodeID))
+			if err != nil {
+				return Turn{}, fmt.Errorf("Inform %s: %w", n.ID, err)
+			}
+			if err := c.takeLocked(e); err != nil {
+				return Turn{}, err
+			}
+			out.EdgeID = e.ID
+			continue
 		default:
 			return Turn{}, fmt.Errorf("unsupported node type %q", n.Type)
 		}
 	}
+}
+
+func (c *Cursor) runInformLocked(n flow.Node) (string, error) {
+	ref := strings.TrimSpace(n.BindingRef)
+	if ref == "" {
+		return "", fmt.Errorf("Inform %q missing binding_ref", n.ID)
+	}
+	if c.Lookup == nil {
+		return "", fmt.Errorf("Inform %q: no binding lookup configured", n.ID)
+	}
+	return c.Lookup(ref, c.lastQuery, c.locale)
+}
+
+func (c *Cursor) failInformLocked(n flow.Node, cause error) (Turn, error) {
+	e, err := soleRepair(c.outEdgesLocked(c.nodeID))
+	if err != nil {
+		return Turn{}, fmt.Errorf("Inform %s: %v (%w)", n.ID, cause, err)
+	}
+	if err := c.takeLocked(e); err != nil {
+		return Turn{}, err
+	}
+	turn := Turn{EdgeID: e.ID, NodeID: c.nodeID}
+	rest, err := c.advanceSilentLocked()
+	if err != nil {
+		return Turn{}, err
+	}
+	mergeAdvance(&turn, rest)
+	return turn, nil
 }
 
 func (c *Cursor) armToolLocked(n flow.Node) (*ArmedTool, error) {

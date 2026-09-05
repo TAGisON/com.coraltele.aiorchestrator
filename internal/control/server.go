@@ -421,6 +421,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, CodeInternal, "flow cursor failed", nil)
 			return
 		}
+		flowCursor.SetInformLookup(graph.BindingInformLookup(s.repo, tenantID, flowDoc.BindingRefs, flowDoc.DefaultLocale))
 		flowID = fv.FlowID
 		flowVer = fv.Version
 	}
