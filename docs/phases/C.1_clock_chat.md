@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `C.1` |
 | **title** | `clock=chat` — text channel, flow pin, no STT/TTS |
-| **status** | **Closed** |
+| **status** | **Closed** (`c8bfe3f`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) OD-13-7; Wave C |
 | **depends_on** | A.6 Closed (`c53b441`); G.7 live pin gate; U.1 catalogs `chat` |
 
