@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `C.3` |
 | **title** | Evidence parity on `clock=chat` path |
-| **status** | **Closed** |
+| **status** | **Closed** (`8ef4bc4`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave C; [09](../09_EVIDENCE_AND_RECORDING.md) B1–B3 |
 | **depends_on** | C.1–C.2 Closed; G.7 emitters; E.1–E.5 Closed |
 
