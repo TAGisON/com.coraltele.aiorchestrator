@@ -59,7 +59,7 @@ Evidence: `.agent/work/P1.*` (local)
 | E.3 | [E.3_orphan_reaper.md](./E.3_orphan_reaper.md) | **Closed** (1aafbce) — orphan_reaper |
 | E.4 | [E.4_audit_allowlist.md](./E.4_audit_allowlist.md) | **Closed** (`8fc4d67`) — P2.4 allowlist emitters |
 | E.5 | [E.5_disposition_tool_settle.md](./E.5_disposition_tool_settle.md) | **Closed** (193c9dd) — P2.6 final on tool settle / Ending |
-| E.6 | [E.6_evidence_soak_checklist.md](./E.6_evidence_soak_checklist.md) | **Closed** — lab soak checklist |
+| E.6 | [E.6_evidence_soak_checklist.md](./E.6_evidence_soak_checklist.md) | **Closed** (3471666) — lab soak checklist |
 
 ## CI / CD (CI.*)
 
