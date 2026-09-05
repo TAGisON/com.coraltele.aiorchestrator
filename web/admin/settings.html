@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a class="active" href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Settings &amp; fallback</h1>
+    <p class="lede">Tenant system settings (key/value) and closed-set fallback WAV scenarios.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>System setting</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="s-key">Key</label>
+          <input id="s-key" type="text" placeholder="setting key" />
+        </div>
+        <div>
+          <label class="field" for="s-val">Value</label>
+          <input id="s-val" type="text" placeholder="value" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="save-setting">Save setting</button>
+        <button type="button" class="btn secondary" id="reload-settings">Reload</button>
+      </div>
+      <div class="probe" id="settings-out"></div>
+      <table class="data" id="settings-table">
+        <thead><tr><th>Key</th><th>Value</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Fallback prompts</h2>
+      <p>Scenario dropdown uses the closed server set when the fallback store is configured.</p>
+      <label class="field" for="fb-sc">Scenario</label>
+      <select id="fb-sc"></select>
+      <label class="field" for="fb-file">WAV file</label>
+      <input id="fb-file" type="file" accept="audio/wav,.wav" />
+      <div class="actions">
+        <button type="button" class="btn" id="upload-fb">Upload WAV</button>
+        <button type="button" class="btn secondary" id="reload-fb">Reload list</button>
+      </div>
+      <div class="probe" id="fb-out"></div>
+      <table class="data" id="fb-table">
+        <thead><tr><th>Scenario</th><th>Detail</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+
+    async function loadSettings() {
+      const out = document.getElementById("settings-out");
+      const tbody = document.querySelector("#settings-table tbody");
+      try {
+        const data = await OrchAPI.listSettings();
+        tbody.innerHTML = "";
+        (data.settings || []).forEach((s) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td>" + s.key + "</td><td>" + s.value + "</td>";
+          tbody.appendChild(tr);
+        });
+        if (!(data.settings || []).length) tbody.innerHTML = "<tr><td colspan='2'>No settings</td></tr>";
+        AdminUI.showStatus(out, true, "Listed " + (data.settings || []).length);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    async function loadFallback() {
+      const out = document.getElementById("fb-out");
+      const tbody = document.querySelector("#fb-table tbody");
+      const sel = document.getElementById("fb-sc");
+      try {
+        const data = await OrchAPI.listFallback();
+        const scenarios = (data.valid_scenarios || []).map(String);
+        AdminUI.fillSelect(sel, scenarios);
+        tbody.innerHTML = "";
+        (data.prompts || []).forEach((p) => {
+          const tr = document.createElement("tr");
+          const detail = p.scenario + (p.path ? " @ " + p.path : "");
+          tr.innerHTML = "<td>" + (p.scenario || "") + "</td><td>" + detail + "</td>";
+          tbody.appendChild(tr);
+        });
+        if (!(data.prompts || []).length) tbody.innerHTML = "<tr><td colspan='2'>No tenant prompts yet</td></tr>";
+        AdminUI.showStatus(out, true, "Fallback store ok");
+      } catch (e) {
+        AdminUI.fillSelect(sel, []);
+        tbody.innerHTML = "<tr><td colspan='2'>Unavailable</td></tr>";
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message + " (fallback store may be unset)");
+      }
+    }
+
+    document.getElementById("save-setting").onclick = async () => {
+      const out = document.getElementById("settings-out");
+      const key = document.getElementById("s-key").value.trim();
+      if (!key) {
+        AdminUI.showStatus(out, false, "key required");
+        return;
+      }
+      try {
+        await OrchAPI.putSetting(key, document.getElementById("s-val").value);
+        AdminUI.showStatus(out, true, "Saved " + key);
+        await loadSettings();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("upload-fb").onclick = async () => {
+      const out = document.getElementById("fb-out");
+      const sc = document.getElementById("fb-sc").value;
+      const file = document.getElementById("fb-file").files[0];
+      if (!sc || !file) {
+        AdminUI.showStatus(out, false, "Select scenario and WAV file");
+        return;
+      }
+      try {
+        const buf = await file.arrayBuffer();
+        await OrchAPI.putFallback(sc, buf);
+        AdminUI.showStatus(out, true, "Uploaded " + sc);
+        await loadFallback();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("reload-settings").onclick = loadSettings;
+    document.getElementById("reload-fb").onclick = loadFallback;
+    loadSettings();
+    loadFallback();
+  </script>
+</body>
+</html>

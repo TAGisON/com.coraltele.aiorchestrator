@@ -110,6 +110,51 @@ h1 { font-size: 1.5rem; font-weight: 650; margin: 0 0 0.5rem; }
   font-family: var(--mono);
   font-size: 0.85rem;
 }
+
+label.field {
+  display: block;
+  margin: 0.65rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+select, input[type="text"], input[type="password"], input[type="number"], textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.55rem;
+  border-radius: 4px;
+  font: inherit;
+}
+textarea { min-height: 6rem; font-family: var(--mono); font-size: 0.85rem; }
+.checks { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin: 0.5rem 0 0.75rem; }
+.checks label { color: var(--text); font-size: 0.9rem; display: flex; gap: 0.35rem; align-items: center; }
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+table.data th, table.data td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+table.data th { color: var(--muted); font-weight: 600; }
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: -0.5rem 0 1.25rem;
+  font-size: 0.9rem;
+}
+.subnav a.active { color: var(--text); font-weight: 600; text-decoration: underline; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.85rem; }
 .hub-list { list-style: none; padding: 0; margin: 0; }
 .hub-list li {
   margin: 0 0 0.75rem;

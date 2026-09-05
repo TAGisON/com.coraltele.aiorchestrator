@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Engines — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a class="active" href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Engines &amp; credentials</h1>
+    <p class="lede">Dropdowns are filled from <code>GET /v1/gateways</code>. Server rejects unknown gateway IDs on save.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tenant engines</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="listen">Listen (STT)</label>
+          <select id="listen"></select>
+        </div>
+        <div>
+          <label class="field" for="think">Think (LLM)</label>
+          <select id="think"></select>
+        </div>
+        <div>
+          <label class="field" for="speak">Speak (TTS)</label>
+          <select id="speak"></select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="save-engines">Save engines</button>
+        <button type="button" class="btn secondary" id="reload-engines">Reload</button>
+      </div>
+      <div class="probe" id="engines-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Gateway credential</h2>
+      <p>API key is write-only; list shows masked preview only.</p>
+      <label class="field" for="cred-gw">Gateway</label>
+      <select id="cred-gw"></select>
+      <label class="field" for="cred-key">API key</label>
+      <input id="cred-key" type="password" autocomplete="off" placeholder="Paste key — never logged" />
+      <div class="actions">
+        <button type="button" class="btn" id="save-cred">Save credential</button>
+        <button type="button" class="btn secondary" id="reload-creds">Reload list</button>
+      </div>
+      <div class="probe" id="cred-out"></div>
+      <table class="data" id="cred-table">
+        <thead><tr><th>Gateway</th><th>Key set</th><th>Preview</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+    let gwCache = null;
+
+    async function loadGateways() {
+      gwCache = await OrchAPI.gateways();
+      AdminUI.fillSelect(document.getElementById("listen"), AdminUI.gatewayIds(gwCache, "listen"));
+      AdminUI.fillSelect(document.getElementById("think"), AdminUI.gatewayIds(gwCache, "think"));
+      AdminUI.fillSelect(document.getElementById("speak"), AdminUI.gatewayIds(gwCache, "speak"));
+      AdminUI.fillSelect(document.getElementById("cred-gw"), AdminUI.allGatewayIds(gwCache));
+    }
+
+    async function loadEngines() {
+      const out = document.getElementById("engines-out");
+      try {
+        await loadGateways();
+        let cur = null;
+        try {
+          cur = await OrchAPI.getEngines();
+        } catch (e) {
+          if (e.status !== 404) throw e;
+        }
+        if (cur) {
+          AdminUI.fillSelect(document.getElementById("listen"), AdminUI.gatewayIds(gwCache, "listen"), cur.listen);
+          AdminUI.fillSelect(document.getElementById("think"), AdminUI.gatewayIds(gwCache, "think"), cur.think);
+          AdminUI.fillSelect(document.getElementById("speak"), AdminUI.gatewayIds(gwCache, "speak"), cur.speak);
+          AdminUI.showStatus(out, true, "Loaded (source=" + (cur.source || "") + ")");
+        } else {
+          AdminUI.showStatus(out, true, "Not configured yet — choose gateways and save.");
+        }
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    async function loadCreds() {
+      const out = document.getElementById("cred-out");
+      const tbody = document.querySelector("#cred-table tbody");
+      try {
+        const data = await OrchAPI.listCredentials();
+        tbody.innerHTML = "";
+        (data.credentials || []).forEach((c) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td>" + c.gateway_id + "</td><td>" + (c.api_key_set ? "yes" : "no") + "</td><td>" + (c.api_key_preview || "") + "</td>";
+          tbody.appendChild(tr);
+        });
+        if (!(data.credentials || []).length) {
+          tbody.innerHTML = "<tr><td colspan='3'>No credentials stored</td></tr>";
+        }
+        AdminUI.showStatus(out, true, "Listed " + (data.credentials || []).length);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    document.getElementById("save-engines").onclick = async () => {
+      const out = document.getElementById("engines-out");
+      const body = {
+        listen: document.getElementById("listen").value,
+        think: document.getElementById("think").value,
+        speak: document.getElementById("speak").value,
+      };
+      if (!body.listen || !body.think || !body.speak) {
+        AdminUI.showStatus(out, false, "Select listen, think, and speak");
+        return;
+      }
+      try {
+        const got = await OrchAPI.putEngines(body);
+        AdminUI.showStatus(out, true, "Saved " + got.listen + " / " + got.think + " / " + got.speak);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+    document.getElementById("reload-engines").onclick = loadEngines;
+    document.getElementById("save-cred").onclick = async () => {
+      const out = document.getElementById("cred-out");
+      const gid = document.getElementById("cred-gw").value;
+      const key = document.getElementById("cred-key").value;
+      if (!gid || !key.trim()) {
+        AdminUI.showStatus(out, false, "Select gateway and enter api_key");
+        return;
+      }
+      try {
+        const got = await OrchAPI.putCredential(gid, { api_key: key.trim() });
+        document.getElementById("cred-key").value = "";
+        AdminUI.showStatus(out, true, "Saved " + got.gateway_id + " preview=" + (got.api_key_preview || ""));
+        await loadCreds();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+    document.getElementById("reload-creds").onclick = loadCreds;
+    loadEngines().then(loadCreds);
+  </script>
+</body>
+</html>

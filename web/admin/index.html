@@ -15,50 +15,38 @@
       <a href="/chat/">Chat</a>
     </nav>
     <h1>Admin</h1>
-    <p class="lede">Configure profiles, engines, flows, matrix, and bindings. Shell only (U.2) — configuration screens land in A.* phases. Dropdowns will bind to <code>/v1/meta/catalog</code>.</p>
+    <p class="lede">Full configuration for the LLM call centre. Gateway and catalog values come from the server — do not invent IDs.</p>
 
     <div class="card">
       <h2>API token (lab)</h2>
-      <p>Required when the orchestrator is started with an auth token. Stored in browser localStorage only.</p>
       <div class="token-row">
         <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
         <button type="button" class="btn secondary" id="save-token">Save</button>
       </div>
+      <div class="probe" id="token-out"></div>
     </div>
 
-    <div class="card">
-      <h2>Catalog probe</h2>
-      <p>Verifies shared client + U.1 catalog wiring.</p>
-      <button type="button" class="btn" id="probe">Load catalog</button>
-      <div class="probe" id="out"></div>
-    </div>
+    <ul class="hub-list">
+      <li>
+        <strong><a href="/admin/engines.html">Engines &amp; credentials</a></strong>
+        <span>Tenant listen / think / speak binding and gateway API keys.</span>
+      </li>
+      <li>
+        <strong><a href="/admin/profiles.html">Profiles</a></strong>
+        <span>Create profiles and publish Talk documents (providers from registered gateways).</span>
+      </li>
+      <li>
+        <strong><a href="/admin/settings.html">Settings &amp; fallback</a></strong>
+        <span>System settings and fallback WAV prompts.</span>
+      </li>
+      <li>
+        <strong>Flows &amp; bindings</strong>
+        <span>Coming in A.2–A.4 — graph publish and knowledge bindings.</span>
+      </li>
+    </ul>
   </div>
   <script src="/shared/api.js"></script>
-  <script>
-    const out = document.getElementById("out");
-    const tokenInput = document.getElementById("token");
-    tokenInput.value = OrchAPI.token();
-    document.getElementById("save-token").onclick = () => {
-      OrchAPI.setToken(tokenInput.value);
-      out.textContent = "Token saved.";
-      out.className = "probe ok";
-    };
-    document.getElementById("probe").onclick = async () => {
-      out.className = "probe";
-      out.textContent = "Loading…";
-      try {
-        const c = await OrchAPI.catalog();
-        out.className = "probe ok";
-        out.textContent =
-          "schema_id=" + c.schema_id +
-          "\nnode_types=" + (c.node_types || []).length +
-          "\nedge_kinds=" + (c.edge_kinds || []).length +
-          "\nclocks=" + (c.clocks || []).join(", ");
-      } catch (e) {
-        out.className = "probe err";
-        out.textContent = (e.status || "") + " " + (e.message || String(e));
-      }
-    };
-  </script>
+  <script src="/admin/admin.js"></script>
+  <script>AdminUI.bindTokenForm();</script>
 </body>
 </html>

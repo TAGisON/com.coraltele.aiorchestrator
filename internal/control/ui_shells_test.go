@@ -31,10 +31,14 @@ func TestConsoleShells_Static(t *testing.T) {
 		contain string
 	}{
 		{"/", http.StatusOK, "/admin/"},
-		{"/admin/", http.StatusOK, "Admin"},
+		{"/admin/", http.StatusOK, "Engines"},
+		{"/admin/engines.html", http.StatusOK, "Tenant engines"},
+		{"/admin/profiles.html", http.StatusOK, "Publish version"},
+		{"/admin/settings.html", http.StatusOK, "Fallback prompts"},
+		{"/admin/admin.js", http.StatusOK, "AdminUI"},
 		{"/supervisor/", http.StatusOK, "Supervisor"},
 		{"/chat/", http.StatusOK, "Chat"},
-		{"/shared/api.js", http.StatusOK, "OrchAPI"},
+		{"/shared/api.js", http.StatusOK, "putEngines"},
 		{"/shared/styles.css", http.StatusOK, "--accent"},
 		{"/admin", http.StatusFound, ""},
 	}

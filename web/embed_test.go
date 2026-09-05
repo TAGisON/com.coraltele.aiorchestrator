@@ -11,6 +11,10 @@ func TestUIFS_EmbedsShells(t *testing.T) {
 	need := []string{
 		"index.html",
 		"admin/index.html",
+		"admin/engines.html",
+		"admin/profiles.html",
+		"admin/settings.html",
+		"admin/admin.js",
 		"supervisor/index.html",
 		"chat/index.html",
 		"shared/api.js",

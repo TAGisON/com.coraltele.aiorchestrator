@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Profiles — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a class="active" href="/admin/profiles.html">Profiles</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Profiles</h1>
+    <p class="lede">Create a profile registry row, then publish a validated Talk document. Router providers are chosen from registered gateways only.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create profile</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="pid">Profile id</label>
+          <input id="pid" type="text" placeholder="e.g. contact-lab" />
+        </div>
+        <div>
+          <label class="field" for="pname">Display name</label>
+          <input id="pname" type="text" placeholder="Lab contact" />
+        </div>
+        <div>
+          <label class="field" for="ptenant">Tenant id</label>
+          <input id="ptenant" type="text" value="default" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="create-profile">Create</button>
+        <button type="button" class="btn secondary" id="reload-profiles">Reload list</button>
+      </div>
+      <div class="probe" id="create-out"></div>
+      <table class="data" id="profile-table">
+        <thead><tr><th>Id</th><th>Name</th><th>Tenant</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Publish version</h2>
+      <label class="field" for="pub-id">Profile id</label>
+      <input id="pub-id" type="text" placeholder="Must exist" />
+      <div class="checks">
+        <label><input type="checkbox" id="m-listen" checked /> listen</label>
+        <label><input type="checkbox" id="m-speak" checked /> speak</label>
+        <label><input type="checkbox" id="m-think" checked /> think</label>
+        <label><input type="checkbox" id="m-talk" checked /> talk</label>
+      </div>
+      <div class="field-row">
+        <div>
+          <label class="field" for="r-listen">Listen provider</label>
+          <select id="r-listen"></select>
+        </div>
+        <div>
+          <label class="field" for="r-think">Think provider</label>
+          <select id="r-think"></select>
+        </div>
+        <div>
+          <label class="field" for="r-speak">Speak provider</label>
+          <select id="r-speak"></select>
+        </div>
+        <div>
+          <label class="field" for="rate">Sample rate Hz</label>
+          <select id="rate">
+            <option value="8000">8000</option>
+            <option value="16000" selected>16000</option>
+          </select>
+        </div>
+      </div>
+      <label class="field" for="voice">Persona voice id (for speak provider)</label>
+      <input id="voice" type="text" value="lab-voice" />
+      <div class="actions">
+        <button type="button" class="btn" id="publish">Publish version</button>
+      </div>
+      <div class="probe" id="pub-out"></div>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+
+    async function loadProfiles() {
+      const out = document.getElementById("create-out");
+      const tbody = document.querySelector("#profile-table tbody");
+      try {
+        const data = await OrchAPI.listProfiles();
+        tbody.innerHTML = "";
+        (data.profiles || []).forEach((p) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td><a href='#' data-id='" + p.id + "'>" + p.id + "</a></td><td>" + (p.display_name || "") + "</td><td>" + (p.tenant_id || "") + "</td>";
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll("a[data-id]").forEach((a) => {
+          a.onclick = (ev) => {
+            ev.preventDefault();
+            document.getElementById("pub-id").value = a.getAttribute("data-id");
+          };
+        });
+        AdminUI.showStatus(out, true, "Listed " + (data.profiles || []).length);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    async function loadGatewaySelects() {
+      const gw = await OrchAPI.gateways();
+      AdminUI.fillSelect(document.getElementById("r-listen"), AdminUI.gatewayIds(gw, "listen"));
+      AdminUI.fillSelect(document.getElementById("r-think"), AdminUI.gatewayIds(gw, "think"));
+      AdminUI.fillSelect(document.getElementById("r-speak"), AdminUI.gatewayIds(gw, "speak"));
+      try {
+        const eng = await OrchAPI.getEngines();
+        if (eng.listen) document.getElementById("r-listen").value = eng.listen;
+        if (eng.think) document.getElementById("r-think").value = eng.think;
+        if (eng.speak) document.getElementById("r-speak").value = eng.speak;
+      } catch (_) {}
+    }
+
+    document.getElementById("create-profile").onclick = async () => {
+      const out = document.getElementById("create-out");
+      const id = document.getElementById("pid").value.trim();
+      if (!id) {
+        AdminUI.showStatus(out, false, "id required");
+        return;
+      }
+      try {
+        await OrchAPI.createProfile({
+          id: id,
+          display_name: document.getElementById("pname").value.trim(),
+          tenant_id: document.getElementById("ptenant").value.trim() || "default",
+        });
+        document.getElementById("pub-id").value = id;
+        AdminUI.showStatus(out, true, "Created " + id);
+        await loadProfiles();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("publish").onclick = async () => {
+      const out = document.getElementById("pub-out");
+      const id = document.getElementById("pub-id").value.trim();
+      const listen = document.getElementById("r-listen").value;
+      const think = document.getElementById("r-think").value;
+      const speak = document.getElementById("r-speak").value;
+      if (!id || !listen || !think || !speak) {
+        AdminUI.showStatus(out, false, "profile id and all three providers required");
+        return;
+      }
+      const voice = document.getElementById("voice").value.trim() || "default";
+      const doc = {
+        id: id,
+        modes: {
+          listen: document.getElementById("m-listen").checked,
+          speak: document.getElementById("m-speak").checked,
+          think: document.getElementById("m-think").checked,
+          talk: document.getElementById("m-talk").checked,
+        },
+        audio: { canonical_sample_rate_hz: parseInt(document.getElementById("rate").value, 10) },
+        persona: { voice: {} },
+        routers: {
+          listen: { providers: [listen] },
+          speak: { providers: [speak] },
+          think: { providers: [think] },
+        },
+      };
+      doc.persona.voice[speak] = voice;
+      try {
+        const got = await OrchAPI.publishProfile(id, doc);
+        AdminUI.showStatus(out, true, "Published version " + got.version + " for " + id);
+      } catch (e) {
+        let extra = "";
+        if (e.data && e.data.error && e.data.error.details) extra = " " + JSON.stringify(e.data.error.details);
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message + extra);
+      }
+    };
+
+    document.getElementById("reload-profiles").onclick = loadProfiles;
+    loadGatewaySelects().then(loadProfiles).catch((e) => {
+      AdminUI.showStatus(document.getElementById("create-out"), false, e.message);
+    });
+  </script>
+</body>
+</html>
