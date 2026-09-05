@@ -81,7 +81,7 @@ Evidence: `.agent/work/P1.*` (local)
 | G.2 | [G.2_flow_control_api.md](./G.2_flow_control_api.md) | **Closed** (5fbdb9a) — `/v1/flows*` + coral.flow.v1 publish validate |
 | G.3 | [G.3_runtime_core_cursor.md](./G.3_runtime_core_cursor.md) | **Closed** (599d37b) — Entry/Speak/ListenChoice/End cursor |
 | G.4 | [G.4_tool_arm_exec.md](./G.4_tool_arm_exec.md) | **Closed** (6870910) — Tool ARM + matrix freeze + exec once |
-| G.5 | [G.5_repair_language.md](./G.5_repair_language.md) | **Closed** — repair + ListenLanguage + locale |
+| G.5 | [G.5_repair_language.md](./G.5_repair_language.md) | **Closed** (1d8fc87) — repair + ListenLanguage + locale |
 | G.6–G.7 | per G.0 | Not started |
 
 ## Still later
