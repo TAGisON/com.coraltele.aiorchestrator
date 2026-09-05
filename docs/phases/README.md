@@ -69,7 +69,8 @@ Evidence: `.agent/work/P1.*` (local)
 | CI.1 | [CI.1_migrate_empty.md](./CI.1_migrate_empty.md) | **Closed** (`14b1965`) — Job B |
 | CI.2 | [CI.2_secrets_hygiene.md](./CI.2_secrets_hygiene.md) | **Closed** (36e0146) — Job C secrets-hygiene |
 | CI.3 | [CI.3_golangci_lint.md](./CI.3_golangci_lint.md) | **Closed** (b286c10) — Job D golangci-lint (fail) |
-| CD.* | per [11](../11_CI_AND_CD.md) | Not started |
+| CD.0 | [CD.0_lab_promote.md](./CD.0_lab_promote.md) | **Closed** — `tools/lab/PROMOTE.md` |
+| CD.1 | per [11](../11_CI_AND_CD.md) | Not started |
 
 ## Still later
 
