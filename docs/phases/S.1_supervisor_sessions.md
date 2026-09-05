@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `S.1` |
 | **title** | Supervisor: session list + detail (transcript, disposition, recording meta) |
-| **status** | **Closed** |
+| **status** | **Closed** (`9ac1e73`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave S |
 | **depends_on** | C.4 Closed (`e78d38f`); U.2 shells; existing `GET /v1/sessions*` |
 
