@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `C.4` |
 | **title** | Chat V1 soak checklist (UI details → turns → evidence) |
-| **status** | **Closed** — checklist authored |
+| **status** | **Closed** (`e78d38f`) — checklist authored |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) C.4 |
 | **depends_on** | C.1–C.3 Closed (`8ef4bc4` tip of C.3); A.5/A.6 for pin/publish; U.2 shells |
 

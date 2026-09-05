@@ -110,7 +110,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | C.1 | [C.1_clock_chat.md](./C.1_clock_chat.md) | **Closed** (c8bfe3f) — `clock=chat` + pin gate + speak short-circuit |
 | C.2 | [C.2_chat_ui.md](./C.2_chat_ui.md) | **Closed** (7573718) — Chat UI create/answer/inject/transcript |
 | C.3 | [C.3_chat_evidence.md](./C.3_chat_evidence.md) | **Closed** (8ef4bc4) — chat path `edge_taken`/`tool_line`/`graph.edge` parity |
-| C.4 | [C.4_chat_soak_checklist.md](./C.4_chat_soak_checklist.md) | **Closed** — Chat UI soak checklist |
+| C.4 | [C.4_chat_soak_checklist.md](./C.4_chat_soak_checklist.md) | **Closed** (e78d38f) — Chat UI soak checklist |
 | S.1–S.4 | — | Next — Supervisor |
 | V.1–V.2 | — | Planned — dual chat+call prove |
 
