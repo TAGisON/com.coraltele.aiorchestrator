@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `S.4` |
 | **title** | Supervisor V1 soak checklist (list → detail → audit → summary) |
-| **status** | **Closed** — checklist authored |
+| **status** | **Closed** (`23d96f7`) — checklist authored |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) S.4 |
 | **depends_on** | S.1–S.3 Closed (`eea05cf` tip of S.3); C.4/A.6 for sessions to inspect |
 

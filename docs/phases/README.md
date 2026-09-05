@@ -114,7 +114,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | S.1 | [S.1_supervisor_sessions.md](./S.1_supervisor_sessions.md) | **Closed** (9ac1e73) — session list + detail (transcript/disposition/recording) |
 | S.2 | [S.2_supervisor_audit.md](./S.2_supervisor_audit.md) | **Closed** (c158232) — audit browser + catalog `audit_event_types` |
 | S.3 | [S.3_supervisor_aggregates.md](./S.3_supervisor_aggregates.md) | **Closed** (eea05cf) — `GET /v1/analytics/summary` + Supervisor summary |
-| S.4 | [S.4_supervisor_soak_checklist.md](./S.4_supervisor_soak_checklist.md) | **Closed** — Supervisor UI soak checklist |
+| S.4 | [S.4_supervisor_soak_checklist.md](./S.4_supervisor_soak_checklist.md) | **Closed** (23d96f7) — Supervisor UI soak checklist |
 | V.1–V.2 | — | Next — dual chat+call prove |
 
 ## Still later
