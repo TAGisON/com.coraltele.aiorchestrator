@@ -62,6 +62,19 @@ type Repository interface {
 	UpsertCallerPreference(ctx context.Context, p CallerPreference) (CallerPreference, error)
 	GetCallerPreference(ctx context.Context, tenantID, ani string) (CallerPreference, error)
 
+	CreateFlow(ctx context.Context, f Flow, draftDoc json.RawMessage) (Flow, error)
+	GetFlow(ctx context.Context, id string) (Flow, error)
+	ListFlows(ctx context.Context, tenantID string, limit int) ([]Flow, error)
+	UpsertFlowDraft(ctx context.Context, flowID string, doc json.RawMessage) (FlowDraft, error)
+	GetFlowDraft(ctx context.Context, flowID string) (FlowDraft, error)
+	PublishFlowVersion(ctx context.Context, flowID string, doc json.RawMessage, contentHash, publishedBy string) (FlowVersion, error)
+	GetFlowVersion(ctx context.Context, flowID string, version int) (FlowVersion, error)
+	GetLatestFlowVersion(ctx context.Context, flowID string) (FlowVersion, error)
+
+	UpsertBinding(ctx context.Context, b Binding) (Binding, error)
+	GetBinding(ctx context.Context, id string) (Binding, error)
+	ListBindings(ctx context.Context, tenantID, kind string, limit int) ([]Binding, error)
+
 	CountActiveSessions(ctx context.Context, tenantID string) (int, error)
 	PurgeSessionData(ctx context.Context, sessionID string) error
 }

@@ -51,6 +51,8 @@ type Session struct {
 	TenantID              string
 	ProfileID             string
 	ProfileVersion        int
+	FlowID                string // published flow pin (nullable in DB)
+	FlowVersion           int    // published version pin; 0 = unset
 	Clock                 string
 	State                 string
 	OwnerInstance         string
@@ -198,33 +200,37 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 INSERT INTO session (
   id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
   canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
-  detected_language, active_language
+  detected_language, active_language, flow_id, flow_version
 ) VALUES (
   $1, NULLIF($2,''), $3, $4, $5, $6, NULLIF($7,''),
-  $8, NULLIF($9,''), $10, NULLIF($11,''), $12, $13, $14, $15
+  $8, NULLIF($9,''), $10, NULLIF($11,''), $12, $13, $14, $15, $16, $17
 )`,
 		sess.ID, sess.TenantID, sess.ProfileID, sess.ProfileVersion, sess.Clock, sess.State, sess.OwnerInstance,
 		sess.CanonicalSampleRateHz, sess.CoralUserID, nullJSON(sess.Caller), sess.RecordingRef, nullJSON(sess.Metadata),
 		marshalGatewayBinding(sess.GatewayBinding),
 		sess.DetectedLanguage, sess.ActiveLanguage,
+		nullBlank(sess.FlowID), nullPosInt(sess.FlowVersion),
 	)
 	return err
 }
 
 func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	var sess Session
-	var tenant, owner, coral, rec *string
+	var tenant, owner, coral, rec, flowID *string
 	var caller, meta, binding []byte
+	var flowVer *int
 	err := s.pool.QueryRow(ctx, `
 SELECT id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
        canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
        COALESCE(detected_language,''), COALESCE(active_language,''),
+       flow_id, flow_version,
        created_at, updated_at
 FROM session WHERE id=$1
 `, id).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
 		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.DetectedLanguage, &sess.ActiveLanguage,
+		&flowID, &flowVer,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -233,38 +239,26 @@ FROM session WHERE id=$1
 	if err != nil {
 		return Session{}, err
 	}
-	if tenant != nil {
-		sess.TenantID = *tenant
-	}
-	if owner != nil {
-		sess.OwnerInstance = *owner
-	}
-	if coral != nil {
-		sess.CoralUserID = *coral
-	}
-	if rec != nil {
-		sess.RecordingRef = *rec
-	}
-	sess.Caller = caller
-	sess.Metadata = meta
-	sess.GatewayBinding = scanGatewayBinding(binding)
-	return sess, nil
+	return finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding), nil
 }
 
 func (s *Store) UpdateSessionState(ctx context.Context, id, state string) (Session, error) {
 	var sess Session
-	var tenant, owner, coral, rec *string
+	var tenant, owner, coral, rec, flowID *string
 	var caller, meta, binding []byte
+	var flowVer *int
 	err := s.pool.QueryRow(ctx, `
 UPDATE session SET state=$2, updated_at=now() WHERE id=$1
 RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
           canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
           COALESCE(detected_language,''), COALESCE(active_language,''),
+          flow_id, flow_version,
           created_at, updated_at
 `, id, state).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
 		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.DetectedLanguage, &sess.ActiveLanguage,
+		&flowID, &flowVer,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -273,39 +267,27 @@ RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instan
 	if err != nil {
 		return Session{}, err
 	}
-	if tenant != nil {
-		sess.TenantID = *tenant
-	}
-	if owner != nil {
-		sess.OwnerInstance = *owner
-	}
-	if coral != nil {
-		sess.CoralUserID = *coral
-	}
-	if rec != nil {
-		sess.RecordingRef = *rec
-	}
-	sess.Caller = caller
-	sess.Metadata = meta
-	sess.GatewayBinding = scanGatewayBinding(binding)
-	return sess, nil
+	return finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding), nil
 }
 
 // UpdateSessionRecordingRef stores the on-disk path of the call recording.
 func (s *Store) UpdateSessionRecordingRef(ctx context.Context, id, ref string) (Session, error) {
 	var sess Session
-	var tenant, owner, coral, rec *string
+	var tenant, owner, coral, rec, flowID *string
 	var caller, meta, binding []byte
+	var flowVer *int
 	err := s.pool.QueryRow(ctx, `
 UPDATE session SET recording_ref=NULLIF($2,''), updated_at=now() WHERE id=$1
 RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
           canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
           COALESCE(detected_language,''), COALESCE(active_language,''),
+          flow_id, flow_version,
           created_at, updated_at
 `, id, ref).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
 		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.DetectedLanguage, &sess.ActiveLanguage,
+		&flowID, &flowVer,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -314,38 +296,26 @@ RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instan
 	if err != nil {
 		return Session{}, err
 	}
-	if tenant != nil {
-		sess.TenantID = *tenant
-	}
-	if owner != nil {
-		sess.OwnerInstance = *owner
-	}
-	if coral != nil {
-		sess.CoralUserID = *coral
-	}
-	if rec != nil {
-		sess.RecordingRef = *rec
-	}
-	sess.Caller = caller
-	sess.Metadata = meta
-	sess.GatewayBinding = scanGatewayBinding(binding)
-	return sess, nil
+	return finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding), nil
 }
 
 func (s *Store) UpdateSessionLanguages(ctx context.Context, id, detected, active string) (Session, error) {
 	var sess Session
-	var tenant, owner, coral, rec *string
+	var tenant, owner, coral, rec, flowID *string
 	var caller, meta, binding []byte
+	var flowVer *int
 	err := s.pool.QueryRow(ctx, `
 UPDATE session SET detected_language=$2, active_language=$3, updated_at=now() WHERE id=$1
 RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
           canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
           COALESCE(detected_language,''), COALESCE(active_language,''),
+          flow_id, flow_version,
           created_at, updated_at
 `, id, detected, active).Scan(
 		&sess.ID, &tenant, &sess.ProfileID, &sess.ProfileVersion, &sess.Clock, &sess.State, &owner,
 		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.DetectedLanguage, &sess.ActiveLanguage,
+		&flowID, &flowVer,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -354,22 +324,7 @@ RETURNING id, tenant_id, profile_id, profile_version, clock, state, owner_instan
 	if err != nil {
 		return Session{}, err
 	}
-	if tenant != nil {
-		sess.TenantID = *tenant
-	}
-	if owner != nil {
-		sess.OwnerInstance = *owner
-	}
-	if coral != nil {
-		sess.CoralUserID = *coral
-	}
-	if rec != nil {
-		sess.RecordingRef = *rec
-	}
-	sess.Caller = caller
-	sess.Metadata = meta
-	sess.GatewayBinding = scanGatewayBinding(binding)
-	return sess, nil
+	return finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding), nil
 }
 
 func nullJSON(b json.RawMessage) any {

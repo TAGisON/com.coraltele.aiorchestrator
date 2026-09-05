@@ -27,6 +27,10 @@ type Memory struct {
 	transcripts   map[string][]TranscriptTurn // session_id → ordered turns
 	dispositions  map[string]SessionDisposition
 	aux           *sessionAuxMemory
+	flows         map[string]Flow
+	flowDrafts    map[string]FlowDraft
+	flowVersions  map[string][]FlowVersion
+	bindings      map[string]Binding
 	healthy       bool
 }
 
