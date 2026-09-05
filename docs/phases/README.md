@@ -91,10 +91,24 @@ Evidence: `.agent/work/P1.*` (local)
 |---|---|---|
 | L.0 | [L.0_graph_lab_soak.md](./L.0_graph_lab_soak.md) | **Closed** (a84614b) — graph V1 soak checklist (+ fixture) |
 
+## Production consoles (U.* / A.* / C.* / S.* / V.*)
+
+**L2:** [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) (**Draft** — settle ODs before L4).  
+Admin = full config (flows create/draft/publish, profiles, engines, bindings, matrix, pin). Chat = same graph without STT/TTS. Supervisor = evidence read-only.
+
+| Phase | File | Status |
+|---|---|---|
+| U.0 | [U.0_consoles_inventory.md](./U.0_consoles_inventory.md) | **Draft** — gap inventory + phase freeze |
+| U.1–U.2 | — | Planned in doc 13 (catalog + shells) |
+| A.1–A.6 | — | Planned — Admin full configuration |
+| C.1–C.4 | — | Planned — User chat channel |
+| S.1–S.4 | — | Planned — Supervisor |
+| V.1–V.2 | — | Planned — dual chat+call prove |
+
 ## Still later
 
-- Owner **runs** L.0 / E.6 sign-off on lab (human)
-- Admin SPA for flow authoring (API-first V1 OK)
+- Owner **settles** doc 13 ODs → Lock → Close U.0 → U.1 L3/L4
+- Owner **runs** L.0 / E.6 / later V.1 sign-off on lab (human)
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
 

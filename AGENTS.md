@@ -16,13 +16,14 @@ Read in order under `docs/`:
 10. `docs/09_EVIDENCE_AND_RECORDING.md` — transcript / audit / recording behaviour (**Draft**)  
 11. `docs/10_CODING_PRINCIPLES.md` — coding rules + EC-* library (**Draft**)  
 12. `docs/11_CI_AND_CD.md` — CI/CD plan (**Draft**)  
-13. `docs/12_AGENTIC_L4_ROLES.md` — L4 roles + skills (**Draft**)  
-14. `docs/phases/` — L3 specs (**P1.*** + **P2.0–P2.14**; no L4 yet)  
-15. `.cursor/skills/aiorchestrator-l4-{implementer,reviewer,summarizer}/` — L4 skills
+13. `docs/12_AGENTIC_L4_ROLES.md` — L4 roles + skills  
+14. `docs/13_PRODUCTION_CONSOLES.md` — Admin / Supervisor / User chat (**Draft**; ODs open)  
+15. `docs/phases/` — L3 specs (kernel Closed; **U/A/C/S/V** consoles Draft)  
+16. `.cursor/skills/aiorchestrator-l4-{implementer,reviewer,summarizer}/` — L4 skills
 
-Older product/architecture docs were removed on branch `docs/llm-callcentre-architecture`. Do not resurrect caption/translator/meeting platform scope into this programme.
+Older product/architecture docs were removed on branch `docs/llm-callcentre-architecture`. Do not resurrect caption/translator/meeting platform scope into this programme. Do not restore purged desk consoles — rebuild only under doc 13.
 
-**Implementation gate:** No code deletes/migrations until `07` §8 checklist is complete and an Implementer skill is approved. Plans must cite architecture refs; do not invent against 01–06.
+**Implementation gate:** Console L4 requires doc 13 ODs settled (Locked) and a Closed L3 phase id. Kernel L4 already authorized for prior waves. Plans must cite architecture refs; do not invent against 01–06 / 13.
 
 ## Hard rules
 
