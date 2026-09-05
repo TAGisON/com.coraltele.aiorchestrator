@@ -111,13 +111,14 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | C.2 | [C.2_chat_ui.md](./C.2_chat_ui.md) | **Closed** (7573718) — Chat UI create/answer/inject/transcript |
 | C.3 | [C.3_chat_evidence.md](./C.3_chat_evidence.md) | **Closed** (8ef4bc4) — chat path `edge_taken`/`tool_line`/`graph.edge` parity |
 | C.4 | [C.4_chat_soak_checklist.md](./C.4_chat_soak_checklist.md) | **Closed** (e78d38f) — Chat UI soak checklist |
-| S.1–S.4 | — | Next — Supervisor |
+| S.1 | [S.1_supervisor_sessions.md](./S.1_supervisor_sessions.md) | **Closed** — session list + detail (transcript/disposition/recording) |
+| S.2–S.4 | — | Next — Audit browser, aggregates, soak |
 | V.1–V.2 | — | Planned — dual chat+call prove |
 
 ## Still later
 
 - Owner **runs** A.6 / C.4 / L.0 / E.6 sign-off on lab (human)
-- **S.1** Supervisor session list + detail, then S.2–S.4 / V.*
+- **S.2** Audit browser, then S.3–S.4 / V.*
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)
 

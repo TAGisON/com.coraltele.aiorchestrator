@@ -219,11 +219,14 @@ func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	var tenant, owner, coral, rec, flowID *string
 	var caller, meta, binding []byte
 	var flowVer *int
+	var started, stopped *time.Time
+	var nbytes *int64
 	err := s.pool.QueryRow(ctx, `
 SELECT id, tenant_id, profile_id, profile_version, clock, state, owner_instance,
        canonical_sample_rate_hz, coral_user_id, caller, recording_ref, metadata, gateway_binding,
        COALESCE(detected_language,''), COALESCE(active_language,''),
        flow_id, flow_version,
+       recording_started_at, recording_stopped_at, COALESCE(recording_stop_reason,''), recording_bytes,
        created_at, updated_at
 FROM session WHERE id=$1
 `, id).Scan(
@@ -231,6 +234,7 @@ FROM session WHERE id=$1
 		&sess.CanonicalSampleRateHz, &coral, &caller, &rec, &meta, &binding,
 		&sess.DetectedLanguage, &sess.ActiveLanguage,
 		&flowID, &flowVer,
+		&started, &stopped, &sess.RecordingStopReason, &nbytes,
 		&sess.CreatedAt, &sess.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -239,7 +243,11 @@ FROM session WHERE id=$1
 	if err != nil {
 		return Session{}, err
 	}
-	return finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding), nil
+	out := finishSessionPointers(&sess, tenant, owner, coral, rec, flowID, flowVer, caller, meta, binding)
+	out.RecordingStartedAt = started
+	out.RecordingStoppedAt = stopped
+	out.RecordingBytes = nbytes
+	return out, nil
 }
 
 func (s *Store) UpdateSessionState(ctx context.Context, id, state string) (Session, error) {

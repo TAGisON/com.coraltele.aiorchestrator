@@ -138,6 +138,10 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			"recording_ref": sess.RecordingRef,
 			"created_at":    sess.CreatedAt, "updated_at": sess.UpdatedAt,
 		}
+		if sess.FlowID != "" {
+			item["flow_id"] = sess.FlowID
+			item["flow_version"] = sess.FlowVersion
+		}
 		if sess.GatewayBinding != nil {
 			item["gateway_binding"] = sess.GatewayBinding
 		}

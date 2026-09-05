@@ -622,9 +622,7 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	if sess.GatewayBinding != nil {
 		out["gateway_binding"] = sess.GatewayBinding
 	}
-	if sess.RecordingRef != "" {
-		out["recording_ref"] = sess.RecordingRef
-	}
+	appendRecordingMeta(out, sess)
 	if len(sess.Caller) > 0 {
 		out["caller"] = json.RawMessage(sess.Caller)
 	}
@@ -632,6 +630,24 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		out["metadata"] = json.RawMessage(sess.Metadata)
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func appendRecordingMeta(out map[string]any, sess store.Session) {
+	if sess.RecordingRef != "" {
+		out["recording_ref"] = sess.RecordingRef
+	}
+	if sess.RecordingStartedAt != nil {
+		out["recording_started_at"] = sess.RecordingStartedAt
+	}
+	if sess.RecordingStoppedAt != nil {
+		out["recording_stopped_at"] = sess.RecordingStoppedAt
+	}
+	if sess.RecordingStopReason != "" {
+		out["recording_stop_reason"] = sess.RecordingStopReason
+	}
+	if sess.RecordingBytes != nil {
+		out["recording_bytes"] = *sess.RecordingBytes
+	}
 }
 
 type stopReq struct {

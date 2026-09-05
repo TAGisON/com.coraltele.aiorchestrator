@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/shared/styles.css" />
 </head>
 <body>
-  <div class="shell">
+  <div class="shell shell-wide">
     <nav class="shell-nav">
       <a class="brand" href="/">AiOrchestrator</a>
       <span class="role">Supervisor</span>
@@ -15,7 +15,7 @@
       <a href="/chat/">Chat</a>
     </nav>
     <h1>Supervisor</h1>
-    <p class="lede">Read-only sessions, transcript, audit, disposition, and light analytics. Shell only (U.2) — browsers land in S.* phases.</p>
+    <p class="lede">Read-only session list and detail — transcript, disposition, recording metadata. Audit browser is S.2; no config writes here.</p>
 
     <div class="card">
       <h2>API token (lab)</h2>
@@ -23,39 +23,49 @@
         <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
         <button type="button" class="btn secondary" id="save-token">Save</button>
       </div>
+      <div class="probe" id="token-out"></div>
     </div>
 
     <div class="card">
-      <h2>Platform probe</h2>
-      <button type="button" class="btn" id="probe">Load platform status</button>
-      <div class="probe" id="out"></div>
+      <h2>Sessions</h2>
+      <div class="actions">
+        <button type="button" class="btn" id="btn-refresh">Refresh list</button>
+      </div>
+      <div class="probe" id="list-out"></div>
+      <table class="data" id="sess-table">
+        <thead>
+          <tr>
+            <th>Session</th>
+            <th>Clock</th>
+            <th>State</th>
+            <th>Profile</th>
+            <th>Flow</th>
+            <th>Recording</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="sess-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="detail-card" hidden>
+      <h2>Session detail</h2>
+      <p class="lede" style="margin-bottom:0.75rem">Selected <code id="detail-id">—</code></p>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="btn-reload-detail">Reload detail</button>
+      </div>
+      <h3 class="detail-h">Summary</h3>
+      <div class="probe" id="summary-out"></div>
+      <h3 class="detail-h">Disposition</h3>
+      <div class="probe" id="disp-out"></div>
+      <h3 class="detail-h">Recording meta</h3>
+      <div class="probe" id="rec-out"></div>
+      <h3 class="detail-h">Transcript</h3>
+      <div id="turns" class="chat-turns" aria-live="polite"></div>
+      <div class="probe" id="detail-err"></div>
     </div>
   </div>
   <script src="/shared/api.js"></script>
-  <script>
-    const out = document.getElementById("out");
-    const tokenInput = document.getElementById("token");
-    tokenInput.value = OrchAPI.token();
-    document.getElementById("save-token").onclick = () => {
-      OrchAPI.setToken(tokenInput.value);
-      out.textContent = "Token saved.";
-      out.className = "probe ok";
-    };
-    document.getElementById("probe").onclick = async () => {
-      out.className = "probe";
-      out.textContent = "Loading…";
-      try {
-        const s = await OrchAPI.platformStatus();
-        out.className = "probe ok";
-        out.textContent =
-          "status=" + s.status +
-          "\nready_for_sessions=" + s.ready_for_sessions +
-          "\nstore=" + s.store_backend;
-      } catch (e) {
-        out.className = "probe err";
-        out.textContent = (e.status || "") + " " + (e.message || String(e));
-      }
-    };
-  </script>
+  <script src="/supervisor/supervisor.js"></script>
 </body>
 </html>

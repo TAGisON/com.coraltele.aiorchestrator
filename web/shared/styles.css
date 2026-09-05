@@ -166,7 +166,23 @@ table.data th { color: var(--muted); font-weight: 600; }
 .hub-list strong { display: block; margin-bottom: 0.25rem; }
 .hub-list span { color: var(--muted); font-size: 0.9rem; }
 
-/* Chat turns (C.2) */
+.shell-wide { max-width: 72rem; }
+.detail-h {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.35rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+table.data tr.row-active td { background: rgba(42, 157, 143, 0.12); }
+button.linkish {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
 .chat-turns {
   display: flex;
   flex-direction: column;

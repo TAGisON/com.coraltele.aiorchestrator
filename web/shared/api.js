@@ -113,6 +113,9 @@
       request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/transcript"),
     getDisposition: (id) =>
       request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/disposition"),
+    listSessions: (qs) => request("GET", "/v1/sessions" + (qs ? "?" + qs : "")),
+    getAudit: (id) =>
+      request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/audit"),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>
