@@ -42,9 +42,10 @@ func TestConsoleShells_Static(t *testing.T) {
 		{"/admin/pin.html", http.StatusOK, "Answer pins"},
 		{"/admin/admin.js", http.StatusOK, "AdminUI"},
 		{"/supervisor/", http.StatusOK, "Supervisor"},
-		{"/chat/", http.StatusOK, "Chat"},
-		{"/shared/api.js", http.StatusOK, "getAnswerPins"},
-		{"/shared/styles.css", http.StatusOK, "--accent"},
+		{"/chat/", http.StatusOK, "Start chat"},
+		{"/chat/chat.js", http.StatusOK, "clock=chat"},
+		{"/shared/api.js", http.StatusOK, "getTranscript"},
+		{"/shared/styles.css", http.StatusOK, "chat-turn"},
 		{"/admin", http.StatusFound, ""},
 	}
 	for _, tc := range cases {

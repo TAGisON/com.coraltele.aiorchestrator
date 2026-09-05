@@ -102,6 +102,17 @@
     getAnswerPins: () => request("GET", "/v1/tenant/answer-pins"),
     putAnswerPins: (body) => request("PUT", "/v1/tenant/answer-pins", body),
     createSession: (body) => request("POST", "/v1/sessions", body),
+    getSession: (id) => request("GET", "/v1/sessions/" + encodeURIComponent(id)),
+    answerSession: (id, body) =>
+      request("POST", "/v1/sessions/" + encodeURIComponent(id) + "/answer", body || {}),
+    injectText: (id, body) =>
+      request("POST", "/v1/sessions/" + encodeURIComponent(id) + "/inject", body),
+    stopSession: (id, body) =>
+      request("POST", "/v1/sessions/" + encodeURIComponent(id) + "/stop", body || {}),
+    getTranscript: (id) =>
+      request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/transcript"),
+    getDisposition: (id) =>
+      request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/disposition"),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>

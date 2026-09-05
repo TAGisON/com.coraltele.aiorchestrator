@@ -15,7 +15,7 @@
       <a href="/supervisor/">Supervisor</a>
     </nav>
     <h1>Chat</h1>
-    <p class="lede">Same pinned conversation graph as voice, without STT/TTS (<code>clock=chat</code> in C.1). Shell only (U.2) — session UX lands in C.* phases.</p>
+    <p class="lede">Same pinned conversation graph as voice, without STT/TTS. Creates sessions with <code>clock=chat</code>, answers the graph, then exchanges text via inject.</p>
 
     <div class="card">
       <h2>API token (lab)</h2>
@@ -23,19 +23,60 @@
         <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
         <button type="button" class="btn secondary" id="save-token">Save</button>
       </div>
+      <div class="probe" id="token-out"></div>
     </div>
 
-    <div class="card">
-      <h2>Coming next</h2>
-      <p>Caller details → create session with flow pin → answer → text turns via inject/events. Not implemented in U.2.</p>
+    <div class="card" id="start-card">
+      <h2>Start chat</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="caller-ani">ANI / phone</label>
+          <input id="caller-ani" type="text" placeholder="optional" />
+        </div>
+        <div>
+          <label class="field" for="caller-name">Caller name</label>
+          <input id="caller-name" type="text" placeholder="optional" />
+        </div>
+        <div>
+          <label class="field" for="profile">Profile</label>
+          <select id="profile"></select>
+        </div>
+        <div>
+          <label class="field" for="flow">Flow</label>
+          <select id="flow"></select>
+        </div>
+        <div>
+          <label class="field" for="flow-ver">Flow version</label>
+          <input id="flow-ver" type="text" value="latest" />
+        </div>
+        <div>
+          <label class="field" for="clock">Clock</label>
+          <input id="clock" type="text" value="chat" readonly />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="btn-start">Start chat</button>
+        <button type="button" class="btn secondary" id="btn-reload">Reload catalogs</button>
+      </div>
+      <div class="probe" id="start-out"></div>
+    </div>
+
+    <div class="card" id="session-card" hidden>
+      <h2>Session</h2>
+      <p class="lede" style="margin-bottom:0.75rem">Session <code id="sess-id">—</code> · state <span id="sess-state">—</span></p>
+      <div id="turns" class="chat-turns" aria-live="polite"></div>
+      <label class="field" for="msg">Your message</label>
+      <textarea id="msg" rows="2" placeholder="Type a turn…"></textarea>
+      <div class="actions">
+        <button type="button" class="btn" id="btn-send">Send</button>
+        <button type="button" class="btn secondary" id="btn-refresh">Refresh transcript</button>
+        <button type="button" class="btn secondary" id="btn-stop">Stop</button>
+      </div>
+      <div class="probe" id="sess-out"></div>
+      <div class="probe" id="disp-out"></div>
     </div>
   </div>
   <script src="/shared/api.js"></script>
-  <script>
-    document.getElementById("token").value = OrchAPI.token();
-    document.getElementById("save-token").onclick = () => {
-      OrchAPI.setToken(document.getElementById("token").value);
-    };
-  </script>
+  <script src="/chat/chat.js"></script>
 </body>
 </html>

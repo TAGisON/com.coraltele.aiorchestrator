@@ -165,3 +165,35 @@ table.data th { color: var(--muted); font-weight: 600; }
 }
 .hub-list strong { display: block; margin-bottom: 0.25rem; }
 .hub-list span { color: var(--muted); font-size: 0.9rem; }
+
+/* Chat turns (C.2) */
+.chat-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.35rem 0;
+}
+.chat-turn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg);
+  font-size: 0.95rem;
+}
+.chat-turn .meta-line {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+  font-family: var(--mono);
+}
+.chat-turn.user { border-color: #3d5a80; }
+.chat-turn.bot { border-color: var(--accent-dim); }
+.chat-turn.tool {
+  border-color: #8a6d3b;
+  border-style: dashed;
+  color: #e8d5a3;
+}
+.chat-turn.meta { color: var(--muted); font-size: 0.9rem; }
