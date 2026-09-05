@@ -1,0 +1,171 @@
+{
+  "schema_id": "coral.flow.v1",
+  "entry_node_id": "entry",
+  "default_locale": "en-IN",
+  "nodes": [
+    { "id": "entry", "type": "Entry" },
+    { "id": "greeting", "type": "Speak", "prompt_ref": "greeting" },
+    { "id": "pick_lang", "type": "ListenLanguage", "repair": { "max_retries": 2, "unclear_prompt_ref": "repair_lang" } },
+    { "id": "menu", "type": "Speak", "prompt_ref": "menu" },
+    { "id": "intent", "type": "ListenChoice", "repair": { "max_retries": 2, "unclear_prompt_ref": "repair_intent" } },
+    { "id": "ask_product", "type": "Speak", "prompt_ref": "ask_product" },
+    { "id": "faq_listen", "type": "ListenChoice", "repair": { "max_retries": 2, "unclear_prompt_ref": "repair_faq" } },
+    { "id": "product_kb", "type": "Inform", "binding_ref": "product-faq" },
+    { "id": "after_faq", "type": "Speak", "prompt_ref": "after_faq" },
+    { "id": "after_faq_choice", "type": "ListenChoice", "repair": { "max_retries": 2, "unclear_prompt_ref": "repair_after_faq" } },
+    { "id": "tech_help", "type": "Speak", "prompt_ref": "tech_help" },
+    { "id": "tech_outcome", "type": "ListenChoice", "repair": { "max_retries": 1, "unclear_prompt_ref": "repair_tech" } },
+    { "id": "xfer_sales", "type": "Tool", "tool": "transfer", "matrix_intent": "sales", "prompt_ref": "closing_sales" },
+    { "id": "xfer_support", "type": "Tool", "tool": "transfer", "matrix_intent": "support", "prompt_ref": "closing_support" },
+    { "id": "xfer_product", "type": "Tool", "tool": "transfer", "matrix_intent": "product", "prompt_ref": "closing_product" },
+    { "id": "hangup", "type": "Tool", "tool": "hangup", "prompt_ref": "closing_hangup" }
+  ],
+  "edges": [
+    { "id": "e_entry_greeting", "from": "entry", "to": "greeting", "kind": "next" },
+    { "id": "e_greeting_lang", "from": "greeting", "to": "pick_lang", "kind": "next" },
+
+    { "id": "e_lang_en", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "en-IN", "option": "english" },
+    { "id": "e_lang_hi", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "hi-IN", "option": "hindi" },
+    { "id": "e_lang_bn", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "bn-IN", "option": "bengali" },
+    { "id": "e_lang_bn2", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "bn-IN", "option": "bangla" },
+    { "id": "e_lang_te", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "te-IN", "option": "telugu" },
+    { "id": "e_lang_mr", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "mr-IN", "option": "marathi" },
+    { "id": "e_lang_ta", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "ta-IN", "option": "tamil" },
+    { "id": "e_lang_gu", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "gu-IN", "option": "gujarati" },
+    { "id": "e_lang_kn", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "kn-IN", "option": "kannada" },
+    { "id": "e_lang_pa", "from": "pick_lang", "to": "menu", "kind": "intent", "intent": "pa-IN", "option": "punjabi" },
+    { "id": "e_lang_repair", "from": "pick_lang", "to": "menu", "kind": "repair" },
+    { "id": "e_menu_intent", "from": "menu", "to": "intent", "kind": "next" },
+
+    { "id": "e_intent_product", "from": "intent", "to": "ask_product", "kind": "intent", "intent": "product" },
+    { "id": "e_intent_products", "from": "intent", "to": "ask_product", "kind": "intent", "intent": "products" },
+    { "id": "e_intent_knowledge", "from": "intent", "to": "ask_product", "kind": "intent", "intent": "knowledge" },
+    { "id": "e_intent_tech", "from": "intent", "to": "tech_help", "kind": "intent", "intent": "technical" },
+    { "id": "e_intent_support", "from": "intent", "to": "tech_help", "kind": "intent", "intent": "support" },
+    { "id": "e_intent_sales", "from": "intent", "to": "xfer_sales", "kind": "intent", "intent": "sales" },
+    { "id": "e_intent_enquiry", "from": "intent", "to": "xfer_sales", "kind": "intent", "intent": "enquiry" },
+    { "id": "e_intent_agent", "from": "intent", "to": "xfer_product", "kind": "intent", "intent": "agent" },
+    { "id": "e_intent_repair", "from": "intent", "to": "xfer_product", "kind": "repair" },
+
+    { "id": "e_ask_faq", "from": "ask_product", "to": "faq_listen", "kind": "next" },
+    { "id": "e_faq_iris", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "iris" },
+    { "id": "e_faq_ivdx", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "ivdx" },
+    { "id": "e_faq_ucs", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "ucs" },
+    { "id": "e_faq_gateway", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "gateway" },
+    { "id": "e_faq_callcenter", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "call center" },
+    { "id": "e_faq_dispatcher", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "dispatcher" },
+    { "id": "e_faq_mcx", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "mcx" },
+    { "id": "e_faq_nms", "from": "faq_listen", "to": "product_kb", "kind": "intent", "intent": "nms" },
+    { "id": "e_faq_agent", "from": "faq_listen", "to": "xfer_product", "kind": "intent", "intent": "agent" },
+    { "id": "e_faq_menu", "from": "faq_listen", "to": "menu", "kind": "intent", "intent": "menu" },
+    { "id": "e_faq_repair", "from": "faq_listen", "to": "xfer_product", "kind": "repair" },
+
+    { "id": "e_kb_after", "from": "product_kb", "to": "after_faq", "kind": "next" },
+    { "id": "e_kb_repair", "from": "product_kb", "to": "ask_product", "kind": "repair" },
+    { "id": "e_after_choice", "from": "after_faq", "to": "after_faq_choice", "kind": "next" },
+    { "id": "e_after_more", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "more" },
+    { "id": "e_after_again", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "another" },
+    { "id": "e_after_baaki", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "baaki" },
+    { "id": "e_after_products", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "products" },
+    { "id": "e_after_product", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "product" },
+    { "id": "e_after_kitne", "from": "after_faq_choice", "to": "ask_product", "kind": "intent", "intent": "kitne" },
+    { "id": "e_after_agent", "from": "after_faq_choice", "to": "xfer_product", "kind": "intent", "intent": "agent" },
+    { "id": "e_after_menu", "from": "after_faq_choice", "to": "menu", "kind": "intent", "intent": "menu" },
+    { "id": "e_after_done", "from": "after_faq_choice", "to": "hangup", "kind": "intent", "intent": "done" },
+    { "id": "e_after_bye", "from": "after_faq_choice", "to": "hangup", "kind": "intent", "intent": "bye" },
+    { "id": "e_after_repair", "from": "after_faq_choice", "to": "ask_product", "kind": "repair" },
+
+    { "id": "e_tech_outcome", "from": "tech_help", "to": "tech_outcome", "kind": "next" },
+    { "id": "e_tech_resolved", "from": "tech_outcome", "to": "hangup", "kind": "intent", "intent": "resolved" },
+    { "id": "e_tech_fixed", "from": "tech_outcome", "to": "hangup", "kind": "intent", "intent": "fixed" },
+    { "id": "e_tech_unresolved", "from": "tech_outcome", "to": "xfer_support", "kind": "intent", "intent": "unresolved" },
+    { "id": "e_tech_notfixed", "from": "tech_outcome", "to": "xfer_support", "kind": "intent", "intent": "not fixed" },
+    { "id": "e_tech_agent", "from": "tech_outcome", "to": "xfer_support", "kind": "intent", "intent": "agent" },
+    { "id": "e_tech_repair", "from": "tech_outcome", "to": "xfer_support", "kind": "repair" }
+  ],
+  "prompts": {
+    "greeting": {
+      "en-IN": "Welcome to Coral Telematics. Please say your language: English, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, or Punjabi.",
+      "hi-IN": "कॉरल टेलीमैटिक्स में आपका स्वागत है। अपनी भाषा कहें: English, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, या Punjabi."
+    },
+    "repair_lang": {
+      "en-IN": "Please say English, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, or Punjabi.",
+      "hi-IN": "कृपया English, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, या Punjabi कहें।"
+    },
+    "menu": {
+      "en-IN": "How can I help? Say product for product questions, technical or support for issues, sales for business enquiry, or agent to speak to a person.",
+      "hi-IN": "मैं कैसे मदद करूँ? प्रोडक्ट सवाल के लिए product, तकनीकी समस्या के लिए technical या support, बिज़नेस के लिए sales, या व्यक्ति से बात के लिए agent कहें।"
+    },
+    "repair_intent": {
+      "en-IN": "Please say product, technical, sales, or agent.",
+      "hi-IN": "कृपया product, technical, sales, या agent कहें।"
+    },
+    "ask_product": {
+      "en-IN": "Ask about a Coral product — for example IRIS IVDX, Coral UCS, Media Gateway, Call Center, Dispatcher Console, MCX, or NMS. Or say agent for product desk, or menu to go back.",
+      "hi-IN": "कॉरल प्रोडक्ट के बारे में पूछें — जैसे IRIS IVDX, Coral UCS, Media Gateway, Call Center, Dispatcher, MCX, या NMS। एजेंट के लिए agent, मेनू के लिए menu कहें।"
+    },
+    "repair_faq": {
+      "en-IN": "Please name a product like IRIS, UCS, gateway, call center, dispatcher, MCX, or NMS — or say agent or menu.",
+      "hi-IN": "कृपया IRIS, UCS, gateway, call center, dispatcher, MCX, या NMS कहें — या agent या menu।"
+    },
+    "after_faq": {
+      "en-IN": "Anything else? Say more for another product question, agent for product desk, menu for main menu, or done to end.",
+      "hi-IN": "और कुछ? और प्रोडक्ट सवाल के लिए more या baaki, प्रोडक्ट डेस्क के लिए agent, मेनू के लिए menu, या समाप्त करने के लिए done कहें।"
+    },
+    "repair_after_faq": {
+      "en-IN": "Please say more, baaki, agent, menu, or done.",
+      "hi-IN": "कृपया more, baaki, agent, menu, या done कहें।"
+    },
+    "tech_help": {
+      "en-IN": "Let's try a quick check. Confirm power and network, restart the device if you can, then say resolved if it is fixed, or unresolved if you still need support.",
+      "hi-IN": "जल्दी जाँच करें। पावर और नेटवर्क देखें, संभव हो तो डिवाइस रीस्टार्ट करें। ठीक हो तो resolved, नहीं तो unresolved कहें।"
+    },
+    "repair_tech": {
+      "en-IN": "Please say resolved or unresolved.",
+      "hi-IN": "कृपया resolved या unresolved कहें।"
+    },
+    "closing_sales": {
+      "en-IN": "Connecting you to the Sales department on 5005.",
+      "hi-IN": "आपको सेल्स विभाग 5005 पर जोड़ रहे हैं।"
+    },
+    "closing_support": {
+      "en-IN": "Connecting you to Technical Support on 5006.",
+      "hi-IN": "आपको तकनीकी सहायता 5006 पर जोड़ रहे हैं।"
+    },
+    "closing_product": {
+      "en-IN": "Connecting you to the Product desk on 5007.",
+      "hi-IN": "आपको प्रोडक्ट डेस्क 5007 पर जोड़ रहे हैं।"
+    },
+    "closing_hangup": {
+      "en-IN": "Thank you for calling Coral. Goodbye.",
+      "hi-IN": "कॉरल को कॉल करने के लिए धन्यवाद। नमस्ते।"
+    }
+  },
+  "matrix": [
+    {
+      "intent": "sales",
+      "owner": "Sales",
+      "target": "sales-q",
+      "number": "5005",
+      "action": "transfer",
+      "disposition_code": "transferred_sales"
+    },
+    {
+      "intent": "support",
+      "owner": "Technical Support",
+      "target": "support-q",
+      "number": "5006",
+      "action": "transfer",
+      "disposition_code": "transferred_support"
+    },
+    {
+      "intent": "product",
+      "owner": "Product Query",
+      "target": "product-q",
+      "number": "5007",
+      "action": "transfer",
+      "disposition_code": "transferred_other"
+    }
+  ],
+  "binding_refs": ["product-faq"]
+}

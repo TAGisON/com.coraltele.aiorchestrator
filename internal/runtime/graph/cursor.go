@@ -169,17 +169,13 @@ func (c *Cursor) handleChoiceLocked(n flow.Node, text string) (Turn, error) {
 
 func (c *Cursor) handleLanguageLocked(n flow.Node, text string) (Turn, error) {
 	c.lastQuery = strings.TrimSpace(text)
-	edge, ok := matchChoice(c.outEdgesLocked(c.nodeID), text)
+	edge, locale, ok := matchLanguage(c.outEdgesLocked(c.nodeID), text)
 	if !ok {
 		return c.repairLocked(n)
 	}
 	c.retries[n.ID] = 0
-	locale := strings.TrimSpace(edge.Intent)
 	if locale == "" {
-		locale = strings.TrimSpace(edge.Option)
-	}
-	if locale == "" {
-		return Turn{}, fmt.Errorf("ListenLanguage edge %q missing intent/option locale", edge.ID)
+		return Turn{}, fmt.Errorf("ListenLanguage edge %q missing BCP-47 locale (intent or option)", edge.ID)
 	}
 	c.locale = locale
 	from := c.nodeID
@@ -517,28 +513,79 @@ func matchChoice(edges []flow.Edge, utterance string) (flow.Edge, bool) {
 		if e.Kind != flow.EdgeOption && e.Kind != flow.EdgeIntent {
 			continue
 		}
-		key := normalize(e.Intent)
-		if key == "" {
-			key = normalize(e.Option)
-		}
-		if key == "" {
-			continue
-		}
-		score := 0
-		if u == key {
-			score = 3
-		} else if strings.Contains(u, key) || strings.Contains(key, u) {
-			score = 2
-		}
-		if score > bestScore {
-			bestScore = score
-			best = e
+		for _, key := range edgeMatchKeys(e) {
+			score := 0
+			if u == key {
+				score = 3
+			} else if strings.Contains(u, key) || strings.Contains(key, u) {
+				score = 2
+			}
+			if score > bestScore {
+				bestScore = score
+				best = e
+			}
 		}
 	}
 	if bestScore == 0 {
 		return flow.Edge{}, false
 	}
 	return best, true
+}
+
+// matchLanguage picks a ListenLanguage edge. Match keys are intent and option;
+// locale is the BCP-47 tag (contains '-') among intent/option, preferring intent.
+func matchLanguage(edges []flow.Edge, utterance string) (flow.Edge, string, bool) {
+	edge, ok := matchChoice(edges, utterance)
+	if !ok {
+		return flow.Edge{}, "", false
+	}
+	return edge, localeFromLanguageEdge(edge), true
+}
+
+func edgeMatchKeys(e flow.Edge) []string {
+	seen := map[string]struct{}{}
+	var keys []string
+	for _, raw := range []string{e.Intent, e.Option} {
+		key := normalize(raw)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func localeFromLanguageEdge(e flow.Edge) string {
+	intent := strings.TrimSpace(e.Intent)
+	option := strings.TrimSpace(e.Option)
+	intentTag := looksLikeLocaleTag(intent)
+	optionTag := looksLikeLocaleTag(option)
+	switch {
+	case intentTag:
+		return intent
+	case optionTag:
+		return option
+	case intent != "":
+		return intent
+	default:
+		return option
+	}
+}
+
+func looksLikeLocaleTag(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" || !strings.Contains(s, "-") {
+		return false
+	}
+	// en-IN / hi-IN style — reject free phrases with hyphens.
+	if strings.ContainsAny(s, " \t") {
+		return false
+	}
+	return true
 }
 
 func normalize(s string) string {

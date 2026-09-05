@@ -118,9 +118,24 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | V.1 | [V.1_dual_channel_prove.md](./V.1_dual_channel_prove.md) | **Closed** (7356791) — dual chat+call prove checklist (same pin) |
 | V.2 | — | Optional — lab performance notes |
 
+## Think edge pick (T.*) — LLM allowlisted edges
+
+**L2:** [14_THINK_EDGE_PICK.md](../14_THINK_EDGE_PICK.md) (**Locked** planning).  
+Closes the gap: docs require LLM legal-edge pick; runtime still uses word-guess until T.3. **Do not start L4 until T.0 Closed.**
+
+| Phase | File | Status |
+|---|---|---|
+| T.0 | [T.0_think_edge_inventory.md](./T.0_think_edge_inventory.md) | **Ready** — cage freeze + inventory |
+| T.1 | [T.1_cursor_allowlist_take.md](./T.1_cursor_allowlist_take.md) | **Ready** — allowlist + TakeEdgeID |
+| T.2 | [T.2_edgepick_classifier.md](./T.2_edgepick_classifier.md) | **Ready** — Think JSON classifier |
+| T.3 | [T.3_talk_wire_graph.md](./T.3_talk_wire_graph.md) | **Ready** — runGraphTurn → edgepick |
+| T.4 | [T.4_edgepick_evidence.md](./T.4_edgepick_evidence.md) | **Ready** — audit / evidence |
+| T.5 | [T.5_think_edge_soak.md](./T.5_think_edge_soak.md) | **Ready** — lab soak checklist |
+
 ## Still later
 
 - Owner **runs** A.6 / C.4 / S.4 / V.1 / L.0 / E.6 sign-off on lab (human) — **this is E2E user testing**
+- **T.0→T.5** LLM edge pick (after word-intent desk release)
 - Optional **V.2** lab performance notes
 - Full flow JSON Schema file ([03](../03_BRAIN_AND_GRAPH.md) deferred)
 - Docs/01 Next/Later SKUs (summary, CRM push, QM, …)

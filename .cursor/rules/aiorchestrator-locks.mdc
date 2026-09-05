@@ -5,7 +5,7 @@ alwaysApply: true
 
 # com.coraltele.aiorchestrator locks
 
-- Docs (LLM call centre restart): `docs/README.md` → `docs/01_*.md` … `docs/13_*.md` + `docs/phases/`
+- Docs (LLM call centre restart): `docs/README.md` → `docs/01_*.md` … `docs/14_*.md` + `docs/phases/`
 - Brain: conversation **graph** is law (`docs/03_BRAIN_AND_GRAPH.md`)
 - Live behaviour: turn machine (`docs/04_LIVE_TURN_MACHINE.md`)
 - Planning: `docs/07_PLANNING_STANDARDS.md` — no L4 until owner Locks 09–12 + skills
@@ -14,11 +14,12 @@ alwaysApply: true
 - Coding: `docs/10_CODING_PRINCIPLES.md` (Draft)
 - CI/CD: `docs/11_CI_AND_CD.md` (Draft)
 - L4 roles: `docs/12_AGENTIC_L4_ROLES.md` + `.cursor/skills/aiorchestrator-l4-*` (Draft)
-- Consoles: `docs/13_PRODUCTION_CONSOLES.md` (**Locked**) — Admin full config / Supervisor / Chat; no desk UI resurrect; **U.* + A.* + C.* Closed**; next S.* Supervisor
+- Consoles: `docs/13_PRODUCTION_CONSOLES.md` (**Locked**) — Admin / Supervisor / Chat; **U.* + A.* + C.* + S.* + V.1** Closed; optional V.2
+- Think edge pick: `docs/14_THINK_EDGE_PICK.md` (**Locked** planning) — L3 **T.0–T.5** Ready; no L4 until T.0 Closed
 - Kernel: **Go** only; no Python/Java media kernel
 - Live PCM: in-memory only; no Kafka/Redis for audio
 - Edge: FreeSWITCH `mod_audio_stream` is a dumb PCM pipe
-- Vendors: behind ports/gateways (Sarvam baseline)
+- Vendors: behind ports/gateways (Sarvam baseline); fakes for CI; desk pins Sarvam
 - Tools: transfer/hangup = arm → final TTS → execute once
 - Scope: LLM voice call centre — no caption/translator SKUs in this programme
 - Never commit `.agent/secrets.local.json` or paste credentials into docs/commits

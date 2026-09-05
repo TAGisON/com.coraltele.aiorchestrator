@@ -306,6 +306,51 @@ func TestCursor_ListenLanguage_SetsLocale(t *testing.T) {
 	}
 }
 
+func TestCursor_ListenLanguage_AliasOption(t *testing.T) {
+	raw := []byte(`{
+  "schema_id":"coral.flow.v1",
+  "entry_node_id":"entry",
+  "default_locale":"en-IN",
+  "nodes":[
+    {"id":"entry","type":"Entry"},
+    {"id":"lang","type":"ListenLanguage"},
+    {"id":"welcome","type":"Speak","prompt_ref":"welcome"},
+    {"id":"end","type":"End"}
+  ],
+  "edges":[
+    {"id":"e1","from":"entry","to":"lang","kind":"next"},
+    {"id":"e2","from":"lang","to":"welcome","kind":"intent","intent":"hi-IN","option":"hindi"},
+    {"id":"e3","from":"welcome","to":"end","kind":"next"}
+  ],
+  "prompts":{
+    "welcome":{"en-IN":"Hello","hi-IN":"Namaste"}
+  },
+  "matrix":[],
+  "binding_refs":[]
+}`)
+	doc, err := flow.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := graph.New(doc, "en-IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cur.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	turn, err := cur.HandleUtterance("hindi please")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if turn.Locale != "hi-IN" || cur.Locale() != "hi-IN" {
+		t.Fatalf("locale %#v cursor %s", turn, cur.Locale())
+	}
+	if strings.Join(turn.Lines, " ") != "Namaste" {
+		t.Fatalf("turn %#v", turn)
+	}
+}
+
 func TestCursor_ListenLanguage_BlocksToolSameTurn(t *testing.T) {
 	raw := []byte(`{
   "schema_id":"coral.flow.v1",

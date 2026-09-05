@@ -118,9 +118,10 @@
   }
 
   async function loadCatalogs() {
+    // ListFlows requires tenant_id (empty tenant returns []). Lab default matches Admin pin page.
     const [plist, flist, pinRes] = await Promise.all([
       OrchAPI.listProfiles(),
-      OrchAPI.listFlows(),
+      OrchAPI.listFlows("tenant_id=default"),
       OrchAPI.getAnswerPins().catch(() => ({ pins: [] })),
     ]);
     profiles = (plist && (plist.profiles || plist.items || plist)) || [];
@@ -128,16 +129,13 @@
     flows = (flist && (flist.flows || flist.items || flist)) || [];
     if (!Array.isArray(flows)) flows = [];
     pins = (pinRes && pinRes.pins) || [];
-    fillSelect(
-      el("profile"),
-      profiles.map((p) => p.id || p).filter(Boolean),
-      el("profile").value
-    );
-    fillSelect(
-      el("flow"),
-      flows.map((f) => f.id || f).filter(Boolean),
-      el("flow").value
-    );
+    const profileIds = profiles.map((p) => p.id || p).filter(Boolean);
+    const flowIds = flows.map((f) => f.id || f).filter(Boolean);
+    let preferProfile = el("profile").value;
+    if (!preferProfile && pins.length === 1 && pins[0].profile_id) preferProfile = pins[0].profile_id;
+    if (!preferProfile && profileIds.length === 1) preferProfile = profileIds[0];
+    fillSelect(el("profile"), profileIds, preferProfile);
+    fillSelect(el("flow"), flowIds, el("flow").value);
     applyPinForProfile();
     show(el("start-out"), true, "Loaded " + profiles.length + " profiles, " + flows.length + " flows.");
   }

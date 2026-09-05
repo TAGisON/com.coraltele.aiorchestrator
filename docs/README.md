@@ -1,7 +1,7 @@
 # Coral LLM Call Centre — documentation
 
 **Branch purpose:** Greenfield architecture for an **LLM-based voice call centre** on Coral PABX / FreeSWITCH.  
-**Status:** Architecture locked (01–06). Planning 07–12 Locked. **Doc 13 Locked**. Kernel G.* Closed; consoles **U.* / A.* / C.* / S.* / V.1 Closed**; optional V.2; owner lab soaks = E2E.
+**Status:** Architecture locked (01–06). Planning 07–12 Locked. **Doc 13 Locked**. **Doc 14 Locked** (T.* Ready). Kernel G.* Closed; consoles **U.* / A.* / C.* / S.* / V.1 Closed**; optional V.2; owner lab soaks = E2E.
 
 ## Source of truth (read in order)
 
@@ -20,7 +20,9 @@
 | 11 | [11_CI_AND_CD.md](./11_CI_AND_CD.md) | CI jobs + lab promote CD |
 | 12 | [12_AGENTIC_L4_ROLES.md](./12_AGENTIC_L4_ROLES.md) | Implementer / Reviewer / Summarizer |
 | 13 | [13_PRODUCTION_CONSOLES.md](./13_PRODUCTION_CONSOLES.md) | Admin / Supervisor / User chat (**Locked**) |
-| — | [phases/](./phases/README.md) | L3 catalogs (P/M/E/CI/G/L + **U/A/C/S/V** consoles) |
+| 14 | [14_THINK_EDGE_PICK.md](./14_THINK_EDGE_PICK.md) | LLM allowlisted edge pick (**Locked** planning; L3 **T.*** Ready) |
+| — | [phases/](./phases/README.md) | L3 catalogs (P/M/E/CI/G/L + U/A/C/S/V + **T.***) |
+| — | [releases/](./releases/) | Tagged release notes |
 
 ## Hard engineering rules (unchanged)
 
