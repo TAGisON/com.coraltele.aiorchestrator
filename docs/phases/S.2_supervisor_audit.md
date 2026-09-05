@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `S.2` |
 | **title** | Supervisor: allowlisted audit event browser |
-| **status** | **Closed** |
+| **status** | **Closed** (`c158232`) |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Wave S |
 | **depends_on** | S.1 Closed (`9ac1e73`); P2.4 / E.4 allowlist |
 
