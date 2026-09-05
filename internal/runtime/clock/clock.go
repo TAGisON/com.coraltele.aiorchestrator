@@ -3,6 +3,7 @@ package clock
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type Kind string
 const (
 	Live     Kind = "live"
 	Playback Kind = "playback"
+	Chat     Kind = "chat"
 )
 
 // Scheduler paces feeder/sink work and declares VAD policy.
@@ -102,10 +104,23 @@ func (c *PlaybackClock) Pace(ctx context.Context) error {
 // New returns a scheduler for the named clock kind.
 func New(kind string, frameMs int) Scheduler {
 	switch Kind(kind) {
-	case Playback:
+	case Playback, Chat:
+		// Chat is text-only: same pace/VAD policy as playback (no mic barge).
 		return NewPlayback(frameMs, 0)
+	case Live:
+		return NewLive(frameMs)
 	default:
 		return NewLive(frameMs)
+	}
+}
+
+// ValidKind reports whether kind is a known session clock.
+func ValidKind(kind string) bool {
+	switch Kind(strings.TrimSpace(kind)) {
+	case Live, Playback, Chat:
+		return true
+	default:
+		return false
 	}
 }
 

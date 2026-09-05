@@ -22,6 +22,7 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/flow"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/port"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/profile"
+	sessclock "github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/clock"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/graph"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/observe"
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/store"
@@ -363,10 +364,16 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	if clock == "" {
 		clock = "live"
 	}
+	if !sessclock.ValidKind(clock) {
+		writeError(w, http.StatusBadRequest, CodeBadRequest, "unknown clock", map[string]any{
+			"allowed": []string{string(sessclock.Live), string(sessclock.Playback), string(sessclock.Chat)},
+		})
+		return
+	}
 	flowID := strings.TrimSpace(req.FlowID)
-	if clock == "live" && flowID == "" {
+	if (clock == "live" || clock == "chat") && flowID == "" {
 		writeError(w, http.StatusUnprocessableEntity, CodeFlowPinRequired,
-			"live sessions require flow_id and flow_version pin", map[string]any{
+			"live/chat sessions require flow_id and flow_version pin", map[string]any{
 				"hint": "publish a coral.flow.v1 then pass flow_id / flow_version; use clock=playback for profile-only lab",
 			})
 		return

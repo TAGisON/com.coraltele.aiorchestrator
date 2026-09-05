@@ -73,7 +73,7 @@ type Talk struct {
 	Bus      *bus.Bus
 	Mem      *session.Memory
 	VAD      vad.Detector
-	Clock    string // live | playback
+	Clock    string // live | playback | chat
 	Session  port.SessionID
 	TenantID string
 	Rate     port.SampleRateHz
@@ -273,8 +273,8 @@ func (t *Talk) OnPCM(frame port.PCMFrame) {
 	if t.VAD == nil {
 		return
 	}
-	// Playback: VAD off unless detector still used for sim tests — gate on clock.
-	if t.Clock == "playback" {
+	// Playback / chat: VAD off unless detector still used for sim tests — gate on clock.
+	if t.Clock == "playback" || t.Clock == "chat" {
 		return
 	}
 	dec := t.VAD.Process(frame)
@@ -762,6 +762,15 @@ func (t *Talk) SpeakLine(ctx context.Context, text string) error {
 }
 
 func (t *Talk) speak(ctx context.Context, text string) error {
+	// Text channel: no TTS / PCM (OD-13-7 / C.1). Still mark spoken for echo/transcript path.
+	if t.Clock == "chat" {
+		t.mu.Lock()
+		t.lastSpokenText = strings.TrimSpace(text)
+		t.mu.Unlock()
+		t.setState(Speaking)
+		t.finishSpeakToListening()
+		return nil
+	}
 	speakGW, speakID, err := t.selectSpeak()
 	if err != nil {
 		t.setState(Listening)

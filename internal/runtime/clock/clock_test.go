@@ -8,6 +8,20 @@ import (
 	"github.com/coraltele/com.coraltele.aiorchestrator/internal/runtime/clock"
 )
 
+func TestChat_ValidKindAndNew(t *testing.T) {
+	if !clock.ValidKind("chat") || clock.ValidKind("banana") {
+		t.Fatal("ValidKind")
+	}
+	c := clock.New("chat", 20)
+	if c.Kind() != clock.Playback {
+		// Chat reuses playback scheduler policy (VAD off).
+		t.Fatalf("kind %s", c.Kind())
+	}
+	if c.VADEnabled() {
+		t.Fatal("chat VAD should be off")
+	}
+}
+
 func TestLive_VsPlayback_Policy(t *testing.T) {
 	live := clock.NewLive(20)
 	pb := clock.NewPlayback(20, 0)
