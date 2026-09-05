@@ -4,7 +4,7 @@
 |---|---|
 | **id** | `A.3` |
 | **title** | Admin: flow registry + draft save/load |
-| **status** | **Closed** — Admin flow list/create/draft |
+| **status** | **Closed** (6c85e18) — Admin flow list/create/draft |
 | **parent_plan** | [13_PRODUCTION_CONSOLES.md](../13_PRODUCTION_CONSOLES.md) Admin inventory A.3 |
 | **depends_on** | A.2 Closed (`6b8b882`); G.2 `/v1/flows*` |
 

@@ -103,7 +103,7 @@ Admin = full config (flows create/draft/publish, profiles, engines, bindings, ma
 | U.2 | [U.2_console_shells.md](./U.2_console_shells.md) | **Closed** (60c46ab) — shared client + Admin/Supervisor/Chat shells |
 | A.1 | [A.1_admin_tenant_config.md](./A.1_admin_tenant_config.md) | **Closed** (411eefd) — profiles / engines / credentials / settings |
 | A.2 | [A.2_bindings_http_admin.md](./A.2_bindings_http_admin.md) | **Closed** (6b8b882) — bindings HTTP + Admin CRUD |
-| A.3 | [A.3_admin_flows_draft.md](./A.3_admin_flows_draft.md) | **Closed** — flow list/create/draft |
+| A.3 | [A.3_admin_flows_draft.md](./A.3_admin_flows_draft.md) | **Closed** (6c85e18) — flow list/create/draft |
 | A.4–A.6 | — | Next — graph builder, pin, soak |
 | C.1–C.4 | — | Planned — User chat channel |
 | S.1–S.4 | — | Planned — Supervisor |
