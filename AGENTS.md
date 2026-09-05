@@ -18,7 +18,7 @@ Read in order under `docs/`:
 12. `docs/11_CI_AND_CD.md` — CI/CD plan (**Draft**)  
 13. `docs/12_AGENTIC_L4_ROLES.md` — L4 roles + skills  
 14. `docs/13_PRODUCTION_CONSOLES.md` — Admin / Supervisor / User chat (**Locked**)  
-15. `docs/phases/` — L3 specs (kernel Closed; **U.0–U.2**, **A.1–A.6**, **C.1–C.4**, **S.1–S.3** Closed; S.4 next)  
+15. `docs/phases/` — L3 specs (kernel Closed; **U.0–U.2**, **A.1–A.6**, **C.1–C.4**, **S.1–S.4** Closed; V.1 next)  
 16. `.cursor/skills/aiorchestrator-l4-{implementer,reviewer,summarizer}/` — L4 skills
 
 Older product/architecture docs were removed on branch `docs/llm-callcentre-architecture`. Do not resurrect caption/translator/meeting platform scope into this programme. Do not restore purged desk consoles — rebuild only under doc 13.
