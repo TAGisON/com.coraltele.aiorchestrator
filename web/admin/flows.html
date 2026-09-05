@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flows — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a href="/admin/bindings.html">Bindings</a>
+      <a class="active" href="/admin/flows.html">Flows</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Flows</h1>
+    <p class="lede">Create conversation graphs and edit the draft document. Structured node/edge builder and publish UI land in <strong>A.4</strong>. Draft may be incomplete; publish validates <code>coral.flow.v1</code>.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create flow</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="f-id">Flow id</label>
+          <input id="f-id" type="text" placeholder="e.g. coral-xfer" />
+        </div>
+        <div>
+          <label class="field" for="f-name">Name</label>
+          <input id="f-name" type="text" placeholder="Coral transfer" />
+        </div>
+        <div>
+          <label class="field" for="f-tenant">Tenant</label>
+          <input id="f-tenant" type="text" value="default" />
+        </div>
+        <div>
+          <label class="field" for="f-dir">Direction</label>
+          <select id="f-dir">
+            <option value="inbound" selected>inbound</option>
+            <option value="outbound">outbound</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="create-flow">Create</button>
+        <button type="button" class="btn secondary" id="reload-flows">Reload list</button>
+      </div>
+      <div class="probe" id="create-out"></div>
+      <table class="data" id="flow-table">
+        <thead><tr><th>Id</th><th>Name</th><th>Direction</th><th>Status</th><th>Version</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Draft document</h2>
+      <label class="field" for="draft-id">Flow id</label>
+      <input id="draft-id" type="text" placeholder="Select from list or type id" />
+      <label class="field" for="draft-json">Draft JSON (advanced editor — A.4 adds structured builder)</label>
+      <textarea id="draft-json" spellcheck="false"></textarea>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="load-draft">Load draft</button>
+        <button type="button" class="btn secondary" id="scaffold">Insert empty coral.flow.v1 scaffold</button>
+        <button type="button" class="btn" id="save-draft">Save draft</button>
+      </div>
+      <div class="probe" id="draft-out"></div>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+
+    const EMPTY_DOC = {
+      schema_id: "coral.flow.v1",
+      entry_node_id: "",
+      default_locale: "en-IN",
+      nodes: [],
+      edges: [],
+      prompts: {},
+      matrix: [],
+      binding_refs: []
+    };
+
+    async function loadFlows() {
+      const out = document.getElementById("create-out");
+      const tbody = document.querySelector("#flow-table tbody");
+      try {
+        const tenant = document.getElementById("f-tenant").value.trim();
+        const qs = tenant ? "tenant_id=" + encodeURIComponent(tenant) : "";
+        const data = await OrchAPI.listFlows(qs);
+        tbody.innerHTML = "";
+        (data.flows || []).forEach((f) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td><a href='#' data-id='" + f.id + "'>" + f.id + "</a></td>" +
+            "<td>" + (f.name || "") + "</td>" +
+            "<td>" + (f.direction || "") + "</td>" +
+            "<td>" + (f.status || "") + "</td>" +
+            "<td>" + (f.current_version || 0) + "</td>";
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll("a[data-id]").forEach((a) => {
+          a.onclick = (ev) => {
+            ev.preventDefault();
+            document.getElementById("draft-id").value = a.getAttribute("data-id");
+            document.getElementById("load-draft").click();
+          };
+        });
+        if (!(data.flows || []).length) tbody.innerHTML = "<tr><td colspan='5'>No flows</td></tr>";
+        AdminUI.showStatus(out, true, "Listed " + (data.flows || []).length);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    }
+
+    document.getElementById("create-flow").onclick = async () => {
+      const out = document.getElementById("create-out");
+      const id = document.getElementById("f-id").value.trim();
+      const dir = document.getElementById("f-dir").value;
+      if (!id) {
+        AdminUI.showStatus(out, false, "id required");
+        return;
+      }
+      if (dir !== "inbound" && dir !== "outbound") {
+        AdminUI.showStatus(out, false, "direction must be inbound or outbound");
+        return;
+      }
+      try {
+        await OrchAPI.createFlow({
+          id: id,
+          name: document.getElementById("f-name").value.trim() || id,
+          tenant_id: document.getElementById("f-tenant").value.trim() || "default",
+          direction: dir,
+          doc: EMPTY_DOC,
+        });
+        document.getElementById("draft-id").value = id;
+        document.getElementById("draft-json").value = JSON.stringify(EMPTY_DOC, null, 2);
+        AdminUI.showStatus(out, true, "Created " + id);
+        await loadFlows();
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("load-draft").onclick = async () => {
+      const out = document.getElementById("draft-out");
+      const id = document.getElementById("draft-id").value.trim();
+      if (!id) {
+        AdminUI.showStatus(out, false, "flow id required");
+        return;
+      }
+      try {
+        const d = await OrchAPI.getFlowDraft(id);
+        document.getElementById("draft-json").value = JSON.stringify(d.doc, null, 2);
+        AdminUI.showStatus(out, true, "Loaded draft for " + id + (d.updated_at ? " @ " + d.updated_at : ""));
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("scaffold").onclick = () => {
+      document.getElementById("draft-json").value = JSON.stringify(EMPTY_DOC, null, 2);
+      AdminUI.showStatus(document.getElementById("draft-out"), true, "Scaffold inserted (not saved)");
+    };
+
+    document.getElementById("save-draft").onclick = async () => {
+      const out = document.getElementById("draft-out");
+      const id = document.getElementById("draft-id").value.trim();
+      const raw = document.getElementById("draft-json").value;
+      if (!id) {
+        AdminUI.showStatus(out, false, "flow id required");
+        return;
+      }
+      let doc;
+      try {
+        doc = JSON.parse(raw);
+      } catch (e) {
+        AdminUI.showStatus(out, false, "invalid JSON: " + e.message);
+        return;
+      }
+      if (doc.schema_id && doc.schema_id !== "coral.flow.v1") {
+        AdminUI.showStatus(out, false, "schema_id must be coral.flow.v1 (or omit until publish)");
+        return;
+      }
+      try {
+        const d = await OrchAPI.putFlowDraft(id, doc);
+        document.getElementById("draft-json").value = JSON.stringify(d.doc, null, 2);
+        AdminUI.showStatus(out, true, "Draft saved for " + id);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("reload-flows").onclick = loadFlows;
+    document.getElementById("draft-json").value = JSON.stringify(EMPTY_DOC, null, 2);
+    loadFlows();
+  </script>
+</body>
+</html>

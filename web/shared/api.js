@@ -89,6 +89,16 @@
     listBindings: (qs) => request("GET", "/v1/bindings" + (qs ? "?" + qs : "")),
     getBinding: (id) => request("GET", "/v1/bindings/" + encodeURIComponent(id)),
     putBinding: (id, body) => request("PUT", "/v1/bindings/" + encodeURIComponent(id), body),
+    listFlows: (qs) => request("GET", "/v1/flows" + (qs ? "?" + qs : "")),
+    getFlow: (id) => request("GET", "/v1/flows/" + encodeURIComponent(id)),
+    createFlow: (body) => request("POST", "/v1/flows", body),
+    getFlowDraft: (id) => request("GET", "/v1/flows/" + encodeURIComponent(id) + "/draft"),
+    putFlowDraft: (id, doc) =>
+      request("PUT", "/v1/flows/" + encodeURIComponent(id) + "/draft", typeof doc === "string" ? doc : JSON.stringify(doc)),
+    publishFlow: (id, doc) =>
+      request("POST", "/v1/flows/" + encodeURIComponent(id) + "/versions", typeof doc === "string" ? doc : JSON.stringify(doc)),
+    getFlowVersion: (id, ver) =>
+      request("GET", "/v1/flows/" + encodeURIComponent(id) + "/versions/" + encodeURIComponent(String(ver))),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>
