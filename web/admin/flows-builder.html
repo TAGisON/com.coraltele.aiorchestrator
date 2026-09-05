@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flow builder — Admin</title>
+  <link rel="stylesheet" href="/shared/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="shell-nav">
+      <a class="brand" href="/">AiOrchestrator</a>
+      <span class="role">Admin</span>
+      <a href="/supervisor/">Supervisor</a>
+      <a href="/chat/">Chat</a>
+    </nav>
+    <nav class="subnav">
+      <a href="/admin/">Hub</a>
+      <a href="/admin/engines.html">Engines</a>
+      <a href="/admin/profiles.html">Profiles</a>
+      <a href="/admin/bindings.html">Bindings</a>
+      <a href="/admin/flows.html">Flows</a>
+      <a class="active" href="/admin/flows-builder.html">Builder</a>
+      <a href="/admin/settings.html">Settings</a>
+    </nav>
+    <h1>Graph builder</h1>
+    <p class="lede">Structured <code>coral.flow.v1</code> editor. Node types, edge kinds, tools, matrix actions, and dispositions come from the server catalog — publish still validates on the server.</p>
+
+    <div class="card">
+      <h2>API token</h2>
+      <div class="token-row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+        <button type="button" class="btn secondary" id="save-token">Save</button>
+      </div>
+      <div class="probe" id="token-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Flow</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="flow-id">Flow id</label>
+          <input id="flow-id" type="text" placeholder="existing flow id" />
+        </div>
+        <div>
+          <label class="field" for="entry">entry_node_id</label>
+          <select id="entry"></select>
+        </div>
+        <div>
+          <label class="field" for="locale">default_locale</label>
+          <input id="locale" type="text" value="en-IN" />
+        </div>
+      </div>
+      <label class="field" for="binding-refs">binding_refs (comma-separated ids)</label>
+      <input id="binding-refs" type="text" list="binding-refs-list" placeholder="lab-faq" />
+      <datalist id="binding-refs-list"></datalist>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="load-draft">Load draft</button>
+        <button type="button" class="btn" id="save-draft">Save draft</button>
+        <button type="button" class="btn" id="publish">Publish version</button>
+      </div>
+      <div class="probe" id="flow-out"></div>
+    </div>
+
+    <div class="card">
+      <h2>Nodes</h2>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="add-node">Add node</button>
+      </div>
+      <div id="nodes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Edges</h2>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="add-edge">Add edge</button>
+      </div>
+      <div id="edges"></div>
+    </div>
+
+    <div class="card">
+      <h2>Prompts</h2>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="add-prompt">Add prompt</button>
+      </div>
+      <div id="prompts"></div>
+    </div>
+
+    <div class="card">
+      <h2>Routing matrix</h2>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="add-matrix">Add matrix row</button>
+      </div>
+      <div id="matrix"></div>
+    </div>
+
+    <div class="card">
+      <h2>Inspect published version</h2>
+      <div class="field-row">
+        <div>
+          <label class="field" for="ver">Version</label>
+          <input id="ver" type="number" min="1" value="1" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="load-ver">Load version into builder</button>
+      </div>
+      <div class="probe" id="ver-out"></div>
+      <textarea id="ver-json" readonly spellcheck="false" placeholder="Published doc JSON appears here"></textarea>
+    </div>
+  </div>
+  <script src="/shared/api.js"></script>
+  <script src="/admin/admin.js"></script>
+  <script src="/admin/flow-builder.js"></script>
+  <script>
+    AdminUI.bindTokenForm();
+    let catalog = null;
+    let doc = FlowBuilder.emptyDoc();
+    let suppressMeta = false;
+
+    function readMetaIntoDoc() {
+      if (suppressMeta) return;
+      doc.schema_id = "coral.flow.v1";
+      doc.entry_node_id = document.getElementById("entry").value;
+      doc.default_locale = document.getElementById("locale").value.trim() || "en-IN";
+      doc.binding_refs = document
+        .getElementById("binding-refs")
+        .value.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function writeMetaFromDoc() {
+      suppressMeta = true;
+      document.getElementById("locale").value = doc.default_locale || "en-IN";
+      document.getElementById("binding-refs").value = (doc.binding_refs || []).join(", ");
+      AdminUI.fillSelect(document.getElementById("entry"), FlowBuilder.nodeIds(doc), doc.entry_node_id || "");
+      suppressMeta = false;
+    }
+
+    function rerender(full) {
+      readMetaIntoDoc();
+      FlowBuilder.ensureArrays(doc);
+      if (full) {
+        FlowBuilder.renderNodes(doc, catalog, document.getElementById("nodes"), rerender);
+        FlowBuilder.renderEdges(doc, catalog, document.getElementById("edges"), rerender);
+        FlowBuilder.renderMatrix(doc, catalog, document.getElementById("matrix"), rerender);
+        FlowBuilder.renderPrompts(doc, document.getElementById("prompts"), rerender);
+      }
+      writeMetaFromDoc();
+    }
+
+    async function boot() {
+      catalog = await OrchAPI.catalog();
+      try {
+        const tenant = "default";
+        const data = await OrchAPI.listBindings("tenant_id=" + encodeURIComponent(tenant));
+        const dl = document.getElementById("binding-refs-list");
+        dl.innerHTML = "";
+        (data.bindings || []).forEach((b) => {
+          const opt = document.createElement("option");
+          opt.value = b.id;
+          dl.appendChild(opt);
+        });
+      } catch (_) {}
+      const params = new URLSearchParams(location.search);
+      const fid = params.get("flow") || "";
+      if (fid) document.getElementById("flow-id").value = fid;
+      rerender(true);
+      if (fid) document.getElementById("load-draft").click();
+    }
+
+    document.getElementById("add-node").onclick = () => {
+      readMetaIntoDoc();
+      const n = { id: "node_" + (doc.nodes.length + 1), type: "Speak" };
+      doc.nodes.push(n);
+      rerender(true);
+    };
+    document.getElementById("add-edge").onclick = () => {
+      readMetaIntoDoc();
+      const ids = FlowBuilder.nodeIds(doc);
+      doc.edges.push({
+        id: "edge_" + (doc.edges.length + 1),
+        kind: "next",
+        from: ids[0] || "",
+        to: ids[1] || ids[0] || "",
+      });
+      rerender(true);
+    };
+    document.getElementById("add-matrix").onclick = () => {
+      readMetaIntoDoc();
+      doc.matrix.push({
+        intent: "sales",
+        owner: "Sales",
+        target: "sales-q",
+        number: "1001",
+        action: "transfer",
+        disposition_code: "transferred_sales",
+      });
+      rerender(true);
+    };
+    document.getElementById("add-prompt").onclick = () => {
+      readMetaIntoDoc();
+      let key = "prompt_" + (Object.keys(doc.prompts).length + 1);
+      doc.prompts[key] = { "en-IN": "" };
+      rerender(true);
+    };
+
+    document.getElementById("entry").onchange = () => readMetaIntoDoc();
+    document.getElementById("locale").onchange = () => readMetaIntoDoc();
+    document.getElementById("binding-refs").onchange = () => readMetaIntoDoc();
+
+    document.getElementById("load-draft").onclick = async () => {
+      const out = document.getElementById("flow-out");
+      const id = document.getElementById("flow-id").value.trim();
+      if (!id) {
+        AdminUI.showStatus(out, false, "flow id required");
+        return;
+      }
+      try {
+        const d = await OrchAPI.getFlowDraft(id);
+        doc = FlowBuilder.ensureArrays(d.doc || FlowBuilder.emptyDoc());
+        rerender(true);
+        AdminUI.showStatus(out, true, "Draft loaded for " + id);
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("save-draft").onclick = async () => {
+      const out = document.getElementById("flow-out");
+      const id = document.getElementById("flow-id").value.trim();
+      readMetaIntoDoc();
+      if (!id) {
+        AdminUI.showStatus(out, false, "flow id required — create on Flows page first");
+        return;
+      }
+      try {
+        await OrchAPI.putFlowDraft(id, doc);
+        AdminUI.showStatus(out, true, "Draft saved");
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    document.getElementById("publish").onclick = async () => {
+      const out = document.getElementById("flow-out");
+      const id = document.getElementById("flow-id").value.trim();
+      readMetaIntoDoc();
+      if (!id) {
+        AdminUI.showStatus(out, false, "flow id required");
+        return;
+      }
+      try {
+        await OrchAPI.putFlowDraft(id, doc);
+        const got = await OrchAPI.publishFlow(id, doc);
+        AdminUI.showStatus(out, true, "Published version " + got.version + " hash=" + (got.content_hash || "").slice(0, 12));
+        document.getElementById("ver").value = got.version;
+      } catch (e) {
+        let extra = "";
+        if (e.data && e.data.error && e.data.error.details) extra = " " + JSON.stringify(e.data.error.details);
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message + extra);
+      }
+    };
+
+    document.getElementById("load-ver").onclick = async () => {
+      const out = document.getElementById("ver-out");
+      const id = document.getElementById("flow-id").value.trim();
+      const ver = document.getElementById("ver").value;
+      if (!id || !ver) {
+        AdminUI.showStatus(out, false, "flow id and version required");
+        return;
+      }
+      try {
+        const fv = await OrchAPI.getFlowVersion(id, ver);
+        document.getElementById("ver-json").value = JSON.stringify(fv.doc, null, 2);
+        doc = FlowBuilder.ensureArrays(FlowBuilder.clone(fv.doc));
+        rerender(true);
+        AdminUI.showStatus(out, true, "Loaded version " + fv.version + " into builder (edit then save as new draft/publish)");
+      } catch (e) {
+        AdminUI.showStatus(out, false, (e.status || "") + " " + e.message);
+      }
+    };
+
+    boot().catch((e) => AdminUI.showStatus(document.getElementById("flow-out"), false, e.message));
+  </script>
+</body>
+</html>

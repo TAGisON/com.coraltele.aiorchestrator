@@ -20,10 +20,11 @@
       <a href="/admin/profiles.html">Profiles</a>
       <a href="/admin/bindings.html">Bindings</a>
       <a class="active" href="/admin/flows.html">Flows</a>
+      <a href="/admin/flows-builder.html">Builder</a>
       <a href="/admin/settings.html">Settings</a>
     </nav>
     <h1>Flows</h1>
-    <p class="lede">Create conversation graphs and edit the draft document. Structured node/edge builder and publish UI land in <strong>A.4</strong>. Draft may be incomplete; publish validates <code>coral.flow.v1</code>.</p>
+    <p class="lede">Create conversation graphs and edit the draft document. Use the <a href="/admin/flows-builder.html">structured builder</a> for nodes/edges/matrix (A.4), or the JSON editor below as an advanced escape hatch.</p>
 
     <div class="card">
       <h2>API token</h2>
@@ -60,6 +61,7 @@
       <div class="actions">
         <button type="button" class="btn" id="create-flow">Create</button>
         <button type="button" class="btn secondary" id="reload-flows">Reload list</button>
+        <a class="btn secondary" href="/admin/flows-builder.html" id="open-builder">Open builder</a>
       </div>
       <div class="probe" id="create-out"></div>
       <table class="data" id="flow-table">
@@ -119,7 +121,9 @@
         tbody.querySelectorAll("a[data-id]").forEach((a) => {
           a.onclick = (ev) => {
             ev.preventDefault();
-            document.getElementById("draft-id").value = a.getAttribute("data-id");
+            const id = a.getAttribute("data-id");
+            document.getElementById("draft-id").value = id;
+            document.getElementById("open-builder").href = "/admin/flows-builder.html?flow=" + encodeURIComponent(id);
             document.getElementById("load-draft").click();
           };
         });
