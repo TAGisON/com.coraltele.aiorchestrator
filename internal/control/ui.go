@@ -33,6 +33,7 @@ func (s *Server) mountUIRoutes(uiFS fs.FS) {
 	s.mux.HandleFunc("GET /v1/sessions", s.handleListSessions)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/audit", s.handleSessionAudit)
 	s.mux.HandleFunc("GET /v1/sessions/{id}/analytics", s.handleSessionAnalytics)
+	s.mux.HandleFunc("GET /v1/analytics/summary", s.handleAnalyticsSummary)
 	s.mux.HandleFunc("GET /v1/gateways", s.handleListGateways)
 	s.mux.HandleFunc("GET /v1/platform/status", s.handlePlatformStatus)
 

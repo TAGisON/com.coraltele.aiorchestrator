@@ -1,4 +1,4 @@
-/* Supervisor console (S.1/S.2) — read-only session list, detail, audit browser. */
+/* Supervisor console (S.1–S.3) — sessions, audit, light aggregates. */
 (function () {
   let selectedId = "";
   let auditEvents = [];
@@ -157,6 +157,11 @@
     renderList(data.sessions || []);
   }
 
+  async function refreshSummary() {
+    const data = await OrchAPI.analyticsSummary("limit=100");
+    show(el("summary-agg-out"), true, JSON.stringify(data, null, 2));
+  }
+
   function recMetaLines(s) {
     const lines = [];
     lines.push("recording_ref: " + (s.recording_ref || "(none)"));
@@ -167,6 +172,21 @@
     return lines.join("\n");
   }
 
+  function renderSessionAnalytics(evs) {
+    if (!evs || !evs.length) {
+      show(el("analytics-out"), true, "No analytics events.");
+      return;
+    }
+    const lines = evs.map(
+      (e) =>
+        (e.metric || "?") +
+        "=" +
+        e.value +
+        (e.created_at ? " @ " + e.created_at : "")
+    );
+    show(el("analytics-out"), true, lines.join("\n"));
+  }
+
   async function openDetail(id) {
     selectedId = id;
     el("detail-card").hidden = false;
@@ -174,7 +194,7 @@
     el("detail-err").textContent = "";
     el("detail-err").className = "probe";
     try {
-      const [sess, tr, disp, audit] = await Promise.all([
+      const [sess, tr, disp, audit, analytics] = await Promise.all([
         OrchAPI.getSession(id),
         OrchAPI.getTranscript(id),
         OrchAPI.getDisposition(id).catch((e) => {
@@ -182,6 +202,7 @@
           throw e;
         }),
         OrchAPI.getAudit(id),
+        OrchAPI.getAnalytics(id),
       ]);
       const summary = {
         session_id: sess.session_id,
@@ -212,6 +233,7 @@
       show(el("rec-out"), true, recMetaLines(sess));
       auditEvents = audit.audit_events || [];
       renderAudit();
+      renderSessionAnalytics(analytics.analytics_events || []);
       renderTurns(tr.turns || []);
       await refreshList();
     } catch (e) {
@@ -238,6 +260,8 @@
     };
     el("btn-refresh").onclick = () =>
       refreshList().catch((e) => show(el("list-out"), false, e.message || String(e)));
+    el("btn-summary").onclick = () =>
+      refreshSummary().catch((e) => show(el("summary-agg-out"), false, e.message || String(e)));
     el("btn-reload-detail").onclick = () => {
       if (selectedId) openDetail(selectedId);
     };
@@ -245,5 +269,7 @@
   }
 
   bind();
-  loadCatalog().then(() => refreshList()).catch((e) => show(el("list-out"), false, e.message || String(e)));
+  loadCatalog()
+    .then(() => Promise.all([refreshList(), refreshSummary()]))
+    .catch((e) => show(el("list-out"), false, e.message || String(e)));
 })();

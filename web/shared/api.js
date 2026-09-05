@@ -116,6 +116,9 @@
     listSessions: (qs) => request("GET", "/v1/sessions" + (qs ? "?" + qs : "")),
     getAudit: (id) =>
       request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/audit"),
+    getAnalytics: (id) =>
+      request("GET", "/v1/sessions/" + encodeURIComponent(id) + "/analytics"),
+    analyticsSummary: (qs) => request("GET", "/v1/analytics/summary" + (qs ? "?" + qs : "")),
     listProfiles: () => request("GET", "/v1/profiles"),
     createProfile: (body) => request("POST", "/v1/profiles", body),
     getProfileVersion: (id, ver) =>
