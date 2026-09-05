@@ -55,7 +55,7 @@ Evidence: `.agent/work/P1.*` (local)
 |---|---|---|
 | E.0 | [E.0_evidence_inventory.md](./E.0_evidence_inventory.md) | **Closed** (`92643ca`) — gap list |
 | E.1 | [E.1_transcript_emitter.md](./E.1_transcript_emitter.md) | **Closed** (e6dc674) |
-| E.2 | [E.2_recording_lifecycle.md](./E.2_recording_lifecycle.md) | **Closed** ($sha) — start/stop stamps |
+| E.2 | [E.2_recording_lifecycle.md](./E.2_recording_lifecycle.md) | **Closed** (4c6418a) — start/stop stamps | **Closed** ($sha) — start/stop stamps |
 | E.3–E.6 | per [09](../09_EVIDENCE_AND_RECORDING.md) | Not started |
 
 ## CI / CD (CI.*)
