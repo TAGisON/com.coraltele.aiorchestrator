@@ -195,3 +195,148 @@ func TestCursor_TransferMissingMatrix_FailClosed(t *testing.T) {
 		t.Fatal("expected validate reject for transfer without matrix row")
 	}
 }
+
+func repairDoc(t *testing.T) *flow.Document {
+	t.Helper()
+	raw := []byte(`{
+  "schema_id":"coral.flow.v1",
+  "entry_node_id":"entry",
+  "default_locale":"en-IN",
+  "nodes":[
+    {"id":"entry","type":"Entry"},
+    {"id":"choice","type":"ListenChoice","prompt_ref":"ask","repair":{"max_retries":1,"unclear_prompt_ref":"repair_unclear"}},
+    {"id":"hang","type":"Tool","tool":"hangup","prompt_ref":"closing_hangup"},
+    {"id":"bye","type":"Speak","prompt_ref":"bye"},
+    {"id":"end","type":"End"}
+  ],
+  "edges":[
+    {"id":"e1","from":"entry","to":"choice","kind":"next"},
+    {"id":"e2","from":"choice","to":"bye","kind":"intent","intent":"ok"},
+    {"id":"e3","from":"choice","to":"hang","kind":"repair"},
+    {"id":"e4","from":"bye","to":"end","kind":"next"}
+  ],
+  "prompts":{
+    "ask":{"en-IN":"Say ok"},
+    "repair_unclear":{"en-IN":"Please say ok"},
+    "closing_hangup":{"en-IN":"Goodbye"},
+    "bye":{"en-IN":"Thanks"}
+  },
+  "matrix":[],
+  "binding_refs":[]
+}`)
+	doc, err := flow.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := flow.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+	return doc
+}
+
+func TestCursor_RepairThenExhaust(t *testing.T) {
+	cur, err := graph.New(repairDoc(t), "en-IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cur.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	r1, err := cur.HandleUtterance("nonsense")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r1.Repair || r1.Lines[0] != "Please say ok" || cur.NodeID() != "choice" {
+		t.Fatalf("repair1 %#v node %s", r1, cur.NodeID())
+	}
+	r2, err := cur.HandleUtterance("still wrong")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Armed == nil || r2.Armed.Kind != "hangup" {
+		t.Fatalf("exhaust %#v", r2)
+	}
+	if strings.Join(r2.Lines, " ") != "Goodbye" {
+		t.Fatalf("lines %#v", r2.Lines)
+	}
+}
+
+func TestCursor_ListenLanguage_SetsLocale(t *testing.T) {
+	raw := []byte(`{
+  "schema_id":"coral.flow.v1",
+  "entry_node_id":"entry",
+  "default_locale":"en-IN",
+  "nodes":[
+    {"id":"entry","type":"Entry"},
+    {"id":"lang","type":"ListenLanguage"},
+    {"id":"welcome","type":"Speak","prompt_ref":"welcome"},
+    {"id":"end","type":"End"}
+  ],
+  "edges":[
+    {"id":"e1","from":"entry","to":"lang","kind":"next"},
+    {"id":"e2","from":"lang","to":"welcome","kind":"option","option":"hi-IN"},
+    {"id":"e3","from":"welcome","to":"end","kind":"next"}
+  ],
+  "prompts":{
+    "welcome":{"en-IN":"Hello","hi-IN":"Namaste"}
+  },
+  "matrix":[],
+  "binding_refs":[]
+}`)
+	doc, err := flow.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := graph.New(doc, "en-IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cur.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	turn, err := cur.HandleUtterance("hi-IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if turn.Locale != "hi-IN" || cur.Locale() != "hi-IN" {
+		t.Fatalf("locale %#v cursor %s", turn, cur.Locale())
+	}
+	if !turn.Ended || strings.Join(turn.Lines, " ") != "Namaste" {
+		t.Fatalf("turn %#v", turn)
+	}
+}
+
+func TestCursor_ListenLanguage_BlocksToolSameTurn(t *testing.T) {
+	raw := []byte(`{
+  "schema_id":"coral.flow.v1",
+  "entry_node_id":"entry",
+  "default_locale":"en-IN",
+  "nodes":[
+    {"id":"entry","type":"Entry"},
+    {"id":"lang","type":"ListenLanguage"},
+    {"id":"hang","type":"Tool","tool":"hangup"}
+  ],
+  "edges":[
+    {"id":"e1","from":"entry","to":"lang","kind":"next"},
+    {"id":"e2","from":"lang","to":"hang","kind":"option","option":"en-IN"}
+  ],
+  "prompts":{},
+  "matrix":[],
+  "binding_refs":[]
+}`)
+	doc, err := flow.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := graph.New(doc, "en-IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cur.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = cur.HandleUtterance("en-IN")
+	if err == nil || !strings.Contains(err.Error(), "EC-23") {
+		t.Fatalf("want EC-23, got %v", err)
+	}
+}

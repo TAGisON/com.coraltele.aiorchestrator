@@ -594,6 +594,13 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 		t.emitTurn(ctx, userText, "", res, false, "no_match", started)
 		return nil
 	}
+	if turn.Locale != "" && t.Actor != nil {
+		t.Actor.SwitchActiveLanguage(turn.Locale)
+		t.Graph.SetLocale(turn.Locale)
+	}
+	if turn.Repair {
+		res.Action = "repair"
+	}
 	if turn.Armed != nil {
 		t.ConfigureBarge(false, 0)
 		res.Action = "tool_" + turn.Armed.Kind
@@ -619,6 +626,9 @@ func (t *Talk) runGraphTurn(ctx, thinkCtx context.Context, userText string, star
 	}
 	if turn.Ended {
 		outcome = "end"
+	}
+	if turn.Repair {
+		outcome = "repair"
 	}
 	t.mu.Lock()
 	t.lastActivity = time.Now()

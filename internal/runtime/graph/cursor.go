@@ -12,12 +12,14 @@ import (
 
 // Turn is one cursor step result for the Talk shell.
 type Turn struct {
-	Lines   []string // texts to Speak in order (includes Tool closing line)
-	Ended   bool     // landed on End (after speaking Lines)
-	NoMatch bool     // ListenChoice had no legal edge for utterance
-	NodeID  string   // cursor after this turn
-	EdgeID  string   // edge taken this turn (if any)
-	Armed   *ArmedTool
+	Lines    []string // texts to Speak in order (includes Tool closing line)
+	Ended    bool     // landed on End (after speaking Lines)
+	NoMatch  bool     // ListenChoice had no legal edge and no repair policy
+	Repair   bool     // unclear reprompt; cursor stays on listen node
+	Locale   string   // set when ListenLanguage matched (BCP-47)
+	NodeID   string   // cursor after this turn
+	EdgeID   string   // edge taken this turn (if any)
+	Armed    *ArmedTool
 }
 
 // ArmedTool is a frozen irreversible action ready for arm→speak→exec (G.4).
@@ -33,14 +35,16 @@ type ArmedTool struct {
 
 // Cursor sits on exactly one node of a published flow document.
 type Cursor struct {
-	mu       sync.Mutex
-	doc      *flow.Document
-	nodeID   string
-	locale   string // active language hint; resolve falls back to default_locale
-	nodes    map[string]flow.Node
-	edges    []flow.Edge
-	lastEdge flow.Edge
-	armed    bool // Tool already armed this cursor lifetime (exec once)
+	mu        sync.Mutex
+	doc       *flow.Document
+	nodeID    string
+	locale    string // active language hint; resolve falls back to default_locale
+	nodes     map[string]flow.Node
+	edges     []flow.Edge
+	lastEdge  flow.Edge
+	armed     bool           // Tool already armed this cursor lifetime (exec once)
+	retries   map[string]int // per listen-node unclear counts
+	blockTool bool           // EC-23: set during ListenLanguage same-turn advance
 }
 
 // New builds a cursor at entry_node_id.
@@ -60,13 +64,21 @@ func New(doc *flow.Document, locale string) (*Cursor, error) {
 		loc = doc.DefaultLocale
 	}
 	c := &Cursor{
-		doc:    doc,
-		nodeID: doc.EntryNodeID,
-		locale: loc,
-		nodes:  nodes,
-		edges:  append([]flow.Edge(nil), doc.Edges...),
+		doc:     doc,
+		nodeID:  doc.EntryNodeID,
+		locale:  loc,
+		nodes:   nodes,
+		edges:   append([]flow.Edge(nil), doc.Edges...),
+		retries: make(map[string]int),
 	}
 	return c, nil
+}
+
+// Locale returns the cursor's active prompt locale.
+func (c *Cursor) Locale() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.locale
 }
 
 // SetLocale updates prompt resolution language (ListenLanguage / prefs).
@@ -93,8 +105,9 @@ func (c *Cursor) Bootstrap() (Turn, error) {
 	return c.advanceSilentLocked()
 }
 
-// HandleUtterance matches a ListenChoice utterance to an option/intent edge,
+// HandleUtterance matches a listen-node utterance to an option/intent edge,
 // then auto-advances Speak/`next` until the next wait or terminal node.
+// Unclear → repair policy; ListenLanguage sets locale (never Tool same turn).
 func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -102,13 +115,22 @@ func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	if !ok {
 		return Turn{}, fmt.Errorf("cursor on unknown node %q", c.nodeID)
 	}
-	if n.Type != flow.NodeListenChoice {
-		return Turn{}, fmt.Errorf("utterance only valid on ListenChoice (at %s/%s)", n.ID, n.Type)
+	switch n.Type {
+	case flow.NodeListenChoice:
+		return c.handleChoiceLocked(n, text)
+	case flow.NodeListenLanguage:
+		return c.handleLanguageLocked(n, text)
+	default:
+		return Turn{}, fmt.Errorf("utterance only valid on ListenChoice/ListenLanguage (at %s/%s)", n.ID, n.Type)
 	}
+}
+
+func (c *Cursor) handleChoiceLocked(n flow.Node, text string) (Turn, error) {
 	edge, ok := matchChoice(c.outEdgesLocked(c.nodeID), text)
 	if !ok {
-		return Turn{NoMatch: true, NodeID: c.nodeID}, nil
+		return c.repairLocked(n)
 	}
+	c.retries[n.ID] = 0
 	if err := c.takeLocked(edge); err != nil {
 		return Turn{}, err
 	}
@@ -117,6 +139,40 @@ func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	if err != nil {
 		return Turn{}, err
 	}
+	mergeAdvance(&turn, rest)
+	return turn, nil
+}
+
+func (c *Cursor) handleLanguageLocked(n flow.Node, text string) (Turn, error) {
+	edge, ok := matchChoice(c.outEdgesLocked(c.nodeID), text)
+	if !ok {
+		return c.repairLocked(n)
+	}
+	c.retries[n.ID] = 0
+	locale := strings.TrimSpace(edge.Intent)
+	if locale == "" {
+		locale = strings.TrimSpace(edge.Option)
+	}
+	if locale == "" {
+		return Turn{}, fmt.Errorf("ListenLanguage edge %q missing intent/option locale", edge.ID)
+	}
+	c.locale = locale
+	if err := c.takeLocked(edge); err != nil {
+		return Turn{}, err
+	}
+	turn := Turn{EdgeID: edge.ID, NodeID: c.nodeID, Locale: locale}
+	c.blockTool = true
+	defer func() { c.blockTool = false }()
+	rest, err := c.advanceSilentLocked()
+	if err != nil {
+		return Turn{}, err
+	}
+	mergeAdvance(&turn, rest)
+	turn.Locale = locale
+	return turn, nil
+}
+
+func mergeAdvance(turn *Turn, rest Turn) {
 	turn.Lines = rest.Lines
 	turn.Ended = rest.Ended
 	turn.Armed = rest.Armed
@@ -124,7 +180,65 @@ func (c *Cursor) HandleUtterance(text string) (Turn, error) {
 	if turn.EdgeID == "" {
 		turn.EdgeID = rest.EdgeID
 	}
+}
+
+func (c *Cursor) repairLocked(n flow.Node) (Turn, error) {
+	pol, has, err := flow.ParseRepair(n.Repair)
+	if err != nil {
+		return Turn{}, fmt.Errorf("node %s repair: %w", n.ID, err)
+	}
+	if !has {
+		return Turn{NoMatch: true, NodeID: c.nodeID}, nil
+	}
+	c.retries[n.ID]++
+	max := pol.EffectiveMaxRetries()
+	if c.retries[n.ID] <= max {
+		ref := strings.TrimSpace(pol.UnclearPromptRef)
+		if ref == "" {
+			ref = strings.TrimSpace(n.PromptRef)
+		}
+		line, err := c.resolvePromptLocked(ref)
+		if err != nil {
+			return Turn{}, err
+		}
+		var lines []string
+		if line != "" {
+			lines = []string{line}
+		}
+		return Turn{Repair: true, Lines: lines, NodeID: c.nodeID}, nil
+	}
+	// Exhausted → drawn repair edge.
+	e, err := soleRepair(c.outEdgesLocked(c.nodeID))
+	if err != nil {
+		return Turn{}, fmt.Errorf("node %s repair exhausted: %w", n.ID, err)
+	}
+	c.retries[n.ID] = 0
+	if err := c.takeLocked(e); err != nil {
+		return Turn{}, err
+	}
+	turn := Turn{EdgeID: e.ID, NodeID: c.nodeID}
+	rest, err := c.advanceSilentLocked()
+	if err != nil {
+		return Turn{}, err
+	}
+	mergeAdvance(&turn, rest)
 	return turn, nil
+}
+
+func soleRepair(edges []flow.Edge) (flow.Edge, error) {
+	var repairs []flow.Edge
+	for _, e := range edges {
+		if e.Kind == flow.EdgeRepair {
+			repairs = append(repairs, e)
+		}
+	}
+	if len(repairs) == 0 {
+		return flow.Edge{}, fmt.Errorf("no repair edge drawn for on_exhausted")
+	}
+	if len(repairs) > 1 {
+		return flow.Edge{}, fmt.Errorf("ambiguous repair edges (%d)", len(repairs))
+	}
+	return repairs[0], nil
 }
 
 func (c *Cursor) advanceSilentLocked() (Turn, error) {
@@ -169,6 +283,9 @@ func (c *Cursor) advanceSilentLocked() (Turn, error) {
 			out.Ended = true
 			return out, nil
 		case flow.NodeTool:
+			if c.blockTool {
+				return Turn{}, fmt.Errorf("ListenLanguage cannot reach Tool same turn (EC-23)")
+			}
 			armed, err := c.armToolLocked(n)
 			if err != nil {
 				return Turn{}, err
